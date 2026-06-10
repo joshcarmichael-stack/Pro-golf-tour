@@ -522,6 +522,8 @@ function GolfCareerSim() {
     const [ryder, setRyder] = useState(null);
     const [recTab, setRecTab] = useState("wins");
     const [zOffers, setZOffers] = useState(null);
+    const [rrAttr, setRrAttr] = useState(null);
+    const [rrPair, setRrPair] = useState(null);
     useEffect(() => {
         (async () => {
             try {
@@ -598,7 +600,7 @@ function GolfCareerSim() {
             const st = { pro, season: 1, evIdx: 0,
                 standings: Object.fromEntries([...PLAYERS.map((p) => [p.name, { pts: 0, money: 0 }]), [pro.name, { pts: 0, money: 0 }]]),
                 myStats: freshStats(), history: [], seasonLog: [], tally: {}, ryderHolder: "USA", lastRyder: null,
-                eventHistory: {}, courseXP: {}, caddie: null, caddieOffers: pickCaddieOffers() };
+                eventHistory: {}, courseXP: {}, caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: false };
             setG(st);
             save(st);
             setTimeout(() => setScreen("hub"), 700);
@@ -624,6 +626,29 @@ function GolfCareerSim() {
         const st = { ...g, caddie: c, caddieOffers: null, prevCaddie: null };
         setG(st);
         await save(st);
+    };
+    const spinReroll = (attrKey) => {
+        setRrAttr(attrKey);
+        const i = Math.floor(Math.random() * PLAYERS.length);
+        let j = Math.floor(Math.random() * PLAYERS.length);
+        while (j === i)
+            j = Math.floor(Math.random() * PLAYERS.length);
+        setRrPair([PLAYERS[i], PLAYERS[j]]);
+    };
+    const applyReroll = async (value, from) => {
+        const newAttrs = { ...g.pro.attrs, [rrAttr]: value };
+        const st = { ...g, pro: { ...g.pro, attrs: newAttrs, overall: calcOverall(newAttrs) }, rerollAvailable: false };
+        setG(st);
+        await save(st);
+        setRrAttr(null);
+        setRrPair(null);
+    };
+    const skipReroll = async () => {
+        const st = { ...g, rerollAvailable: false };
+        setG(st);
+        await save(st);
+        setRrAttr(null);
+        setRrPair(null);
     };
     // ---------- field & event setup ----------
     const buildField = (ev, state) => {
@@ -1028,7 +1053,7 @@ function GolfCareerSim() {
         const st = { ...g, season: g.season + 1, evIdx: 0, champion: null,
             standings: Object.fromEntries([...PLAYERS.map((p) => [p.name, { pts: 0, money: 0 }]), [g.pro.name, { pts: 0, money: 0 }]]),
             myStats: { ...g.myStats, events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 0, bestFinish: null, birdies: 0, eagles: 0, albatrosses: 0, aces: 0 },
-            history: [], seasonLog: [], lastRyder: null, prevCaddie: g.caddie, caddie: null, caddieOffers: pickCaddieOffers() };
+            history: [], seasonLog: [], lastRyder: null, prevCaddie: g.caddie, caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: true };
         setG(st);
         await save(st);
         setScreen("hub");
@@ -1177,6 +1202,40 @@ function GolfCareerSim() {
                         PERK_LABEL[k]))),
                     g.prevCaddie.wxPerks && React.createElement("span", { className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: "rgba(127,183,217,0.15)", color: C.blue } }, "WEATHER GUIDANCE")))),
             React.createElement("p", { className: "text-xs text-center", style: { color: C.muted } }, "Weather-guidance caddies improve your hidden weather skills \u2014 you'll feel it, not see it.")));
+    }
+    // ---------- pre-season attribute re-roll ----------
+    if (g && g.caddie && g.rerollAvailable && screen === "hub") {
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "pt-6 text-center" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 4, color: C.gold } },
+                    "SEASON ",
+                    g.season,
+                    " \u00B7 PRE-SEASON"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: C.chalk, lineHeight: 1 } }, "RANGE SESSION"),
+                React.createElement("p", { className: "text-sm mt-2 mb-3", style: { color: C.muted } }, !rrPair ? "You've rebuilt one part of your game this winter. Pick ONE attribute to re-roll — but be warned: once you spin, you MUST take one of the two values dealt. It could come out worse." :
+                    "No backing out now. Two pros dealt — take one of their numbers.")),
+            !rrPair && (React.createElement("div", null,
+                React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3" }, SLOTS.map((s) => (React.createElement("button", { key: s.key, onClick: () => spinReroll(s.key), className: "p-2.5 rounded-lg text-left active:scale-95", style: { background: C.card, border: "1px solid rgba(244,247,242,0.2)" } },
+                    React.createElement("div", { className: "flex justify-between items-baseline" },
+                        React.createElement("span", { className: "text-[10px]", style: { color: C.muted } }, s.label),
+                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: tint(g.pro.attrs[s.key]) } }, g.pro.attrs[s.key])),
+                    React.createElement("div", { className: "text-[9px]", style: { color: C.gold } }, "TAP TO RISK IT \uD83C\uDFB2"))))),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: skipReroll }, "SKIP \u2014 KEEP MY GAME AS IT IS"))),
+            rrPair && (React.createElement("div", null,
+                React.createElement("div", { className: "text-center mb-2" },
+                    React.createElement("span", { className: "text-xs", style: { color: C.muted } },
+                        SLOTS.find((s) => s.key === rrAttr).label,
+                        " \u00B7 currently "),
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 18, color: tint(g.pro.attrs[rrAttr]) } }, g.pro.attrs[rrAttr])),
+                React.createElement("div", { className: "flex gap-2 mb-2" }, rrPair.map((p) => {
+                    const v = p[rrAttr];
+                    const diff = v - g.pro.attrs[rrAttr];
+                    return (React.createElement("button", { key: p.name, onClick: () => applyReroll(v, p.name), className: "flex-1 p-3 rounded-xl text-center active:scale-95", style: { background: C.card, border: `1.5px solid ${diff > 0 ? "rgba(159,217,139,0.6)" : diff < 0 ? "rgba(217,108,79,0.6)" : "rgba(244,247,242,0.3)"}` } },
+                        React.createElement("div", { className: "text-xs mb-1", style: { color: C.chalk } }, p.name),
+                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 40, color: tint(v), lineHeight: 1 } }, v),
+                        React.createElement("div", { className: "text-xs mt-1", style: { color: diff > 0 ? C.green : diff < 0 ? C.red : C.muted } }, diff > 0 ? `+${diff} UPGRADE` : diff < 0 ? `${diff} downgrade` : "no change")));
+                })),
+                React.createElement("p", { className: "text-xs text-center", style: { color: C.muted } }, "You must take one. Choose the lesser evil if it's gone badly.")))));
     }
     if (screen === "hub") {
         const ev = SCHEDULE[g.evIdx];
