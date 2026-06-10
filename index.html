@@ -1292,10 +1292,11 @@ function GolfCareerSim() {
                     myRecord.slice(-4).map((h) => `S${h.s}: ${h.r}`).join(" · "))),
                 React.createElement("div", { className: myRecord.length ? "" : "mt-3" },
                     React.createElement(Btn, { onClick: startEvent }, ev.type === "team" ? "FIND A PARTNER" : "TEE IT UP")))),
-            React.createElement("div", { className: "grid grid-cols-3 gap-2 mb-3" },
+            React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3" },
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setRecTab("wins"); setScreen("records"); } }, "\uD83D\uDCCA RECORDS"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("mystats") }, "\u26F3 NUMBERS"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("ryderHQ") }, "\uD83C\uDFC6 RYDER HQ")),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("ryderHQ") }, "\uD83C\uDF0D RYDER HQ"),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("cabinet") }, "\uD83C\uDFC6 CABINET")),
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" },
                     "SEASON \u00B7 ",
@@ -1384,6 +1385,62 @@ function GolfCareerSim() {
                             p.name),
                         React.createElement("span", null, p.pts)));
                 }))))),
+            React.createElement(Btn, { onClick: () => setScreen("hub"), kind: "panel" }, "BACK")));
+    }
+    // ---------- trophy cabinet ----------
+    if (screen === "cabinet") {
+        const wins = Object.entries(g.eventHistory || {}).map(([evName, list]) => {
+            const seasons = list.filter((x) => x.r === "1st").map((x) => x.s);
+            const sched = SCHEDULE.find((s) => s.e === evName);
+            return { evName, seasons, type: (sched === null || sched === void 0 ? void 0 : sched.type) || "regular" };
+        }).filter((w) => w.seasons.length > 0);
+        const majors = wins.filter((w) => w.type === "major");
+        const big = wins.filter((w) => ["players", "tc", "playoff"].includes(w.type));
+        const rest = wins.filter((w) => !["major", "players", "tc", "playoff"].includes(w.type));
+        const trophyCard = (w, icon, border) => (React.createElement("div", { key: w.evName, className: "p-3 rounded-xl mb-2", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border } },
+            React.createElement("div", { className: "flex justify-between items-baseline" },
+                React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: C.chalk } },
+                    icon,
+                    " ",
+                    w.evName),
+                React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } },
+                    "\u00D7",
+                    w.seasons.length)),
+            React.createElement("div", { className: "text-xs", style: { color: C.muted } },
+                "Won: ",
+                w.seasons.map((s) => `Season ${s}`).join(" · "))));
+        const empty = wins.length === 0 && g.myStats.fedexTitles === 0 && g.myStats.rc.teamWins === 0;
+        return (React.createElement(Shell, null,
+            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk } }, "\uD83C\uDFC6 TROPHY CABINET"),
+            React.createElement("p", { className: "text-xs mb-3", style: { color: C.muted } },
+                g.pro.name,
+                " \u00B7 ",
+                g.myStats.careerWins,
+                " career wins \u00B7 ",
+                g.myStats.careerMajors,
+                " majors"),
+            empty && (React.createElement("div", { className: "p-5 rounded-xl mb-3 text-center", style: { background: C.panel } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.muted } }, "THE SHELVES ARE BARE"),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "Every legend's cabinet started empty. Go win something."))),
+            majors.length > 0 && (React.createElement("div", { className: "mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\u2605 MAJOR CHAMPIONSHIPS"),
+                majors.map((w) => trophyCard(w, "★", `2px solid ${C.gold}`)))),
+            (g.myStats.fedexTitles > 0 || g.myStats.rc.teamWins > 0 || big.length > 0) && (React.createElement("div", { className: "mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "CROWN JEWELS"),
+                g.myStats.fedexTitles > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: "1.5px solid rgba(127,183,217,0.6)" } },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: C.blue } }, "\uD83D\uDC8E FEDEX CUP"),
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold }, className: "float-right" },
+                        "\u00D7",
+                        g.myStats.fedexTitles))),
+                g.myStats.rc.teamWins > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: "1.5px solid rgba(127,183,217,0.6)" } },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: C.blue } }, "\uD83C\uDF0D RYDER CUP (team)"),
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold }, className: "float-right" },
+                        "\u00D7",
+                        g.myStats.rc.teamWins))),
+                big.map((w) => trophyCard(w, "💎", "1.5px solid rgba(127,183,217,0.6)")))),
+            rest.length > 0 && (React.createElement("div", { className: "mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "TOUR TITLES"),
+                rest.map((w) => trophyCard(w, "🏆", "1px solid rgba(244,247,242,0.25)")))),
             React.createElement(Btn, { onClick: () => setScreen("hub"), kind: "panel" }, "BACK")));
     }
     // ---------- records / mystats ----------
@@ -2007,6 +2064,11 @@ function GolfCareerSim() {
                     " \u00B7 ",
                     ryder.homeSide === "USA" ? "🇺🇸" : "🇪🇺",
                     " home crowd advantage"),
+                React.createElement("div", { className: "text-xs", style: { color: C.gold } },
+                    "\uD83C\uDFC6 ",
+                    g.ryderHolder === "USA" ? "USA" : "Europe",
+                    " arrive as holders",
+                    (ryder.usaPts + ryder.eurPts) >= 28 ? "" : " — 14-14 and they keep it"),
                 React.createElement("div", { className: "flex justify-center items-baseline gap-4 mt-1" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 38, color: "#7FB7D9" } },
                         "\uD83C\uDDFA\uD83C\uDDF8 ",
