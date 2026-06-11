@@ -1,2 +1,2 @@
-# Pro-golf-tour
+# Sunday Pins 
 Golf career sim
