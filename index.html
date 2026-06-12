@@ -366,15 +366,36 @@ const aiAgeOf = (name) => { if (AI_AGES[name] != null)
     return AI_AGES[name]; let h = 53; for (let i = 0; i < name.length; i++)
     h = (h * 31 + name.charCodeAt(i)) % 9973; return 24 + (h % 11); };
 const ATTR_HINTS = {
-    drivingAccuracy: "The fairways are corridors — leak it offline and you're pitching out sideways all week.",
-    drivingDistance: "Length is a cheat code here. The bombers turn long holes into flicks.",
-    longApproach: "You'll have a long iron in hand more than almost anywhere on tour.",
-    shortApproach: "It's a wedge week — the scoring clubs will decide who contends.",
-    chipping: "Miss these greens and your touch around the fringes gets a full examination.",
-    putting: "Whatever happens tee to green, this tournament gets decided ON the greens.",
-    recovery: "Trouble lurks on every hole — the escape artists always hang around here.",
-    bunker: "Sand everywhere, and it's penal. The splash shot is not optional this week.",
+    drivingAccuracy: ["The fairways are corridors — leak it offline and you're pitching out sideways all week.", "Position off the tee is everything here. The winner won't be the longest — he'll be the straightest."],
+    drivingDistance: ["Length is a cheat code here. The bombers turn long holes into flicks.", "It's a big ballpark — carry numbers off the tee separate the field before anyone hits an iron."],
+    longApproach: ["You'll have a long iron in hand more than almost anywhere on tour.", "The approach shots come from WAY back here — flush your 4-iron or suffer."],
+    shortApproach: ["It's a wedge week — the scoring clubs will decide who contends.", "Loads of short clubs into these greens. Stuff your wedges and the course opens up."],
+    chipping: ["Miss these greens and your touch around the fringes gets a full examination.", "Greenside touch is the quiet weapon this week — the up-and-down brigade thrives."],
+    putting: ["Whatever happens tee to green, this tournament gets decided ON the greens.", "These surfaces are where the field separates — hole everything inside ten feet or go home."],
+    recovery: ["Trouble lurks on every hole — the escape artists always hang around here.", "You WILL be in trouble at some point. The question is whether you make 5 or 7 from there."],
+    bunker: ["Sand everywhere, and it's penal. The splash shot is not optional this week.", "The bunkering is the course's defence — get comfortable in there before Thursday."],
 };
+const aggVitals = (course) => {
+    const agg = { drivingAccuracy: 0, drivingDistance: 0, longApproach: 0, shortApproach: 0, chipping: 0, putting: 0, recovery: 0, bunker: 0 };
+    course.holes.forEach((h) => {
+        const w = holeWeights(h[0], h[1]);
+        agg.drivingAccuracy += w.acc;
+        agg.drivingDistance += w.dist;
+        agg.longApproach += w.lng;
+        agg.shortApproach += w.sht;
+        agg.chipping += w.chp;
+        agg.putting += w.put;
+        agg.recovery += w.rec + h[2] * 0.05;
+        agg.bunker += w.bnk;
+    });
+    return agg;
+};
+const VITALS_BASELINE = (() => {
+    const t = { drivingAccuracy: 0, drivingDistance: 0, longApproach: 0, shortApproach: 0, chipping: 0, putting: 0, recovery: 0, bunker: 0 };
+    COURSES.forEach((c) => { const a = aggVitals(c); Object.keys(t).forEach((k) => { t[k] += a[k]; }); });
+    Object.keys(t).forEach((k) => { t[k] /= COURSES.length; });
+    return t;
+})();
 const ptsFor = (pos, wp) => { var _a; const f = (_a = [1, .6, .38, .3, .25, .225, .2, .188, .175, .163][pos - 1]) !== null && _a !== void 0 ? _a : Math.max(0.01, .15 - (pos - 10) * 0.004); return Math.round(wp * f); };
 const SHARE = [18, 10.9, 6.9, 4.9, 4.1, 3.6, 3.35, 3.1, 2.9, 2.7];
 const moneyFor = (pos, purseM, madeCut) => {
@@ -946,19 +967,9 @@ function GolfCareerSim() {
         };
     };
     const courseVitals = (course) => {
-        const agg = { drivingAccuracy: 0, drivingDistance: 0, longApproach: 0, shortApproach: 0, chipping: 0, putting: 0, recovery: 0, bunker: 0 };
-        course.holes.forEach((h) => {
-            const w = holeWeights(h[0], h[1]);
-            agg.drivingAccuracy += w.acc;
-            agg.drivingDistance += w.dist;
-            agg.longApproach += w.lng;
-            agg.shortApproach += w.sht;
-            agg.chipping += w.chp;
-            agg.putting += w.put;
-            agg.recovery += w.rec + h[2] * 0.05;
-            agg.bunker += w.bnk;
-        });
-        return Object.entries(agg).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+        const agg = aggVitals(course);
+        // rank by how much MORE this course demands an attribute vs the average tour stop
+        return Object.entries(agg).sort((a, b) => (b[1] / VITALS_BASELINE[b[0]]) - (a[1] / VITALS_BASELINE[a[0]])).map(([k]) => k);
     };
     const startEvent = () => {
         const ev = SCHEDULE[g.evIdx];
@@ -2149,9 +2160,9 @@ function GolfCareerSim() {
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.card, border: "1px solid rgba(244,247,242,0.2)" } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\uD83C\uDF92 CADDIE'S COURSE NOTES"),
                 React.createElement("p", { className: "text-xs italic mb-1.5", style: { color: C.chalk, opacity: .85 } }, prep.course.style),
-                prep.vitals.slice(0, 3).map((k) => (React.createElement("p", { key: k, className: "text-xs mb-1", style: { color: C.chalk } },
+                prep.vitals.slice(0, 3).map((k, idx) => (React.createElement("p", { key: k, className: "text-xs mb-1", style: { color: C.chalk } },
                     "\u2022 ",
-                    ATTR_HINTS[k]))),
+                    ATTR_HINTS[k][(prep.course.name.length + k.length + idx) % 2]))),
                 React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "Read between the lines \u2014 train what the course will ask for and the work pays off double.")),
             React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "PICK ONE TRAINING FOCUS"),
             React.createElement("div", { className: "grid grid-cols-2 gap-1.5 mb-2" }, SLOTS.map((s) => (React.createElement("button", { key: s.key, onClick: () => launchTour(prep, s.key), className: "p-2 rounded-lg text-left active:scale-95", style: { background: C.panel, border: "1px solid rgba(244,247,242,0.2)" } },
