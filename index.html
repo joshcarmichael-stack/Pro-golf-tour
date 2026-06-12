@@ -858,14 +858,14 @@ function GolfCareerSim() {
         setLastTake(null);
         let t = 0;
         spinIv.current = setInterval(() => {
-            setFlashName(ELITE[Math.floor(Math.random() * ELITE.length)].name);
+            setFlashName(PLAYERS[Math.floor(Math.random() * PLAYERS.length)].name);
             if (++t > 14) {
                 clearInterval(spinIv.current);
-                const i = Math.floor(Math.random() * ELITE.length);
-                let j = Math.floor(Math.random() * ELITE.length);
-                while (j === i)
-                    j = Math.floor(Math.random() * ELITE.length);
-                setPair([ELITE[i], ELITE[j]]);
+                const a = ELITE[Math.floor(Math.random() * ELITE.length)];
+                let b = PLAYERS[Math.floor(Math.random() * PLAYERS.length)];
+                while (b.name === a.name)
+                    b = PLAYERS[Math.floor(Math.random() * PLAYERS.length)];
+                setPair(Math.random() < .5 ? [a, b] : [b, a]);
                 setSpinning(false);
             }
         }, 85);
@@ -910,11 +910,11 @@ function GolfCareerSim() {
     };
     const spinReroll = (attrKey) => {
         setRrAttr(attrKey);
-        const i = Math.floor(Math.random() * ELITE.length);
-        let j = Math.floor(Math.random() * ELITE.length);
+        const i = Math.floor(Math.random() * PLAYERS.length);
+        let j = Math.floor(Math.random() * PLAYERS.length);
         while (j === i)
-            j = Math.floor(Math.random() * ELITE.length);
-        setRrPair([ELITE[i], ELITE[j]]);
+            j = Math.floor(Math.random() * PLAYERS.length);
+        setRrPair([PLAYERS[i], PLAYERS[j]]);
     };
     const applyReroll = async (value, from) => {
         const newAttrs = { ...g.pro.attrs, [rrAttr]: value };
@@ -1559,7 +1559,7 @@ function GolfCareerSim() {
             !pair && !spinning && filled.length < 8 && React.createElement(Btn, { onClick: spin }, "\uD83C\uDFB0 SPIN FOR ATTRIBUTES"),
             spinning && (React.createElement("div", { className: "w-full py-5 rounded-md text-center", style: { background: C.panel, border: `1px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk } }, flashName),
-                React.createElement("div", { className: "text-xs", style: { color: C.muted } }, "scanning the world top 100..."))),
+                React.createElement("div", { className: "text-xs", style: { color: C.muted } }, "scanning the world's top 200..."))),
             pair && (React.createElement("div", null,
                 React.createElement("p", { className: "text-center text-sm mb-2", style: { color: C.chalk } },
                     "Steal ",
@@ -1739,7 +1739,7 @@ function GolfCareerSim() {
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("ryderHQ") }, "\uD83C\uDF0D RYDER HQ"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("cabinet") }, "\uD83C\uDFC6 CABINET"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setSelSched(null); setScreen("schedule"); } }, "\uD83D\uDCC5 SCHEDULE"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("world") }, "\uD83C\uDF10 WORLD TOP 100")),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("world") }, "\uD83C\uDF10 WORLD RANKINGS")),
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" },
                     "SEASON \u00B7 ",
@@ -1836,30 +1836,27 @@ function GolfCareerSim() {
         const list = owgrList();
         const myIdx = list.findIndex((x) => x.name === g.pro.name);
         return (React.createElement(Shell, null,
-            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83C\uDF10 WORLD RANKING"),
-            React.createElement("p", { className: "text-xs mb-1", style: { color: C.muted } }, "Rolling points: results carry over between seasons (decaying), so the ranking rewards sustained form. The stars start seeded by their real-world ranking \u2014 knock them off."),
+            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83C\uDF10 WORLD RANKINGS"),
+            React.createElement("p", { className: "text-xs mb-1", style: { color: C.muted } },
+                "All ",
+                Object.keys(g.standings).length,
+                " ranked players. Rolling points: results carry over between seasons (decaying), so the ranking rewards sustained form. The stars start seeded by their real-world ranking \u2014 knock them off."),
             React.createElement("p", { className: "text-sm mb-3", style: { color: myIdx < 10 ? C.gold : myIdx < 50 ? C.green : C.chalk } },
                 "You are World #",
                 myIdx + 1,
                 myIdx === 0 ? " — WORLD NUMBER ONE 👑" : myIdx < 10 ? " — elite company" : myIdx < 50 ? " — established" : myIdx < 100 ? " — inside the top 100" : " — outside the top 100. Climb."),
-            React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
-                list.slice(0, 100).map((p, i) => {
-                    const you = p.name === g.pro.name;
-                    return (React.createElement("div", { key: p.name, className: "flex justify-between text-xs mb-0.5", style: { color: you ? C.gold : i < 10 ? C.chalk : C.muted, fontWeight: you ? 700 : 400 } },
+            React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } }, list.map((p, i) => {
+                const you = p.name === g.pro.name;
+                return (React.createElement(React.Fragment, { key: p.name },
+                    i === 100 && (React.createElement("div", { className: "text-center text-[10px] my-1 py-0.5", style: { color: C.red, borderTop: "1px dashed rgba(217,108,79,0.5)", borderBottom: "1px dashed rgba(217,108,79,0.5)" } }, "\u2014 OUTSIDE THE TOP 100 \u2014")),
+                    React.createElement("div", { className: "flex justify-between text-xs mb-0.5", style: { color: you ? C.gold : i < 10 ? C.chalk : C.muted, fontWeight: you ? 700 : 400 } },
                         React.createElement("span", { className: "truncate pr-2" },
                             i + 1,
                             ". ",
                             p.name,
                             you ? " (YOU)" : ""),
-                        React.createElement("span", null, p.pts)));
-                }),
-                myIdx >= 100 && (React.createElement("div", { className: "flex justify-between text-xs mt-1 pt-1", style: { color: C.gold, borderTop: "1px solid rgba(244,247,242,0.15)" } },
-                    React.createElement("span", null,
-                        myIdx + 1,
-                        ". ",
-                        g.pro.name,
-                        " (YOU)"),
-                    React.createElement("span", null, list[myIdx].pts)))),
+                        React.createElement("span", null, p.pts))));
+            })),
             React.createElement(Btn, { onClick: () => setScreen("hub"), kind: "panel" }, "BACK")));
     }
     // ---------- schedule & past winners ----------
