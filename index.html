@@ -738,7 +738,7 @@ const freshStats = () => ({ events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 
     careerMoney: 0, careerWins: 0, careerMajors: 0, careerBirdies: 0, careerEagles: 0, careerAlbatrosses: 0, careerAces: 0,
     fedexTitles: 0, rc: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, pc: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] } });
 function GolfCareerSim() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
     const [g, setG] = useState(null);
     const [screen, setScreen] = useState("loading");
     const [name, setName] = useState("");
@@ -759,6 +759,7 @@ function GolfCareerSim() {
     const [rrAttr, setRrAttr] = useState(null);
     const [selSched, setSelSched] = useState(null);
     const [prep, setPrep] = useState(null);
+    const [worldTab, setWorldTab] = useState("pts");
     const [rrPair, setRrPair] = useState(null);
     useEffect(() => {
         (async () => {
@@ -1018,7 +1019,7 @@ function GolfCareerSim() {
         const champ = pw.length ? pw[pw.length - 1].w : null;
         return (name) => {
             if (ev.type === "major")
-                return rank[name] <= 60 || name === champ || (name === g.pro.name && g.myStats.wins > 0);
+                return rank[name] <= 100 || name === champ || (name === g.pro.name && g.myStats.wins > 0);
             if (ev.type === "signature")
                 return rank[name] <= 50 || fedexRank[name] <= 30;
             return true;
@@ -1812,11 +1813,11 @@ function GolfCareerSim() {
                     const youOk = qualifiedCheck(ev)(g.pro.name);
                     return youOk ? (React.createElement("p", { className: "text-xs mt-1", style: { color: C.green } },
                         "\u2713 QUALIFIED",
-                        ev.type === "major" ? " (world top 60, reigning champ, or a win this season)" : " (world top 50 or FedEx top 30)")) : (React.createElement("p", { className: "text-xs mt-1", style: { color: C.red } },
+                        ev.type === "major" ? " (world top 100, reigning champ, or a win this season)" : " (world top 50 or FedEx top 30)")) : (React.createElement("p", { className: "text-xs mt-1", style: { color: C.red } },
                         "\u2717 NOT QUALIFIED \u2014 you'll play the ",
                         ALT_EVENTS[g.evIdx % ALT_EVENTS.length].e,
                         " instead. ",
-                        ev.type === "major" ? "Get inside the world top 60 (or win) to make these fields." : "World top 50 or FedEx top 30 gets you in."));
+                        ev.type === "major" ? "Get inside the world top 100 (or win) to make these fields." : "World top 50 or FedEx top 30 gets you in."));
                 })(),
                 React.createElement("div", { className: "mt-2" },
                     React.createElement(Btn, { onClick: startEvent }, ev.type === "team" ? "FIND A PARTNER" : (ev.type === "major" || ev.type === "signature") && !qualifiedCheck(ev)(g.pro.name) ? "PLAY THE OPPOSITE EVENT" : "HIT THE RANGE")))),
@@ -1928,30 +1929,53 @@ function GolfCareerSim() {
     if (screen === "world") {
         const list = owgrList();
         const myIdx = list.findIndex((x) => x.name === g.pro.name);
+        const ovrList = [...ROSTER().map((p) => { var _a; return ({ name: p.name, ovr: p.overall, age: (_a = p.age) !== null && _a !== void 0 ? _a : aiAgeOf(p.name), country: p.country, rookie: p.rookie }); }),
+            { name: g.pro.name, ovr: calcOverall(effAttrs(g)), age: (_d = g.pro.age) !== null && _d !== void 0 ? _d : 22, country: NATION_CODE[g.pro.nation] || "INT", isYou: true }]
+            .sort((a, b) => b.ovr - a.ovr);
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83C\uDF10 WORLD RANKINGS"),
-            React.createElement("p", { className: "text-xs mb-1", style: { color: C.muted } },
-                "All ",
-                Object.keys(g.standings).length,
-                " ranked players. Rolling points: results carry over between seasons (decaying), so the ranking rewards sustained form. The stars start seeded by their real-world ranking \u2014 knock them off."),
-            React.createElement("p", { className: "text-sm mb-3", style: { color: myIdx < 10 ? C.gold : myIdx < 50 ? C.green : C.chalk } },
-                "You are World #",
-                myIdx + 1,
-                myIdx === 0 ? " — WORLD NUMBER ONE 👑" : myIdx < 10 ? " — elite company" : myIdx < 50 ? " — established" : myIdx < 100 ? " — inside the top 100" : " — outside the top 100. Climb."),
-            React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } }, list.map((p, i) => {
-                const you = p.name === g.pro.name;
-                return (React.createElement(React.Fragment, { key: p.name },
-                    i === 100 && (React.createElement("div", { className: "text-center text-[10px] my-1 py-0.5", style: { color: C.red, borderTop: "1px dashed rgba(217,108,79,0.5)", borderBottom: "1px dashed rgba(217,108,79,0.5)" } }, "\u2014 OUTSIDE THE TOP 100 \u2014")),
-                    React.createElement("div", { className: "flex justify-between text-xs mb-0.5", style: { color: you ? C.gold : i < 10 ? C.chalk : C.muted, fontWeight: you ? 700 : 400 } },
-                        React.createElement("span", { className: "truncate pr-2" },
-                            i + 1,
-                            ". ",
-                            p.name,
-                            you ? " (YOU)" : ""),
-                        React.createElement("span", null, p.pts))));
-            })),
-            React.createElement(Btn, { onClick: () => setScreen("hub"), kind: "panel" }, "BACK")));
+            React.createElement("div", { className: "flex gap-1 mb-2" }, [["pts", "RANKING POINTS"], ["ovr", "OVERALL RATINGS"]].map(([k, l]) => (React.createElement("button", { key: k, onClick: () => setWorldTab(k), className: "px-3 py-1.5 rounded-md", style: { background: worldTab === k ? C.gold : C.panel, color: worldTab === k ? C.bg : C.muted, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, l)))),
+            worldTab === "ovr" && (React.createElement(React.Fragment, null,
+                React.createElement("p", { className: "text-xs mb-2", style: { color: C.muted } }, "Live ability ratings \u2014 these evolve every season as young players rise and veterans fade. \uD83C\uDF31 = regen rookie."),
+                React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } }, ovrList.map((p, i) => (React.createElement("div", { key: p.name, className: "flex justify-between items-baseline text-xs mb-0.5", style: { color: p.isYou ? C.gold : i < 10 ? C.chalk : C.muted, fontWeight: p.isYou ? 700 : 400 } },
+                    React.createElement("span", { className: "truncate pr-2" },
+                        i + 1,
+                        ". ",
+                        p.name,
+                        p.isYou ? " (YOU)" : "",
+                        p.rookie ? " 🌱" : "",
+                        " ",
+                        React.createElement("span", { style: { color: C.muted, fontSize: 10 } },
+                            "(",
+                            p.country,
+                            " \u00B7 ",
+                            p.age,
+                            ")")),
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 15, color: tint(p.ovr) } }, p.ovr))))),
+                React.createElement(Btn, { onClick: () => setScreen("hub"), kind: "panel" }, "BACK"))),
+            worldTab === "ovr" ? null : React.createElement(React.Fragment, null,
+                React.createElement("p", { className: "text-xs mb-1", style: { color: C.muted } },
+                    "All ",
+                    Object.keys(g.standings).length,
+                    " ranked players. Rolling points: results carry over between seasons (decaying), so the ranking rewards sustained form. The stars start seeded by their real-world ranking \u2014 knock them off."),
+                React.createElement("p", { className: "text-sm mb-3", style: { color: myIdx < 10 ? C.gold : myIdx < 50 ? C.green : C.chalk } },
+                    "You are World #",
+                    myIdx + 1,
+                    myIdx === 0 ? " — WORLD NUMBER ONE 👑" : myIdx < 10 ? " — elite company" : myIdx < 50 ? " — established" : myIdx < 100 ? " — inside the top 100" : " — outside the top 100. Climb."),
+                React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } }, list.map((p, i) => {
+                    const you = p.name === g.pro.name;
+                    return (React.createElement(React.Fragment, { key: p.name },
+                        i === 100 && (React.createElement("div", { className: "text-center text-[10px] my-1 py-0.5", style: { color: C.red, borderTop: "1px dashed rgba(217,108,79,0.5)", borderBottom: "1px dashed rgba(217,108,79,0.5)" } }, "\u2014 OUTSIDE THE TOP 100 \u2014")),
+                        React.createElement("div", { className: "flex justify-between text-xs mb-0.5", style: { color: you ? C.gold : i < 10 ? C.chalk : C.muted, fontWeight: you ? 700 : 400 } },
+                            React.createElement("span", { className: "truncate pr-2" },
+                                i + 1,
+                                ". ",
+                                p.name,
+                                you ? " (YOU)" : ""),
+                            React.createElement("span", null, p.pts))));
+                })),
+                React.createElement(Btn, { onClick: () => setScreen("hub"), kind: "panel" }, "BACK"))));
     }
     // ---------- schedule & past winners ----------
     if (screen === "schedule") {
@@ -2025,7 +2049,7 @@ function GolfCareerSim() {
     }
     // ---------- coaching staff ----------
     if (screen === "coaches") {
-        const bank = (_d = g.bank) !== null && _d !== void 0 ? _d : g.myStats.careerMoney;
+        const bank = (_e = g.bank) !== null && _e !== void 0 ? _e : g.myStats.careerMoney;
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHING STAFF"),
@@ -2077,7 +2101,7 @@ function GolfCareerSim() {
             React.createElement("div", { className: "text-xs", style: { color: C.muted } },
                 "Won: ",
                 w.seasons.map((s) => `Season ${s}`).join(" · "))));
-        const empty = wins.length === 0 && g.myStats.fedexTitles === 0 && g.myStats.rc.teamWins === 0 && (((_e = g.myStats.pc) === null || _e === void 0 ? void 0 : _e.teamWins) || 0) === 0;
+        const empty = wins.length === 0 && g.myStats.fedexTitles === 0 && g.myStats.rc.teamWins === 0 && (((_f = g.myStats.pc) === null || _f === void 0 ? void 0 : _f.teamWins) || 0) === 0;
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk } }, "\uD83C\uDFC6 TROPHY CABINET"),
@@ -2101,7 +2125,7 @@ function GolfCareerSim() {
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold }, className: "float-right" },
                         "\u00D7",
                         g.myStats.fedexTitles))),
-                (((_f = g.myStats.pc) === null || _f === void 0 ? void 0 : _f.teamWins) || 0) > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: "1.5px solid rgba(159,217,139,0.6)" } },
+                (((_g = g.myStats.pc) === null || _g === void 0 ? void 0 : _g.teamWins) || 0) > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: "1.5px solid rgba(159,217,139,0.6)" } },
                     React.createElement("div", { className: "flex justify-between items-baseline" },
                         React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: C.green } }, "\uD83C\uDF0F PRESIDENTS CUP (team)"),
                         React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } },
@@ -2223,8 +2247,8 @@ function GolfCareerSim() {
             ["Career earnings", fmtMoney(m.careerMoney)], ["Career birdies", m.careerBirdies], ["Career eagles", m.careerEagles],
             ["Albatrosses", m.careerAlbatrosses], ["Holes-in-one", m.careerAces],
             ["Ryder Cups played", m.rc.apps], ["Ryder Cup record", `${m.rc.w}-${m.rc.l}-${m.rc.h}`], ["Ryder Cup team wins", m.rc.teamWins],
-            ["Presidents Cups played", ((_g = m.pc) === null || _g === void 0 ? void 0 : _g.apps) || 0], ["Presidents Cup record", `${((_h = m.pc) === null || _h === void 0 ? void 0 : _h.w) || 0}-${((_j = m.pc) === null || _j === void 0 ? void 0 : _j.l) || 0}-${((_k = m.pc) === null || _k === void 0 ? void 0 : _k.h) || 0}`], ["Presidents Cup team wins", ((_l = m.pc) === null || _l === void 0 ? void 0 : _l.teamWins) || 0],
-            ["Bank (spendable)", fmtMoney((_m = g.bank) !== null && _m !== void 0 ? _m : m.careerMoney)], ["Tour XP banked", g.xp || 0],
+            ["Presidents Cups played", ((_h = m.pc) === null || _h === void 0 ? void 0 : _h.apps) || 0], ["Presidents Cup record", `${((_j = m.pc) === null || _j === void 0 ? void 0 : _j.w) || 0}-${((_k = m.pc) === null || _k === void 0 ? void 0 : _k.l) || 0}-${((_l = m.pc) === null || _l === void 0 ? void 0 : _l.h) || 0}`], ["Presidents Cup team wins", ((_m = m.pc) === null || _m === void 0 ? void 0 : _m.teamWins) || 0],
+            ["Bank (spendable)", fmtMoney((_o = g.bank) !== null && _o !== void 0 ? _o : m.careerMoney)], ["Tour XP banked", g.xp || 0],
         ];
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
@@ -2242,7 +2266,7 @@ function GolfCareerSim() {
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: tint(calcOverall(effAttrs(g))) } },
                         calcOverall(effAttrs(g)),
                         " OVR",
-                        ((_o = g.caddie) === null || _o === void 0 ? void 0 : _o.perks) ? " (w/ caddie)" : "")),
+                        ((_p = g.caddie) === null || _p === void 0 ? void 0 : _p.perks) ? " (w/ caddie)" : "")),
                 SLOTS.map((s) => {
                     var _a, _b;
                     const base = g.pro.attrs[s.key];
@@ -2359,7 +2383,7 @@ function GolfCareerSim() {
                             React.createElement(Btn, { onClick: closeEvent }, "CONTINUE")))));
         }
         if (round === 0 && !live) {
-            const myRecord = ((_p = g.eventHistory) === null || _p === void 0 ? void 0 : _p[ev.e]) || [];
+            const myRecord = ((_q = g.eventHistory) === null || _q === void 0 ? void 0 : _q[ev.e]) || [];
             return (React.createElement(Shell, null,
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, ev.type === "major" ? "★ MAJOR CHAMPIONSHIP ★" : ev.e.toUpperCase()),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1 } }, course.name),
@@ -2593,8 +2617,8 @@ function GolfCareerSim() {
                             React.createElement("div", { className: "text-[9px]", style: { color: C.muted } },
                                 "PROJ. CUT \u00B7 ",
                                 myDeltaNow <= projCut ? "INSIDE" : "OUTSIDE"))) : (React.createElement(React.Fragment, null,
-                            React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: C.chalk } }, hasCut && round >= 2 ? "WEEKEND" : "NO CUT"),
-                            React.createElement("div", { className: "text-[9px]", style: { color: C.muted } }, hasCut && round >= 2 ? "CUT MADE" : "ALL 4 ROUNDS")))),
+                            React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: C.chalk } }, hasCut ? (round >= 2 ? "WEEKEND" : `CUT: TOP ${cutIdxOf(tour) + 1}`) : "NO CUT"),
+                            React.createElement("div", { className: "text-[9px]", style: { color: C.muted } }, hasCut ? (round >= 2 ? "CUT MADE" : "AND TIES") : "ALL 4 ROUNDS")))),
                         React.createElement("div", null,
                             React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: C.chalk } }, fmtMoney(projMoney)),
                             React.createElement("div", { className: "text-[9px]", style: { color: C.muted } },
@@ -2902,7 +2926,7 @@ function GolfCareerSim() {
                         " \u2014 ",
                         m.out === "H" ? "HALVED" : `${m.out === "A" ? "USA" : "EUR"} win ${m.margin}`),
                     m.youIn && React.createElement("span", { style: { color: C.gold } }, " \u2605")))))),
-            !finalDone ? (React.createElement(Btn, { onClick: () => setRyder({ ...ryder, revealed: rev + 1 }) }, rev === 0 ? "START THE MATCHES" : `NEXT: ${((_q = ryder.sessions[rev]) === null || _q === void 0 ? void 0 : _q.label) || ""}`)) : (React.createElement("div", { className: "text-center" },
+            !finalDone ? (React.createElement(Btn, { onClick: () => setRyder({ ...ryder, revealed: rev + 1 }) }, rev === 0 ? "START THE MATCHES" : `NEXT: ${((_r = ryder.sessions[rev]) === null || _r === void 0 ? void 0 : _r.label) || ""}`)) : (React.createElement("div", { className: "text-center" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 30, color: C.gold, lineHeight: 1.1 }, className: "mb-2" }, ryder.kind === "pres"
                     ? (ryder.usaPts > ryder.eurPts ? "🇺🇸 USA WIN THE PRESIDENTS CUP" : ryder.eurPts > ryder.usaPts ? "🌏 THE INTERNATIONALS WIN THE PRESIDENTS CUP" : `15-15 TIE — ${g.presHolder || "USA"} RETAIN`)
                     : (ryder.usaPts > ryder.eurPts ? "🇺🇸 USA WIN THE RYDER CUP" : ryder.eurPts > ryder.usaPts ? "🇪🇺 EUROPE WIN THE RYDER CUP" : `14-14 TIE — ${g.ryderHolder} RETAIN`)),
@@ -2992,16 +3016,16 @@ function GolfCareerSim() {
                 React.createElement(Btn, { onClick: newSeason },
                     "START SEASON ",
                     g.season + 1,
-                    ((_r = g.pro.age) !== null && _r !== void 0 ? _r : 22) + 1 >= 32 ? ` · AGE ${((_s = g.pro.age) !== null && _s !== void 0 ? _s : 22) + 1}` : ""),
-                ((_t = g.pro.age) !== null && _t !== void 0 ? _t : 22) + 1 >= 32 && React.createElement("p", { className: "text-xs mt-1", style: { color: C.bogey } }, "\u23F3 The body slows past 31 \u2014 distance and recovery fade a touch each year. Skill holds."),
-                ((_u = g.pro.age) !== null && _u !== void 0 ? _u : 22) >= 38 && React.createElement("div", { className: "mt-2" },
+                    ((_s = g.pro.age) !== null && _s !== void 0 ? _s : 22) + 1 >= 32 ? ` · AGE ${((_t = g.pro.age) !== null && _t !== void 0 ? _t : 22) + 1}` : ""),
+                ((_u = g.pro.age) !== null && _u !== void 0 ? _u : 22) + 1 >= 32 && React.createElement("p", { className: "text-xs mt-1", style: { color: C.bogey } }, "\u23F3 The body slows past 31 \u2014 distance and recovery fade a touch each year. Skill holds."),
+                ((_v = g.pro.age) !== null && _v !== void 0 ? _v : 22) >= 38 && React.createElement("div", { className: "mt-2" },
                     React.createElement(Btn, { small: true, kind: "red", onClick: () => setScreen("retired") }, "\uD83C\uDFC1 RETIRE \u2014 END YOUR CAREER")),
                 React.createElement("button", { onClick: resetAll, className: "w-full text-xs mt-3", style: { color: C.muted } }, "Delete career & start over"))));
     }
     // ---------- retirement & hall of fame ----------
     if (screen === "retired") {
         const m = g.myStats;
-        const hofScore = m.careerWins * 2 + m.careerMajors * 8 + m.fedexTitles * 6 + (m.rc.teamWins + (((_v = m.pc) === null || _v === void 0 ? void 0 : _v.teamWins) || 0)) * 2 + Math.floor(m.careerMoney / 2e7);
+        const hofScore = m.careerWins * 2 + m.careerMajors * 8 + m.fedexTitles * 6 + (m.rc.teamWins + (((_w = m.pc) === null || _w === void 0 ? void 0 : _w.teamWins) || 0)) * 2 + Math.floor(m.careerMoney / 2e7);
         const hof = hofScore >= 30;
         return (React.createElement(Shell, null,
             React.createElement("div", { className: "pt-8 text-center" },
@@ -3010,7 +3034,7 @@ function GolfCareerSim() {
                     g.pro.name.toUpperCase(),
                     " RETIRES"),
                 React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } },
-                    "Age ", (_w = g.pro.age) !== null && _w !== void 0 ? _w : 22,
+                    "Age ", (_x = g.pro.age) !== null && _x !== void 0 ? _x : 22,
                     " \u00B7 ",
                     g.season,
                     " seasons on tour"),
@@ -3040,7 +3064,7 @@ function GolfCareerSim() {
                             m.rc.teamWins),
                         React.createElement("span", null,
                             "Presidents Cup wins: ",
-                            ((_x = m.pc) === null || _x === void 0 ? void 0 : _x.teamWins) || 0)),
+                            ((_y = m.pc) === null || _y === void 0 ? void 0 : _y.teamWins) || 0)),
                     React.createElement("p", { className: "text-xs mt-2", style: { color: C.muted } }, hof ? "Your locker goes to St Augustine. They'll talk about your era for decades." :
                         m.careerMajors > 0 ? "A major champion's career — the Hall wanted more, but the trophy doesn't care." :
                             m.careerWins > 0 ? "A winner on the biggest tour in the world. Most never manage one." :
