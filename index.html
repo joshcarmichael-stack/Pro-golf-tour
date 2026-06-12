@@ -117,7 +117,7 @@ const CADDIES = [
     { name: "★ THE LEGEND", desc: "Five majors on his own card. Rarely takes a bag.", special: true, perks: { putting: 2, longApproach: 2 }, wxPerks: [5, 3, 3] },
     { name: "★ Aoife Brennan", desc: "Links savant from Lahinch. Wind is her first language.", special: true, wxPerks: [9, 6, 5], perks: { bunker: 1 } },
 ];
-const PERK_LABEL = { drivingAccuracy: "DRV ACC", drivingDistance: "DRV DIST", longApproach: "LONG APP", shortApproach: "SHORT APP", chipping: "CHIPPING", putting: "PUTTING", recovery: "RECOVERY", bunker: "BUNKER" };
+const PERK_LABEL = { ALL: "EVERY ATTRIBUTE", drivingAccuracy: "DRV ACC", drivingDistance: "DRV DIST", longApproach: "LONG APP", shortApproach: "SHORT APP", chipping: "CHIPPING", putting: "PUTTING", recovery: "RECOVERY", bunker: "BUNKER" };
 const pickCaddieOffers = () => {
     const specials = CADDIES.filter((c) => c.special);
     const normals = CADDIES.filter((c) => !c.special);
@@ -371,6 +371,12 @@ const BADGES = [
     { id: "fedex", name: "Marathon Man", desc: "FedEx Cup champion", attr: "chipping", test: (m) => m.fedexTitles >= 1 },
     { id: "teamcup", name: "Team Colours", desc: "Win a team cup", attr: "drivingAccuracy", test: (m) => { var _a; return (m.rc.teamWins + (((_a = m.pc) === null || _a === void 0 ? void 0 : _a.teamWins) || 0)) >= 1; } },
     { id: "money50", name: "Bankable", desc: "$50M career earnings", attr: "bunker", test: (m) => m.careerMoney >= 5e7 },
+    { id: "ace", name: "Flaghunter", desc: "Make a hole-in-one", attr: "longApproach", test: (m) => m.careerAces >= 1 },
+    { id: "eagles100", name: "Eagle Hunter", desc: "100 career eagles", attr: "drivingDistance", test: (m) => m.careerEagles >= 100 },
+    { id: "birdies500", name: "Birdie Machine", desc: "500 career birdies", attr: "putting", test: (m) => m.careerBirdies >= 500 },
+    { id: "birdies1000", name: "Mr. Consistent", desc: "1,000 career birdies", attr: "shortApproach", test: (m) => m.careerBirdies >= 1000 },
+    { id: "slam", name: "★ CAREER GRAND SLAM ★", desc: "Win all four majors", attr: "ALL",
+        test: (m, st) => ["The Masters", "PGA Championship", "U.S. Open", "The Open Championship"].every((e) => (((st === null || st === void 0 ? void 0 : st.pastWinners) || {})[e] || []).some((x) => { var _a; return x.w === ((_a = st === null || st === void 0 ? void 0 : st.pro) === null || _a === void 0 ? void 0 : _a.name); })) },
 ];
 const COACHES = [
     { name: "Dave Stockwell", title: "Putting guru", attr: "putting", price: 2.5e6 },
@@ -902,7 +908,7 @@ function GolfCareerSim() {
             const st = { pro, season: 1, evIdx: 0,
                 standings: Object.fromEntries([...PLAYERS.map((p) => [p.name, { pts: 0, money: 0 }]), [pro.name, { pts: 0, money: 0 }]]),
                 myStats: freshStats(), history: [], seasonLog: [], tally: {}, ryderHolder: "USA", lastRyder: null,
-                eventHistory: {}, courseXP: {}, rcRace: {}, pastWinners: {}, owgrBase: { ...OWGR_SEED }, xp: 0, bank: 0, wxXP: [0, 0, 0], coach: null, badges: [], badgeNews: [], caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: false };
+                eventHistory: {}, courseXP: {}, rcRace: {}, pastWinners: {}, owgrBase: { ...OWGR_SEED }, xp: 0, bank: 0, wxXP: [0, 0, 0], earned: {}, coach: null, badges: [], badgeNews: [], caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: false };
             setG(st);
             save(st);
             setTimeout(() => setScreen("hub"), 700);
@@ -931,14 +937,19 @@ function GolfCareerSim() {
     };
     const spinReroll = (attrKey) => {
         setRrAttr(attrKey);
-        const i = Math.floor(Math.random() * PLAYERS.length);
-        let j = Math.floor(Math.random() * PLAYERS.length);
-        while (j === i)
-            j = Math.floor(Math.random() * PLAYERS.length);
-        setRrPair([PLAYERS[i], PLAYERS[j]]);
+        const v = g.pro.attrs[attrKey];
+        const count = v < 80 ? 4 : v < 90 ? 3 : 2;
+        const picks = [];
+        while (picks.length < count) {
+            const p = PLAYERS[Math.floor(Math.random() * PLAYERS.length)];
+            if (!picks.some((x) => x.name === p.name))
+                picks.push(p);
+        }
+        setRrPair(picks);
     };
     const applyReroll = async (value, from) => {
-        const newAttrs = { ...g.pro.attrs, [rrAttr]: value };
+        const bonus = (g.earned || {})[rrAttr] || 0;
+        const newAttrs = { ...g.pro.attrs, [rrAttr]: Math.min(99, value + bonus) };
         const st = { ...g, pro: { ...g.pro, attrs: newAttrs, overall: calcOverall(newAttrs) }, rerollAvailable: false };
         setG(st);
         await save(st);
@@ -957,24 +968,31 @@ function GolfCareerSim() {
         let attrs = { ...st.pro.attrs };
         const news = [...(st.badgeNews || [])];
         let changed = false;
+        const earned = { ...(st.earned || {}) };
         BADGES.forEach((b) => {
-            if (!have.includes(b.id) && b.test(st.myStats)) {
+            if (!have.includes(b.id) && b.test(st.myStats, st)) {
                 have.push(b.id);
-                attrs[b.attr] = Math.min(99, attrs[b.attr] + 1);
+                if (b.attr === "ALL") {
+                    Object.keys(attrs).forEach((k) => { attrs[k] = Math.min(99, attrs[k] + 1); earned[k] = (earned[k] || 0) + 1; });
+                }
+                else {
+                    attrs[b.attr] = Math.min(99, attrs[b.attr] + 1);
+                    earned[b.attr] = (earned[b.attr] || 0) + 1;
+                }
                 news.push({ name: b.name, desc: b.desc, attr: b.attr });
                 changed = true;
             }
         });
         if (!changed)
             return st;
-        return { ...st, badges: have, badgeNews: news, pro: { ...st.pro, attrs, overall: calcOverall(attrs) } };
+        return { ...st, badges: have, badgeNews: news, earned, pro: { ...st.pro, attrs, overall: calcOverall(attrs) } };
     };
     const trainAttr = async (key) => {
         const cost = trainCost(g.pro.attrs[key]);
         if ((g.xp || 0) < cost || g.pro.attrs[key] >= 99)
             return;
         const attrs = { ...g.pro.attrs, [key]: g.pro.attrs[key] + 1 };
-        const st = { ...g, xp: (g.xp || 0) - cost, pro: { ...g.pro, attrs, overall: calcOverall(attrs) } };
+        const st = { ...g, xp: (g.xp || 0) - cost, earned: { ...(g.earned || {}), [key]: ((g.earned || {})[key] || 0) + 1 }, pro: { ...g.pro, attrs, overall: calcOverall(attrs) } };
         setG(st);
         await save(st);
     };
@@ -1268,7 +1286,7 @@ function GolfCareerSim() {
             return tally;
         const out = { ...tally };
         t.scores.forEach((s, i) => {
-            if (s.cut || !gen.holes[i])
+            if (s.cut || s.isYou || !gen.holes[i])
                 return;
             let b = 0, e = 0;
             gen.holes[i].forEach((sc, hI) => {
@@ -1338,9 +1356,10 @@ function GolfCareerSim() {
             });
             const w = tour.results.finishers[0];
             if (tour.team) {
-                w.members.forEach((m) => { const tw = st.tally[m.name] || { b: 0, e: 0, w: 0, m: 0 }; st.tally[m.name] = { ...tw, w: tw.w + 1 }; });
+                w.members.forEach((m) => { if (m.name === st.pro.name)
+                    return; const tw = st.tally[m.name] || { b: 0, e: 0, w: 0, m: 0 }; st.tally[m.name] = { ...tw, w: tw.w + 1 }; });
             }
-            else {
+            else if (!w.isYou) {
                 const tw = st.tally[w.name] || { b: 0, e: 0, w: 0, m: 0 };
                 st.tally[w.name] = { ...tw, w: tw.w + 1, m: tw.m + (ev.type === "major" ? 1 : 0) };
             }
@@ -1559,11 +1578,13 @@ function GolfCareerSim() {
             declined = true;
         }
         let coachNote = null;
+        const earnedN = { ...(g.earned || {}) };
         if (g.coach) {
             newAttrs[g.coach.attr] = Math.min(99, newAttrs[g.coach.attr] + 1);
+            earnedN[g.coach.attr] = (earnedN[g.coach.attr] || 0) + 1;
             coachNote = { attr: g.coach.attr, name: g.coach.name };
         }
-        const st = { ...g, season: g.season + 1, evIdx: 0, champion: null, coach: null, coachNote,
+        const st = { ...g, season: g.season + 1, evIdx: 0, champion: null, coach: null, coachNote, earned: earnedN,
             pro: { ...g.pro, age: newAge, attrs: newAttrs, overall: calcOverall(newAttrs) }, agedNote: declined,
             standings: Object.fromEntries([...rosterNames.map((n) => [n, { pts: 0, money: 0 }]), [g.pro.name, { pts: 0, money: 0 }]]),
             retiredNews: evo.news,
@@ -1727,14 +1748,16 @@ function GolfCareerSim() {
                     g.season,
                     " \u00B7 PRE-SEASON"),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: C.chalk, lineHeight: 1 } }, "WINTER REBUILD"),
-                React.createElement("p", { className: "text-sm mt-2 mb-3", style: { color: C.muted } }, !rrPair ? "You've rebuilt one part of your game this winter. Pick ONE attribute to re-roll — but be warned: once you spin, you MUST take one of the two values dealt. It could come out worse." :
-                    "No backing out now. Two pros dealt — take one of their numbers.")),
+                React.createElement("p", { className: "text-sm mt-2 mb-3", style: { color: C.muted } }, !rrPair ? "You've rebuilt one part of your game this winter. Pick ONE attribute to re-roll — once you spin, you MUST take one of the values dealt. Weaker attributes attract more suitors: below 80 deals 4 cards, the 80s deal 3, the 90s just 2. Earned boosts (training, coaches, milestones) always carry over." :
+                    "No backing out now. Take one of these numbers.")),
             !rrPair && (React.createElement("div", null,
                 React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3" }, SLOTS.map((s) => (React.createElement("button", { key: s.key, onClick: () => spinReroll(s.key), className: "p-2.5 rounded-lg text-left active:scale-95", style: { background: C.card, border: "1px solid rgba(244,247,242,0.2)" } },
                     React.createElement("div", { className: "flex justify-between items-baseline" },
                         React.createElement("span", { className: "text-[10px]", style: { color: C.muted } }, s.label),
                         React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: tint(g.pro.attrs[s.key]) } }, g.pro.attrs[s.key])),
-                    React.createElement("div", { className: "text-[9px]", style: { color: C.gold } }, "TAP TO RISK IT \uD83C\uDFB2"))))),
+                    React.createElement("div", { className: "text-[9px]", style: { color: C.gold } },
+                        g.pro.attrs[s.key] < 80 ? "4" : g.pro.attrs[s.key] < 90 ? "3" : "2",
+                        " CARDS DEALT \uD83C\uDFB2"))))),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: skipReroll }, "SKIP \u2014 KEEP MY GAME AS IT IS"))),
             rrPair && (React.createElement("div", null,
                 React.createElement("div", { className: "text-center mb-2" },
@@ -1742,12 +1765,23 @@ function GolfCareerSim() {
                         SLOTS.find((s) => s.key === rrAttr).label,
                         " \u00B7 currently "),
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 18, color: tint(g.pro.attrs[rrAttr]) } }, g.pro.attrs[rrAttr])),
-                React.createElement("div", { className: "flex gap-2 mb-2" }, rrPair.map((p) => {
-                    const v = p[rrAttr];
+                ((g.earned || {})[rrAttr] || 0) > 0 && (React.createElement("p", { className: "text-xs text-center mb-2", style: { color: C.green } },
+                    "\uD83D\uDEE1\uFE0F Your earned work travels with you: +",
+                    (g.earned || {})[rrAttr],
+                    " (training, coaching & milestones) gets added to whichever value you take.")),
+                React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2" }, rrPair.map((p) => {
+                    const bonus = (g.earned || {})[rrAttr] || 0;
+                    const v = Math.min(99, p[rrAttr] + bonus);
                     const diff = v - g.pro.attrs[rrAttr];
-                    return (React.createElement("button", { key: p.name, onClick: () => applyReroll(v, p.name), className: "flex-1 p-3 rounded-xl text-center active:scale-95", style: { background: C.card, border: `1.5px solid ${diff > 0 ? "rgba(159,217,139,0.6)" : diff < 0 ? "rgba(217,108,79,0.6)" : "rgba(244,247,242,0.3)"}` } },
+                    return (React.createElement("button", { key: p.name, onClick: () => applyReroll(p[rrAttr], p.name), className: "p-3 rounded-xl text-center active:scale-95", style: { background: C.card, border: `1.5px solid ${diff > 0 ? "rgba(159,217,139,0.6)" : diff < 0 ? "rgba(217,108,79,0.6)" : "rgba(244,247,242,0.3)"}` } },
                         React.createElement("div", { className: "text-xs mb-1", style: { color: C.chalk } }, p.name),
-                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 40, color: tint(v), lineHeight: 1 } }, v),
+                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 36, color: tint(v), lineHeight: 1 } }, v),
+                        bonus > 0 && React.createElement("div", { className: "text-[10px]", style: { color: C.muted } },
+                            "base ",
+                            p[rrAttr],
+                            " +",
+                            bonus,
+                            " earned"),
                         React.createElement("div", { className: "text-xs mt-1", style: { color: diff > 0 ? C.green : diff < 0 ? C.red : C.muted } }, diff > 0 ? `+${diff} UPGRADE` : diff < 0 ? `${diff} downgrade` : "no change")));
                 })),
                 React.createElement("p", { className: "text-xs text-center", style: { color: C.muted } }, "You must take one. Choose the lesser evil if it's gone badly.")))));
@@ -2220,20 +2254,20 @@ function GolfCareerSim() {
     }
     // ---------- records / mystats ----------
     if (screen === "records") {
-        const eraB = Object.entries(g.tally || {}).map(([n, t]) => [n, t.b]).filter(([, v]) => v > 0);
-        const eraE = Object.entries(g.tally || {}).map(([n, t]) => [n, t.e]).filter(([, v]) => v > 0);
+        const eraB = Object.entries(g.tally || {}).filter(([n]) => n !== g.pro.name).map(([n, t]) => [n, t.b]).filter(([, v]) => v > 0);
+        const eraE = Object.entries(g.tally || {}).filter(([n]) => n !== g.pro.name).map(([n, t]) => [n, t.e]).filter(([, v]) => v > 0);
         if (g.myStats.careerBirdies > 0)
             eraB.push([g.pro.name + " (YOU)", g.myStats.careerBirdies]);
         if (g.myStats.careerEagles > 0)
             eraE.push([g.pro.name + " (YOU)", g.myStats.careerEagles]);
-        const eraW = Object.entries(g.tally || {}).map(([n, t]) => [n, t.w]).filter(([, v]) => v > 0);
+        const eraW = Object.entries(g.tally || {}).filter(([n]) => n !== g.pro.name).map(([n, t]) => [n, t.w]).filter(([, v]) => v > 0);
         if (g.myStats.careerWins > 0)
             eraW.push([g.pro.name + " (YOU)", g.myStats.careerWins]);
         const tabs = [["wins", "ALL-TIME WINS"], ["majors", "ALL-TIME MAJORS"], ["eraW", "ERA WINS"], ["eraB", "ERA BIRDIES"], ["eraE", "ERA EAGLES"]];
         let rows = [];
         const mergeEra = (legend, key) => {
             const map = new Map(legend.map(([n, v]) => [n, v]));
-            Object.entries(g.tally || {}).forEach(([n, t]) => { if (t[key] > 0)
+            Object.entries(g.tally || {}).forEach(([n, t]) => { if (n !== g.pro.name && t[key] > 0)
                 map.set(n, (map.get(n) || 0) + t[key]); });
             return [...map.entries()];
         };
