@@ -780,7 +780,7 @@ const Shell = ({ children }) => (React.createElement("div", { className: "min-h-
     React.createElement("style", null, `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');`),
     React.createElement("div", { className: "max-w-md mx-auto p-4 pb-10" }, children)));
 const ELITE = PLAYERS.filter((p) => p.rank <= 100);
-const OWGR_SEED = Object.fromEntries(PLAYERS.map((p) => [p.name, p.rank <= 100 ? (101 - p.rank) * 20 : Math.max(2, Math.round((201 - p.rank) * 0.2))]));
+const OWGR_SEED = Object.fromEntries(PLAYERS.map((p) => [p.name, p.rank <= 100 ? (101 - p.rank) * 20 : Math.round(12 + (200 - p.rank) * 1.5)]));
 const REGEN_FIRST = {
     NA: ["Tyler", "Brooks", "Hunter", "Cole", "Mason", "Logan", "Carter", "Wyatt", "Austin", "Chase", "Bryce", "Tanner"],
     GBI: ["Ollie", "Harry", "Callum", "Finlay", "Rory", "Conor", "Lewis", "Archie", "Freddie", "Jamie", "Cian", "Theo"],
@@ -2208,7 +2208,7 @@ function GolfCareerSim() {
                 React.createElement("p", { className: "text-xs mb-1", style: { color: C.muted } },
                     "All ",
                     Object.keys(g.standings).length,
-                    " ranked players. Rolling points: results carry over between seasons (decaying), so the ranking rewards sustained form. The stars start seeded by their real-world ranking \u2014 knock them off."),
+                    " ranked players. Rolling points carry over between seasons (decaying), rewarding sustained form. You start outside the top 200 with nothing \u2014 every ranked pro above you has banked points, so cracking the top 100 takes a real run of form, not just showing up."),
                 React.createElement("p", { className: "text-sm mb-3", style: { color: myIdx < 10 ? C.gold : myIdx < 50 ? C.green : C.chalk } },
                     "You are World #",
                     myIdx + 1,
