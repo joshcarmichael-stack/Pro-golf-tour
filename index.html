@@ -631,6 +631,10 @@ const simPresSessions = (usa, intl, strategy, homeSide) => {
     return { sessions, usaPts, eurPts, youTeam, youSinglesMod: singlesMod };
 };
 const matchOutcome = (rA, rB) => {
+    if (rA == null || isNaN(rA))
+        rA = 80;
+    if (rB == null || isNaN(rB))
+        rB = 80;
     const pHalf = 0.14;
     const pA = (1 - pHalf) / (1 + Math.pow(10, -(rA - rB) / 10));
     const r = Math.random();
@@ -951,7 +955,7 @@ function GolfCareerSim() {
             return base;
         return { ...base, ...e.attrs, name: e.displayName || base.name, country: e.country || base.country, overall: e.overall, age: e.age, rookie: e.rookie, tier: e.tier };
     };
-    const ROSTER = (st = g) => PLAYERS.map((p) => aiP(p.name, st));
+    const ROSTER = (st = g) => PLAYERS.map((p) => aiP(p.name, st)).filter(Boolean);
     const evolveAI = () => {
         const cur = g.ai || {};
         const out = {};
@@ -1621,7 +1625,8 @@ function GolfCareerSim() {
         const cupNo = st.presCupNo || 0;
         const homeSide = cupNo % 2 === 0 ? "USA" : "INTL";
         const venue = PC_VENUES[homeSide][Math.floor(cupNo / 2) % PC_VENUES[homeSide].length];
-        const { usa, eur, youIn, youPick } = buildPres(st.standings, st.pro, side, PLAYERS.map((p) => aiP(p.name, st)));
+        const plist = PLAYERS.map((p) => aiP(p.name, st)).filter(Boolean);
+        const { usa, eur, youIn, youPick } = buildPres(st.standings, st.pro, side, plist);
         if (youIn) {
             setRyder({ kind: "pres", usa, eur, youIn, youPick, side, homeSide, venue, pending: true });
             setScreen("ryderCall");
@@ -1642,7 +1647,8 @@ function GolfCareerSim() {
         const cupNo = st.ryderCupNo || 0;
         const homeSide = cupNo % 2 === 0 ? "USA" : "EUR";
         const venue = RC_VENUES[homeSide][Math.floor(cupNo / 2) % RC_VENUES[homeSide].length];
-        const { usa, eur, youIn, youPick } = buildRyder(rcCombined(st), st.pro, side, PLAYERS.map((p) => aiP(p.name, st)));
+        const plist = PLAYERS.map((p) => aiP(p.name, st)).filter(Boolean);
+        const { usa, eur, youIn, youPick } = buildRyder(rcCombined(st), st.pro, side, plist);
         if (youIn) {
             setRyder({ kind: "ryder", usa, eur, youIn, youPick, side, homeSide, venue, pending: true });
             setScreen("ryderCall");
