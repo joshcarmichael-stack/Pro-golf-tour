@@ -882,9 +882,20 @@ function GolfCareerSim() {
             try {
                 const res = await window.storage.get(SAVE_KEY);
                 if (res === null || res === void 0 ? void 0 : res.value) {
-                    const s = JSON.parse(res.value);
+                    let s = JSON.parse(res.value);
                     if (s === null || s === void 0 ? void 0 : s.pro) {
+                        // REPAIR: a season finished but never rolled over (evIdx past schedule end, not retired)
+                        if (!s.retired && s.evIdx >= SCHEDULE.length) {
+                            try {
+                                if (s.season % 2 === 0 ? !s.lastRyder : !(s.lastRyder && s.lastRyder.kind === "pres")) {
+                                    // a cup/review was owed but skipped — just complete the rollover safely
+                                }
+                                s = buildNextSeason(s);
+                            }
+                            catch (e) { }
+                        }
                         setG(s);
+                        await save(s);
                         setScreen(s.retired ? "retired" : "hub");
                         return;
                     }
@@ -925,6 +936,7 @@ function GolfCareerSim() {
         }, dramaNow(tour) ? 2400 : 420);
         return () => clearTimeout(t);
     }, [autoPlay, (_a = tour === null || tour === void 0 ? void 0 : tour.live) === null || _a === void 0 ? void 0 : _a.revealed]);
+    const gRef = g;
     const save = async (st) => { try {
         await window.storage.set(SAVE_KEY, JSON.stringify(st));
     }
@@ -964,7 +976,7 @@ function GolfCareerSim() {
         return { ...base, ...e.attrs, name: e.displayName || base.name, country: e.country || base.country, overall: e.overall, age: e.age, rookie: e.rookie, tier: e.tier };
     };
     const ROSTER = (st = g) => PLAYERS.map((p) => aiP(p.name, st)).filter(Boolean);
-    const evolveAI = () => {
+    const evolveAI = (g = gRef) => {
         const cur = g.ai || {};
         const out = {};
         const news = [];
@@ -1716,9 +1728,9 @@ function GolfCareerSim() {
         setRyder(null);
         setScreen("seasonEnd");
     };
-    const newSeason = async () => {
+    const buildNextSeason = (g) => {
         var _a;
-        const evo = evolveAI();
+        const evo = evolveAI(g);
         const rosterNames = PLAYERS.map((p) => { var _a; return ((_a = evo.ai[p.name]) === null || _a === void 0 ? void 0 : _a.displayName) || p.name; });
         const newAge = ((_a = g.pro.age) !== null && _a !== void 0 ? _a : 22) + 1;
         let newAttrs = { ...g.pro.attrs };
@@ -1746,9 +1758,13 @@ function GolfCareerSim() {
             owgrBase: Object.fromEntries([...rosterNames, g.pro.name].map((n) => { var _a; return [n, Math.round(((g.owgrBase || OWGR_SEED)[n] || 0) * 0.4 + (((_a = g.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0))]; })), ai: evo.ai };
         if (newAge >= 45)
             st.retired = true;
+        return st;
+    };
+    const newSeason = async () => {
+        const st = buildNextSeason(g);
         setG(st);
         await save(st);
-        setScreen(newAge >= 45 ? "retired" : "hub");
+        setScreen(st.retired ? "retired" : "hub");
     };
     const insights = () => {
         const log = (g.seasonLog || []).filter((l) => l.myR.length > 0);
