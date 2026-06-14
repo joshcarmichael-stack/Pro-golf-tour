@@ -3280,6 +3280,30 @@ function GolfCareerSim() {
         const oppNames = m.youSideA ? m.b : m.a;
         const status = am.diff > 0 ? `${am.diff} UP` : am.diff < 0 ? `${-am.diff} DOWN` : "ALL SQUARE";
         const last = am.log[am.log.length - 1];
+        const isSingles = sess.label.includes("SINGLES");
+        const myMatchNo = am.mIdx + 1;
+        const totalMatches = sess.matches.length;
+        const usaId = "USA", oppId2 = ryder.kind === "pres" ? "INTL" : "EUR";
+        // points already decided across the whole cup (other sessions + decided matches this session)
+        let baseU = 0, baseO = 0;
+        ryder.sessions.forEach((s, si) => s.matches.forEach((mm, mi) => {
+            if (si === am.sIdx && mi === am.mIdx)
+                return;
+            if (mm.out === "A")
+                baseU += 1;
+            else if (mm.out === "B")
+                baseO += 1;
+            else if (mm.out === "H") {
+                baseU += .5;
+                baseO += .5;
+            }
+        }));
+        // project your match onto the team total from where it currently stands
+        const myProjSide = am.diff === 0 ? "H" : (am.diff > 0) === m.youSideA ? "A" : "B";
+        const myPts = am.diff === 0 ? [.5, .5] : am.diff > 0 ? (m.youSideA ? [1, 0] : [0, 1]) : (m.youSideA ? [0, 1] : [1, 0]);
+        const liveU = baseU + myPts[0];
+        const liveO = baseO + myPts[1];
+        const target = ryder.kind === "pres" ? 15.5 : 14.5;
         return (React.createElement(Shell, null,
             React.createElement("div", { className: "text-center" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } },
@@ -3289,12 +3313,23 @@ function GolfCareerSim() {
                 React.createElement("div", { className: "text-xs", style: { color: C.muted } },
                     ryder.venue,
                     " \u00B7 ",
-                    mode),
+                    mode,
+                    isSingles ? ` · Match ${myMatchNo} of ${totalMatches} out on course` : ""),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk, lineHeight: 1.1 }, className: "mt-1" },
                     myNames.map((n) => n === g.pro.name ? "YOU" : n.split(" ").slice(-1)[0]).join(" / "),
                     React.createElement("span", { style: { color: C.muted, fontSize: 16 } }, " vs "),
                     oppNames.map((n) => n.split(" ").slice(-1)[0]).join(" / ")),
-                React.createElement("div", { className: "my-1", style: { fontFamily: FONT, fontSize: 36, color: am.diff > 0 ? C.green : am.diff < 0 ? C.red : C.chalk, lineHeight: 1 } }, am.done ? (am.diff === 0 ? "MATCH HALVED" : am.diff > 0 ? `MATCH WON ${am.hole < 18 ? `${am.diff}&${18 - am.hole}` : `${am.diff} UP`}` : `LOST ${am.hole < 18 ? `${-am.diff}&${18 - am.hole}` : `${-am.diff} DOWN`}`) : `${status} · THRU ${am.hole}`)),
+                React.createElement("div", { className: "my-1", style: { fontFamily: FONT, fontSize: 36, color: am.diff > 0 ? C.green : am.diff < 0 ? C.red : C.chalk, lineHeight: 1 } }, am.done ? (am.diff === 0 ? "MATCH HALVED" : am.diff > 0 ? `MATCH WON ${am.hole < 18 ? `${am.diff}&${18 - am.hole}` : `${am.diff} UP`}` : `LOST ${am.hole < 18 ? `${-am.diff}&${18 - am.hole}` : `${-am.diff} DOWN`}`) : `${status} · THRU ${am.hole}`),
+                React.createElement("div", { className: "mt-1 mb-1 px-3 py-1.5 rounded-lg inline-block", style: { background: C.panel } },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: "#7FB7D9" } },
+                        "\uD83C\uDDFA\uD83C\uDDF8 ",
+                        liveU),
+                    React.createElement("span", { style: { color: C.muted, fontSize: 12 } }, " \u2014 "),
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: C.gold } },
+                        liveO,
+                        " ",
+                        ryder.kind === "pres" ? "🌏" : "🇪🇺"),
+                    React.createElement("div", { className: "text-[9px]", style: { color: C.muted } }, am.done ? "TEAM SCORE incl. your match" : `PROJECTED if your match ends ${myProjSide === "H" ? "halved" : "as it stands"} · ${target} to win`))),
             React.createElement("div", { className: "grid grid-cols-9 gap-0.5 my-2" }, Array.from({ length: 18 }).map((_, i) => {
                 const lg = am.log[i];
                 const col = !lg ? "rgba(244,247,242,0.25)" : lg.my < lg.opp ? C.green : lg.my > lg.opp ? C.red : C.chalk;
@@ -3302,7 +3337,7 @@ function GolfCareerSim() {
                     React.createElement("div", { style: { color: C.muted, fontSize: 8 } }, i + 1),
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, color: col } }, lg ? (lg.my < lg.opp ? "W" : lg.my > lg.opp ? "L" : "½") : "·")));
             })),
-            last && (React.createElement("p", { className: "text-center text-xs mb-2", style: { color: last.my < last.opp ? C.green : last.my > last.opp ? C.red : C.muted } },
+            last && (React.createElement("p", { className: "text-center text-xs mb-1", style: { color: last.my < last.opp ? C.green : last.my > last.opp ? C.red : C.muted } },
                 "Hole ",
                 last.h,
                 " (par ",
@@ -3313,6 +3348,7 @@ function GolfCareerSim() {
                 last.opp,
                 " \u2014 ",
                 last.my < last.opp ? "YOU TAKE THE HOLE" : last.my > last.opp ? "hole lost" : "halved")),
+            isSingles && !am.done && (Math.abs(liveU - liveO) <= 1.5) && (React.createElement("p", { className: "text-center text-xs mb-2", style: { color: C.bogey } }, "\u26A1 The cup is on a knife edge \u2014 your point could decide it.")),
             !am.done && (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: "1px solid rgba(244,247,242,0.2)" } },
                 React.createElement("div", { className: "flex justify-between items-baseline" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk } },
