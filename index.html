@@ -996,15 +996,15 @@ function GolfCareerSim() {
             const attrs = { ...e.attrs };
             const bump = (k, d) => { attrs[k] = clampN(attrs[k] + d, 60, 99); };
             const rk = () => keys[Math.floor(Math.random() * keys.length)];
-            const cur = calcOverall(attrs);
-            const pot = e.pot || Math.max(cur, p.overall);
+            const curOvr = calcOverall(attrs);
+            const pot = e.pot || Math.max(curOvr, p.overall);
             if (age <= 23) {
-                const gains = cur < pot - 4 ? 3 : cur < pot ? 2 : 0;
+                const gains = curOvr < pot - 4 ? 3 : curOvr < pot ? 2 : 0;
                 for (let i = 0; i < gains; i++)
                     bump(rk(), 1);
             }
             else if (age <= 28) {
-                if (cur < pot - 2 && Math.random() < .6)
+                if (curOvr < pot - 2 && Math.random() < .6)
                     bump(rk(), 1);
                 else if (Math.random() < .25)
                     bump(rk(), -1);
@@ -1013,7 +1013,7 @@ function GolfCareerSim() {
                 bump("drivingDistance", -1);
                 if (Math.random() < .4)
                     bump("recovery", -1);
-                if (cur < pot && Math.random() < .3)
+                if (curOvr < pot && Math.random() < .3)
                     bump(rk(), 1);
             }
             else {
