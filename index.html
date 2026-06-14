@@ -584,6 +584,8 @@ const simPresSessions = (usa, intl, strategy, homeSide) => {
             const iSel = sessionPlayersN(intl, sIdx, youTeam === "INTL" ? youTier : 99, nMatch * 2);
             for (let m = 0; m < nMatch; m++) {
                 const a = [uSel[m * 2], uSel[m * 2 + 1]], b = [iSel[m * 2], iSel[m * 2 + 1]];
+                if (!a[0] || !a[1] || !b[0] || !b[1])
+                    continue;
                 const yIn = [...a, ...b].some((x) => x.isYou);
                 if (yIn) {
                     matches.push({ a: a.map((x) => x.name), b: b.map((x) => x.name), out: null, pending: true, margin: null, youIn: true, youSideA: a.some((x) => x.isYou) });
@@ -609,6 +611,8 @@ const simPresSessions = (usa, intl, strategy, homeSide) => {
             const iS = [...intl].sort(() => Math.random() - .5);
             for (let m = 0; m < 12; m++) {
                 const a = uS[m], b = iS[m];
+                if (!a || !b)
+                    continue;
                 if (a.isYou || b.isYou) {
                     matches.push({ a: [a.name], b: [b.name], out: null, pending: true, margin: null, youIn: true, youSideA: a.isYou });
                     continue;
@@ -709,6 +713,8 @@ const simRyderSessions = (usa, eur, strategy, homeSide) => {
             const eSel = sessionPlayers(eur, sIdx, youTeam === "EUR" ? youTier : 99);
             for (let m = 0; m < 4; m++) {
                 const a = [uSel[m * 2], uSel[m * 2 + 1]], b = [eSel[m * 2], eSel[m * 2 + 1]];
+                if (!a[0] || !a[1] || !b[0] || !b[1])
+                    continue;
                 const rA = (a[0].overall + a[1].overall) / 2 + hbU + gauss() * 1.6;
                 const rB = (b[0].overall + b[1].overall) / 2 + hbE + gauss() * 1.6;
                 const yIn = [...a, ...b].some((x) => x.isYou);
@@ -736,6 +742,8 @@ const simRyderSessions = (usa, eur, strategy, homeSide) => {
             const eS = [...eur].sort(() => Math.random() - .5);
             for (let m = 0; m < 12; m++) {
                 const a = uS[m], b = eS[m];
+                if (!a || !b)
+                    continue;
                 if (a.isYou || b.isYou) {
                     matches.push({ a: [a.name], b: [b.name], out: null, pending: true, margin: null, youIn: true, youSideA: a.isYou });
                     continue;
