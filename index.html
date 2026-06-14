@@ -983,7 +983,34 @@ function GolfCareerSim() {
         const keys = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
         const taken = new Set([g.pro.name, ...PLAYERS.map((p) => { var _a; return ((_a = cur[p.name]) === null || _a === void 0 ? void 0 : _a.displayName) || p.name; })]);
         PLAYERS.forEach((p) => {
-            const e = cur[p.name] || { age: aiAgeOf(p.name), attrs: Object.fromEntries(keys.map((k) => [k, p[k]])), pot: clampN(p.overall + 3 + Math.floor(gauss() * 2), p.overall, 97) };
+            const seedAge = aiAgeOf(p.name);
+            // age-based potential: the younger the player, the higher and more variable the ceiling they MIGHT reach.
+            // randomised per save, so different young stars break out each career.
+            const potSeed = (() => {
+                let ceilBonus, spread;
+                if (seedAge <= 21) {
+                    ceilBonus = 12;
+                    spread = 6;
+                } // teen prospects: could become anything
+                else if (seedAge <= 24) {
+                    ceilBonus = 9;
+                    spread = 5;
+                } // young guns
+                else if (seedAge <= 27) {
+                    ceilBonus = 6;
+                    spread = 4;
+                } // rising
+                else if (seedAge <= 30) {
+                    ceilBonus = 3;
+                    spread = 3;
+                } // near ceiling
+                else {
+                    ceilBonus = 1;
+                    spread = 2;
+                } // established/declining
+                return clampN(Math.round(p.overall + Math.random() * ceilBonus + gauss() * (spread / 3)), p.overall, 97);
+            })();
+            const e = cur[p.name] || { age: seedAge, attrs: Object.fromEntries(keys.map((k) => [k, p[k]])), pot: potSeed };
             const age = e.age + 1;
             if (age > 45) {
                 const oldName = e.displayName || p.name;
