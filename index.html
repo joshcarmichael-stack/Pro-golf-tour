@@ -28,6 +28,60 @@ const PLAYERS = [{ "rank": 1, "name": "Scottie Scheffler", "country": "USA", "ov
 const COURSES = [{ "name": "Waialae Country Club", "event": "Sony Open", "location": "Honolulu, HI", "par": 70, "yards": 7044, "difficulty": -1.8, "style": "Tight, short, wind off the ocean \u2014 position and putting", "holes": [[5, 488, 1, -0.4479], [4, 426, 1, -0.0293], [4, 401, 1, -0.065], [3, 165, 1, -0.0446], [4, 418, 1, -0.0408], [4, 420, 1, -0.0379], [3, 180, 1, -0.0196], [4, 400, 1, -0.0665], [5, 510, 1, -0.4204], [4, 350, 1, -0.1379], [3, 185, 1, -0.0112], [3, 175, 1, -0.0279], [4, 430, 1, -0.0236], [4, 445, 1, -0.0022], [4, 395, 1, -0.0736], [4, 410, 1, -0.0522], [3, 190, 1, -0.0029], [5, 551, 1, -0.3691]] }, { "name": "PGA West (Stadium)", "event": "The American Express", "location": "La Quinta, CA", "par": 72, "yards": 7187, "difficulty": -2.3, "style": "Desert birdie-fest \u2014 wedges and hot putters", "holes": [[4, 395, 1, -0.1203], [4, 425, 1, -0.0774], [4, 440, 1, -0.056], [3, 180, 1, -0.0663], [5, 535, 1, -0.4358], [3, 170, 2, -0.0229], [4, 450, 1, -0.0417], [4, 415, 1, -0.0917], [5, 560, 1, -0.4046], [4, 400, 1, -0.1132], [4, 455, 1, -0.0346], [3, 200, 1, -0.0329], [4, 380, 1, -0.1417], [4, 435, 1, -0.0632], [5, 580, 1, -0.3796], [3, 165, 2, -0.0313], [5, 545, 3, -0.3033], [4, 442, 2, 0.0068]] }, { "name": "Torrey Pines (South)", "event": "Farmers Insurance Open", "location": "San Diego, CA", "par": 72, "yards": 7765, "difficulty": 1.0, "style": "Long, heavy air, thick rough \u2014 power and grinding", "holes": [[4, 452, 1, 0.1184], [4, 389, 1, 0.0284], [3, 198, 2, 0.181], [4, 488, 1, 0.1698], [4, 453, 1, 0.1198], [5, 560, 1, -0.2473], [4, 462, 1, 0.1327], [3, 176, 1, 0.0843], [5, 613, 1, -0.1811], [4, 405, 1, 0.0512], [3, 221, 1, 0.1593], [4, 504, 1, 0.1927], [5, 541, 1, -0.2711], [4, 437, 1, 0.0969], [4, 478, 1, 0.1555], [3, 227, 1, 0.1693], [4, 442, 1, 0.1041], [5, 570, 2, -0.1748]] }, { "name": "TPC Scottsdale", "event": "WM Phoenix Open", "location": "Scottsdale, AZ", "par": 71, "yards": 7261, "difficulty": -1.2, "style": "Desert target golf, loud crowds \u2014 scoring clubs", "holes": [[4, 410, 1, -0.0636], [4, 476, 1, 0.0307], [5, 554, 1, -0.3768], [3, 150, 1, -0.081], [4, 470, 1, 0.0221], [4, 432, 1, -0.0322], [3, 215, 1, 0.0273], [4, 482, 1, 0.0392], [4, 464, 1, 0.0135], [4, 403, 1, -0.0736], [4, 469, 1, 0.0207], [3, 195, 1, -0.006], [5, 608, 1, -0.3093], [4, 490, 1, 0.0507], [5, 553, 2, -0.3181], [3, 163, 1, -0.0593], [4, 332, 1, -0.1751], [4, 442, 2, 0.0421]] }, { "name": "Pebble Beach Golf Links", "event": "AT&T Pebble Beach Pro-Am", "location": "Pebble Beach, CA", "par": 72, "yards": 6972, "difficulty": -0.6, "style": "Tiny greens on the cliffs \u2014 iron precision", "holes": [[4, 380, 1, -0.0448], [5, 516, 1, -0.3626], [4, 404, 1, -0.0105], [4, 331, 1, -0.1148], [3, 195, 1, 0.0557], [5, 523, 2, -0.2939], [3, 106, 2, -0.0326], [4, 428, 2, 0.0838], [4, 505, 2, 0.1938], [4, 495, 2, 0.1795], [4, 390, 1, -0.0305], [3, 202, 1, 0.0674], [4, 445, 1, 0.0481], [5, 580, 1, -0.2826], [4, 396, 1, -0.0219], [4, 403, 1, -0.0119], [3, 208, 2, 0.1374], [5, 543, 2, -0.2689]] }, { "name": "Riviera Country Club", "event": "The Genesis Invitational", "location": "Pacific Palisades, CA", "par": 71, "yards": 7322, "difficulty": 0.6, "style": "Kikuyu rough, poa greens, the great strategic test", "holes": [[5, 503, 0, -0.4004], [4, 471, 1, 0.1237], [4, 434, 1, 0.0709], [3, 236, 1, 0.1625], [4, 444, 1, 0.0851], [3, 199, 2, 0.1609], [4, 408, 1, 0.0337], [4, 433, 1, 0.0694], [4, 458, 1, 0.1051], [4, 315, 2, -0.0391], [5, 583, 1, -0.2404], [4, 479, 1, 0.1351], [4, 459, 1, 0.1066], [3, 192, 1, 0.0892], [4, 487, 1, 0.1466], [3, 166, 1, 0.0459], [5, 590, 1, -0.2316], [4, 475, 1, 0.1294]] }, { "name": "PGA National (Champion)", "event": "Cognizant Classic", "location": "Palm Beach Gardens, FL", "par": 71, "yards": 7167, "difficulty": 0.9, "style": "Water everywhere \u2014 the Bear Trap punishes misses", "holes": [[4, 365, 1, -0.0059], [4, 425, 1, 0.0798], [5, 540, 1, -0.2724], [3, 170, 1, 0.0743], [4, 420, 1, 0.0726], [4, 450, 1, 0.1155], [3, 210, 1, 0.141], [4, 430, 1, 0.0869], [4, 410, 1, 0.0584], [5, 560, 1, -0.2474], [4, 450, 1, 0.1155], [4, 400, 1, 0.0441], [4, 400, 1, 0.0441], [4, 415, 1, 0.0655], [3, 179, 3, 0.2093], [4, 434, 3, 0.2126], [3, 190, 3, 0.2276], [5, 556, 2, -0.1924]] }, { "name": "Bay Hill Club", "event": "Arnold Palmer Invitational", "location": "Orlando, FL", "par": 72, "yards": 7466, "difficulty": 1.0, "style": "Long, penal rough, gusty \u2014 a bruiser", "holes": [[4, 461, 1, 0.1358], [3, 218, 1, 0.1589], [4, 434, 2, 0.1572], [5, 565, 1, -0.2366], [4, 390, 1, 0.0343], [5, 555, 2, -0.1891], [3, 199, 1, 0.1272], [4, 460, 1, 0.1343], [4, 467, 1, 0.1443], [4, 400, 1, 0.0486], [4, 438, 2, 0.1629], [5, 570, 1, -0.2303], [4, 370, 1, 0.0058], [3, 206, 1, 0.1389], [4, 425, 1, 0.0843], [5, 511, 2, -0.2441], [3, 221, 2, 0.2239], [4, 458, 3, 0.2515]] }, { "name": "TPC Sawgrass (Stadium)", "event": "The Players Championship", "location": "Ponte Vedra, FL", "par": 72, "yards": 7352, "difficulty": 0.8, "style": "Pete Dye's exam \u2014 precision into every target", "holes": [[4, 423, 1, 0.0809], [5, 532, 1, -0.2784], [3, 177, 1, 0.0899], [4, 384, 1, 0.0252], [4, 471, 1, 0.1495], [4, 393, 1, 0.038], [4, 442, 1, 0.108], [3, 237, 1, 0.1899], [5, 583, 1, -0.2146], [4, 424, 1, 0.0823], [5, 558, 1, -0.2459], [4, 358, 1, -0.012], [3, 181, 1, 0.0966], [4, 481, 2, 0.2237], [4, 449, 1, 0.118], [5, 523, 2, -0.2296], [3, 137, 3, 0.1433], [4, 462, 3, 0.2566]] }, { "name": "Innisbrook (Copperhead)", "event": "Valspar Championship", "location": "Palm Harbor, FL", "par": 71, "yards": 7340, "difficulty": 0.4, "style": "Tree-lined snake pit \u2014 fairways first", "holes": [[4, 420, 1, 0.0364], [4, 425, 1, 0.0435], [4, 455, 1, 0.0864], [3, 195, 1, 0.0797], [5, 575, 1, -0.2649], [4, 430, 1, 0.0507], [4, 410, 1, 0.0221], [3, 235, 1, 0.1464], [4, 415, 1, 0.0293], [4, 425, 1, 0.0435], [5, 555, 1, -0.2899], [4, 380, 1, -0.0207], [3, 175, 1, 0.0464], [5, 590, 1, -0.2461], [4, 435, 1, 0.0578], [4, 460, 2, 0.1535], [3, 215, 2, 0.1731], [4, 445, 2, 0.1321]] }, { "name": "Memorial Park", "event": "Houston Open", "location": "Houston, TX", "par": 70, "yards": 7475, "difficulty": 0.5, "style": "Brawny muni, big run-offs around greens", "holes": [[4, 460, 1, 0.0945], [4, 430, 1, 0.0517], [5, 555, 1, -0.2889], [3, 180, 1, 0.0557], [4, 470, 1, 0.1088], [4, 420, 1, 0.0374], [3, 210, 1, 0.1057], [5, 585, 1, -0.2514], [4, 415, 1, 0.0302], [3, 205, 1, 0.0974], [4, 400, 1, 0.0088], [3, 195, 1, 0.0807], [4, 480, 1, 0.1231], [4, 435, 1, 0.0588], [3, 165, 2, 0.0907], [5, 590, 1, -0.2451], [4, 455, 1, 0.0874], [4, 470, 2, 0.1688]] }, { "name": "TPC San Antonio (Oaks)", "event": "Valero Texas Open", "location": "San Antonio, TX", "par": 72, "yards": 7438, "difficulty": 0.6, "style": "Windy hill country \u2014 flighted irons and sand saves", "holes": [[4, 430, 1, 0.0909], [5, 560, 1, -0.2434], [4, 415, 1, 0.0695], [3, 190, 1, 0.1116], [4, 455, 1, 0.1266], [4, 420, 1, 0.0766], [3, 205, 1, 0.1366], [5, 585, 1, -0.2121], [4, 440, 1, 0.1052], [4, 425, 1, 0.0838], [4, 455, 1, 0.1266], [3, 180, 1, 0.0949], [4, 410, 1, 0.0623], [5, 565, 1, -0.2371], [4, 445, 1, 0.1123], [3, 185, 2, 0.1633], [4, 420, 1, 0.0766], [5, 591, 1, -0.2046]] }, { "name": "Augusta National", "event": "The Masters", "location": "Augusta, GA", "par": 72, "yards": 7555, "difficulty": 1.4, "style": "Second-shot golf, lightning greens, imagination required", "holes": [[4, 445, 1, 0.1441], [5, 575, 0, -0.2529], [4, 350, 1, 0.0084], [3, 240, 1, 0.2267], [4, 495, 1, 0.2155], [3, 180, 1, 0.1267], [4, 450, 0, 0.0912], [5, 570, 0, -0.2591], [4, 460, 0, 0.1055], [4, 495, 1, 0.2155], [4, 520, 2, 0.3112], [3, 155, 3, 0.2051], [5, 545, 2, -0.1704], [4, 440, 0, 0.077], [5, 550, 2, -0.1641], [3, 170, 2, 0.1701], [4, 440, 0, 0.077], [4, 465, 1, 0.1727]] }, { "name": "Harbour Town Golf Links", "event": "RBC Heritage", "location": "Hilton Head, SC", "par": 71, "yards": 7213, "difficulty": -0.5, "style": "Tiny corridors and tiny greens \u2014 accuracy over power", "holes": [[4, 410, 1, -0.0126], [5, 502, 1, -0.3908], [4, 469, 1, 0.0717], [3, 200, 1, 0.0533], [5, 540, 1, -0.3433], [4, 419, 1, 0.0002], [3, 195, 1, 0.045], [4, 473, 1, 0.0774], [4, 332, 1, -0.1241], [4, 436, 1, 0.0245], [4, 438, 1, 0.0274], [4, 430, 1, 0.0159], [4, 373, 1, -0.0655], [3, 192, 2, 0.1], [5, 588, 1, -0.2833], [4, 434, 1, 0.0217], [3, 175, 2, 0.0717], [4, 472, 2, 0.1359]] }, { "name": "TPC Louisiana", "event": "Zurich Classic (Teams)", "location": "Avondale, LA", "par": 72, "yards": 7425, "difficulty": -2.0, "style": "Flat Dye design, soft \u2014 a birdie shootout", "holes": [[4, 420, 1, -0.0585], [5, 560, 1, -0.3785], [4, 435, 1, -0.037], [3, 185, 1, -0.0318], [4, 440, 1, -0.0299], [4, 415, 1, -0.0656], [5, 575, 1, -0.3597], [3, 195, 1, -0.0151], [4, 425, 1, -0.0513], [4, 430, 1, -0.0442], [5, 555, 1, -0.3847], [3, 170, 1, -0.0568], [4, 445, 1, -0.0227], [4, 410, 1, -0.0727], [4, 435, 1, -0.037], [3, 200, 1, -0.0068], [5, 570, 1, -0.366], [4, 460, 2, 0.0587]] }, { "name": "Trump National Doral (Blue Monster)", "event": "Miami Championship", "location": "Miami, FL", "par": 72, "yards": 7608, "difficulty": 0.8, "style": "Long, wind-whipped, water lurking \u2014 power with control", "holes": [[5, 580, 1, -0.2366], [4, 425, 1, 0.0656], [4, 440, 1, 0.087], [3, 195, 2, 0.1618], [4, 460, 1, 0.1156], [4, 430, 1, 0.0727], [4, 415, 1, 0.0513], [5, 600, 2, -0.1516], [3, 180, 1, 0.0768], [5, 560, 1, -0.2616], [4, 420, 1, 0.0584], [5, 602, 2, -0.1491], [3, 235, 2, 0.2284], [4, 430, 1, 0.0727], [4, 455, 1, 0.1084], [4, 410, 1, 0.0442], [3, 190, 1, 0.0934], [4, 468, 3, 0.247]] }, { "name": "Quail Hollow Club", "event": "Truist Championship", "location": "Charlotte, NC", "par": 71, "yards": 7626, "difficulty": 0.7, "style": "Premium ball-striking, the Green Mile finish", "holes": [[4, 505, 1, 0.1356], [4, 452, 1, 0.0599], [4, 483, 1, 0.1041], [3, 184, 1, 0.0391], [5, 568, 1, -0.2959], [3, 249, 1, 0.1475], [4, 481, 1, 0.1013], [4, 346, 1, -0.0916], [4, 505, 1, 0.1356], [5, 592, 1, -0.2659], [4, 462, 1, 0.0741], [4, 456, 1, 0.0656], [3, 208, 1, 0.0791], [4, 344, 1, -0.0944], [5, 577, 1, -0.2846], [4, 529, 2, 0.2299], [3, 223, 3, 0.2241], [4, 494, 3, 0.2399]] }, { "name": "Aronimink Golf Club", "event": "PGA Championship", "location": "Newtown Square, PA", "par": 70, "yards": 7267, "difficulty": 1.2, "style": "Classic Ross \u2014 long irons into pitched greens, deep bunkers", "holes": [[4, 430, 1, 0.0727], [4, 455, 1, 0.1085], [3, 220, 1, 0.1435], [4, 445, 1, 0.0942], [5, 560, 1, -0.2615], [4, 415, 1, 0.0513], [4, 470, 1, 0.1299], [3, 185, 2, 0.1451], [5, 580, 1, -0.2365], [4, 425, 1, 0.0656], [4, 440, 1, 0.087], [3, 200, 1, 0.1101], [4, 460, 1, 0.1156], [4, 410, 1, 0.0442], [4, 435, 1, 0.0799], [4, 472, 1, 0.1327], [3, 210, 1, 0.1268], [4, 455, 1, 0.1085]] }, { "name": "TPC Craig Ranch", "event": "CJ Cup Byron Nelson", "location": "McKinney, TX", "par": 71, "yards": 7414, "difficulty": -2.8, "style": "Defenseless in calm air \u2014 lowest fit wins the putting contest", "holes": [[4, 415, 1, -0.1268], [5, 545, 1, -0.4584], [4, 430, 1, -0.1054], [3, 175, 1, -0.1097], [4, 440, 1, -0.0911], [5, 565, 1, -0.4334], [4, 400, 1, -0.1483], [3, 190, 1, -0.0847], [4, 445, 1, -0.084], [4, 420, 1, -0.1197], [4, 435, 1, -0.0983], [3, 170, 1, -0.118], [5, 580, 1, -0.4147], [4, 410, 1, -0.134], [4, 450, 1, -0.0768], [3, 200, 1, -0.068], [4, 449, 1, -0.0783], [4, 385, 1, -0.1697]] }, { "name": "Colonial Country Club", "event": "Charles Schwab Challenge", "location": "Fort Worth, TX", "par": 70, "yards": 7209, "difficulty": 0.3, "style": "Hogan's Alley \u2014 doglegs that demand shaping both ways", "holes": [[5, 565, 1, -0.3069], [4, 400, 1, -0.0217], [4, 483, 1, 0.0969], [3, 247, 1, 0.1369], [4, 481, 2, 0.154], [4, 406, 1, -0.0131], [4, 427, 1, 0.0169], [3, 199, 1, 0.0569], [4, 407, 1, -0.0117], [4, 404, 1, -0.016], [5, 635, 1, -0.2194], [4, 445, 1, 0.0426], [3, 190, 2, 0.1019], [4, 457, 1, 0.0597], [4, 430, 1, 0.0212], [3, 192, 1, 0.0452], [4, 387, 1, -0.0403], [4, 441, 1, 0.0369]] }, { "name": "Muirfield Village", "event": "The Memorial", "location": "Dublin, OH", "par": 72, "yards": 7571, "difficulty": 0.9, "style": "Jack's place \u2014 complete examination, fast greens", "holes": [[4, 470, 1, 0.1557], [4, 455, 1, 0.1343], [4, 401, 1, 0.0571], [3, 200, 1, 0.1359], [5, 527, 1, -0.277], [4, 447, 1, 0.1228], [5, 563, 1, -0.232], [3, 182, 1, 0.1059], [4, 412, 1, 0.0728], [4, 471, 1, 0.1571], [5, 567, 1, -0.227], [3, 184, 2, 0.1693], [4, 455, 1, 0.1343], [4, 365, 1, 0.0057], [5, 503, 2, -0.247], [3, 215, 1, 0.1609], [4, 478, 1, 0.1671], [4, 484, 1, 0.1757]] }, { "name": "TPC Toronto (North)", "event": "RBC Canadian Open", "location": "Caledon, ON", "par": 70, "yards": 7389, "difficulty": -1.5, "style": "New-school parkland \u2014 gettable for aggressive iron play", "holes": [[4, 420, 1, -0.0714], [4, 445, 1, -0.0357], [3, 185, 1, -0.0447], [4, 430, 1, -0.0571], [5, 555, 1, -0.3976], [4, 415, 1, -0.0785], [3, 200, 1, -0.0197], [4, 450, 1, -0.0285], [4, 425, 1, -0.0642], [4, 440, 1, -0.0428], [3, 175, 1, -0.0614], [4, 435, 1, -0.0499], [5, 570, 1, -0.3789], [4, 410, 1, -0.0857], [3, 195, 1, -0.028], [4, 445, 1, -0.0357], [4, 424, 1, -0.0657], [4, 460, 1, -0.0142]] }, { "name": "Shinnecock Hills", "event": "U.S. Open", "location": "Southampton, NY", "par": 70, "yards": 7445, "difficulty": 2.5, "style": "Wind, fescue, tilted greens \u2014 survival golf", "holes": [[4, 399, 1, 0.0972], [3, 252, 1, 0.2656], [4, 474, 1, 0.2044], [4, 435, 1, 0.1486], [5, 589, 1, -0.1565], [4, 491, 1, 0.2286], [3, 189, 2, 0.2206], [4, 398, 1, 0.0958], [4, 485, 1, 0.2201], [4, 415, 1, 0.1201], [3, 159, 2, 0.1706], [4, 468, 1, 0.1958], [4, 374, 1, 0.0615], [4, 443, 1, 0.1601], [4, 409, 1, 0.1115], [5, 616, 1, -0.1228], [3, 175, 1, 0.1372], [4, 450, 1, 0.1701]] }, { "name": "TPC River Highlands", "event": "Travelers Championship", "location": "Cromwell, CT", "par": 70, "yards": 6844, "difficulty": -1.8, "style": "Short and soft \u2014 wedge-and-putt shootout", "holes": [[4, 434, 1, -0.059], [4, 341, 1, -0.1919], [4, 431, 1, -0.0633], [4, 481, 1, 0.0081], [3, 223, 1, 0.011], [5, 574, 0, -0.4415], [4, 443, 1, -0.0462], [3, 202, 1, -0.024], [4, 406, 1, -0.099], [4, 462, 1, -0.019], [3, 158, 0, -0.1574], [4, 411, 1, -0.0919], [5, 523, 2, -0.3853], [4, 421, 1, -0.0776], [4, 296, 2, -0.1962], [3, 171, 2, -0.0157], [4, 420, 2, -0.019], [4, 444, 2, 0.0152]] }, { "name": "TPC Deere Run", "event": "John Deere Classic", "location": "Silvis, IL", "par": 71, "yards": 7289, "difficulty": -2.5, "style": "The birdie factory \u2014 20-under territory", "holes": [[4, 420, 1, -0.099], [5, 560, 1, -0.419], [4, 425, 1, -0.0919], [3, 180, 1, -0.0807], [4, 440, 1, -0.0704], [4, 415, 1, -0.1061], [3, 195, 1, -0.0557], [5, 555, 1, -0.4253], [4, 430, 1, -0.0847], [4, 460, 1, -0.0419], [4, 405, 1, -0.1204], [3, 170, 1, -0.0973], [4, 425, 1, -0.0919], [4, 440, 1, -0.0704], [3, 185, 1, -0.0723], [4, 410, 1, -0.1133], [5, 561, 1, -0.4178], [4, 403, 1, -0.1233]] }, { "name": "The Renaissance Club", "event": "Genesis Scottish Open", "location": "North Berwick, SCO", "par": 70, "yards": 7293, "difficulty": -1.3, "style": "Modern links \u2014 wind management and ground game", "holes": [[4, 430, 2, 0.0062], [4, 445, 1, -0.0324], [3, 190, 2, 0.0269], [4, 420, 1, -0.0681], [5, 560, 1, -0.3881], [4, 435, 1, -0.0467], [3, 175, 2, 0.0019], [4, 450, 1, -0.0253], [4, 425, 1, -0.061], [5, 575, 1, -0.3694], [4, 415, 1, -0.0753], [3, 205, 1, -0.0081], [4, 440, 1, -0.0396], [4, 430, 1, -0.0538], [3, 185, 2, 0.0185], [4, 455, 1, -0.0181], [4, 420, 1, -0.0681], [4, 428, 1, -0.0567]] }, { "name": "Royal Birkdale", "event": "The Open Championship", "location": "Southport, ENG", "par": 70, "yards": 7156, "difficulty": 1.0, "style": "True links \u2014 pot bunkers, gales, flighted everything", "holes": [[4, 448, 2, 0.1375], [4, 422, 1, 0.0404], [4, 451, 1, 0.0818], [3, 199, 2, 0.1475], [4, 346, 1, -0.0682], [4, 499, 2, 0.2104], [3, 178, 2, 0.1125], [4, 458, 1, 0.0918], [4, 414, 1, 0.029], [4, 402, 1, 0.0118], [4, 436, 1, 0.0604], [3, 189, 2, 0.1309], [4, 499, 1, 0.1504], [3, 201, 1, 0.0909], [5, 542, 2, -0.245], [4, 439, 1, 0.0647], [5, 567, 1, -0.2737], [4, 473, 1, 0.1133]] }, { "name": "TPC Twin Cities", "event": "3M Open", "location": "Blaine, MN", "par": 71, "yards": 7431, "difficulty": -1.5, "style": "Risk-reward water holes \u2014 bombs away", "holes": [[4, 425, 1, -0.0572], [4, 445, 1, -0.0286], [5, 565, 1, -0.3781], [3, 185, 1, -0.0376], [4, 430, 1, -0.05], [4, 415, 1, -0.0715], [5, 580, 2, -0.2993], [3, 200, 1, -0.0126], [4, 440, 1, -0.0357], [4, 420, 1, -0.0643], [4, 435, 1, -0.0429], [3, 175, 2, 0.0057], [4, 450, 1, -0.0215], [4, 425, 1, -0.0572], [4, 450, 1, -0.0215], [3, 190, 1, -0.0293], [4, 415, 1, -0.0715], [5, 576, 3, -0.2443]] }, { "name": "Sedgefield Country Club", "event": "Wyndham Championship", "location": "Greensboro, NC", "par": 70, "yards": 7131, "difficulty": -1.7, "style": "Donald greens \u2014 small targets, putting contest", "holes": [[4, 400, 1, -0.092], [4, 425, 1, -0.0563], [5, 545, 1, -0.4021], [3, 165, 1, -0.0701], [4, 420, 1, -0.0634], [4, 435, 1, -0.042], [3, 185, 1, -0.0367], [4, 410, 1, -0.0777], [4, 430, 1, -0.0491], [4, 415, 1, -0.0705], [4, 425, 1, -0.0563], [3, 200, 1, -0.0117], [5, 560, 1, -0.3834], [4, 405, 1, -0.0848], [4, 435, 1, -0.042], [3, 175, 1, -0.0534], [4, 420, 1, -0.0634], [4, 421, 1, -0.062]] }, { "name": "TPC Southwind", "event": "FedEx St. Jude Championship", "location": "Memphis, TN", "par": 70, "yards": 7244, "difficulty": -0.4, "style": "Water on half the holes \u2014 controlled aggression", "holes": [[4, 430, 1, -0.0129], [4, 445, 1, 0.0085], [5, 555, 2, -0.2935], [3, 180, 1, -0.0089], [4, 425, 1, -0.0201], [4, 415, 1, -0.0343], [3, 205, 1, 0.0328], [4, 440, 1, 0.0014], [4, 430, 1, -0.0129], [4, 420, 1, -0.0272], [3, 165, 2, 0.0261], [4, 445, 1, 0.0085], [4, 410, 1, -0.0415], [3, 190, 2, 0.0678], [4, 435, 1, -0.0058], [5, 560, 1, -0.3472], [4, 425, 1, -0.0201], [4, 464, 3, 0.1557]] }, { "name": "East Lake Golf Club", "event": "Tour Championship", "location": "Atlanta, GA", "par": 71, "yards": 7490, "difficulty": -0.8, "style": "Restored Ross for the finale \u2014 bermuda precision", "holes": [[4, 425, 1, -0.0399], [4, 485, 1, 0.0458], [4, 391, 1, -0.0885], [3, 215, 1, 0.0296], [4, 520, 1, 0.0958], [5, 535, 2, -0.3383], [4, 400, 1, -0.0756], [5, 590, 1, -0.3295], [4, 430, 1, -0.0328], [4, 545, 1, 0.1315], [3, 200, 1, 0.0046], [4, 400, 1, -0.0756], [4, 440, 1, -0.0185], [3, 230, 2, 0.1146], [4, 495, 1, 0.0601], [4, 410, 1, -0.0613], [3, 195, 1, -0.0037], [5, 590, 1, -0.3295]] }, { "name": "Pebble Beach (U.S. Open)", "event": "U.S. Open", "location": "Pebble Beach, CA", "par": 72, "yards": 7040, "difficulty": 1.9, "style": "The cliffs with teeth \u2014 tiny greens, championship rough", "holes": [[4, 380, 1, 0.0947], [5, 516, 1, -0.2232], [4, 404, 1, 0.129], [4, 331, 1, 0.0247], [3, 195, 1, 0.1952], [5, 523, 2, -0.1544], [3, 106, 2, 0.1068], [4, 428, 2, 0.2232], [4, 505, 2, 0.3332], [4, 495, 2, 0.319], [4, 390, 1, 0.109], [3, 202, 1, 0.2068], [4, 445, 1, 0.1875], [5, 580, 1, -0.1432], [4, 396, 1, 0.1175], [4, 403, 1, 0.1275], [3, 208, 2, 0.2768], [5, 543, 2, -0.1294]] }, { "name": "Winged Foot (West)", "event": "U.S. Open", "location": "Mamaroneck, NY", "par": 70, "yards": 7477, "difficulty": 2.4, "style": "Tillinghast's monster \u2014 deep rough, pitched greens, no escape", "holes": [[4, 450, 1, 0.1594], [4, 470, 1, 0.188], [3, 243, 1, 0.2399], [4, 467, 1, 0.1837], [5, 565, 1, -0.1972], [4, 321, 1, -0.0248], [3, 162, 1, 0.1049], [4, 475, 1, 0.1952], [4, 514, 1, 0.2509], [3, 214, 1, 0.1916], [4, 384, 1, 0.0652], [5, 633, 1, -0.1122], [3, 212, 1, 0.1883], [4, 458, 1, 0.1709], [4, 426, 1, 0.1252], [4, 491, 1, 0.218], [4, 504, 1, 0.2366], [4, 469, 1, 0.1866]] }, { "name": "Pinehurst No. 2", "event": "U.S. Open", "location": "Pinehurst, NC", "par": 70, "yards": 7588, "difficulty": 1.6, "style": "Turtleback greens repel everything \u2014 short game examination", "holes": [[4, 404, 1, 0.0427], [4, 502, 1, 0.1827], [4, 387, 1, 0.0185], [4, 529, 1, 0.2213], [5, 576, 1, -0.2344], [3, 246, 1, 0.1939], [4, 424, 1, 0.0713], [4, 491, 1, 0.167], [3, 191, 1, 0.1023], [5, 617, 1, -0.1832], [4, 483, 1, 0.1556], [4, 451, 1, 0.1099], [4, 385, 1, 0.0156], [4, 473, 1, 0.1413], [3, 205, 1, 0.1256], [4, 528, 1, 0.2199], [3, 187, 1, 0.0956], [4, 451, 1, 0.1099]] }, { "name": "Fields Ranch East", "event": "PGA Championship", "location": "Frisco, TX", "par": 72, "yards": 7841, "difficulty": 1.0, "style": "Texas wind and massive scale \u2014 power with flight control", "holes": [[4, 470, 1, 0.1345], [5, 635, 1, -0.1632], [4, 450, 1, 0.1059], [3, 195, 1, 0.1064], [4, 480, 1, 0.1488], [4, 425, 1, 0.0702], [3, 230, 1, 0.1648], [5, 590, 2, -0.1594], [4, 460, 1, 0.1202], [4, 445, 1, 0.0988], [3, 180, 1, 0.0814], [5, 620, 2, -0.1219], [4, 490, 1, 0.1631], [4, 415, 1, 0.0559], [3, 210, 1, 0.1314], [4, 470, 1, 0.1345], [4, 376, 1, 0.0002], [5, 600, 2, -0.1469]] }, { "name": "The Olympic Club (Lake)", "event": "PGA Championship", "location": "San Francisco, CA", "par": 70, "yards": 7170, "difficulty": 1.5, "style": "Fog, doglegs, reverse-camber fairways \u2014 position above all", "holes": [[4, 520, 1, 0.2282], [4, 428, 1, 0.0968], [3, 247, 1, 0.2154], [4, 438, 1, 0.1111], [4, 498, 1, 0.1968], [4, 489, 1, 0.1839], [4, 288, 1, -0.1032], [3, 200, 1, 0.137], [4, 449, 1, 0.1268], [4, 424, 1, 0.0911], [4, 430, 1, 0.0997], [4, 451, 1, 0.1297], [3, 199, 1, 0.1354], [4, 419, 1, 0.0839], [3, 154, 1, 0.0604], [5, 670, 1, -0.0971], [5, 522, 1, -0.2821], [4, 344, 1, -0.0232]] }, { "name": "St Andrews (Old Course)", "event": "The Open Championship", "location": "St Andrews, SCO", "par": 72, "yards": 7313, "difficulty": -0.5, "style": "The Home of Golf \u2014 double greens, hidden pot bunkers, the Road Hole", "holes": [[4, 376, 1, -0.067], [4, 453, 1, 0.043], [4, 398, 1, -0.0356], [4, 480, 1, 0.0816], [5, 568, 1, -0.3142], [4, 414, 1, -0.0127], [4, 371, 1, -0.0742], [3, 175, 1, 0.0058], [4, 352, 1, -0.1013], [4, 386, 1, -0.0527], [3, 174, 1, 0.0042], [4, 348, 1, -0.107], [4, 465, 1, 0.0601], [5, 614, 2, -0.1967], [4, 455, 1, 0.0458], [4, 418, 1, -0.007], [4, 495, 3, 0.223], [4, 357, 1, -0.0942]] }, { "name": "Royal Lytham & St Annes", "event": "The Open Championship", "location": "Lytham, ENG", "par": 70, "yards": 7118, "difficulty": 0.9, "style": "200 bunkers in the dunes \u2014 a links minefield", "holes": [[3, 206, 1, 0.1038], [4, 437, 2, 0.1264], [4, 458, 1, 0.0964], [4, 393, 1, 0.0036], [3, 219, 2, 0.1855], [4, 494, 2, 0.2079], [5, 592, 1, -0.2378], [4, 418, 1, 0.0393], [3, 165, 1, 0.0355], [4, 386, 1, -0.0064], [5, 599, 1, -0.2291], [3, 198, 1, 0.0905], [4, 357, 1, -0.0478], [4, 444, 1, 0.0764], [4, 463, 1, 0.1036], [4, 358, 2, 0.0136], [4, 453, 2, 0.1493], [4, 414, 2, 0.0936]] }, { "name": "Corales Golf Club", "event": "Puntacana Championship", "location": "Punta Cana, DOM", "par": 72, "yards": 7670, "difficulty": -1.2, "style": "Caribbean cliffs and trade winds \u2014 birdies with a breeze", "holes": [[4, 415, 1, -0.0433], [5, 560, 2, -0.2961], [4, 430, 1, -0.0218], [3, 185, 1, -0.0095], [4, 450, 1, 0.0067], [4, 420, 1, -0.0361], [5, 580, 2, -0.2711], [3, 200, 1, 0.0155], [4, 435, 1, -0.0147], [4, 425, 1, -0.029], [3, 175, 1, -0.0261], [5, 570, 1, -0.3436], [4, 445, 1, -0.0004], [4, 410, 1, -0.0504], [3, 215, 2, 0.1005], [4, 460, 1, 0.021], [4, 430, 1, -0.0218], [5, 565, 3, -0.2299]] }, { "name": "The Dunes Golf & Beach Club", "event": "Myrtle Beach Classic", "location": "Myrtle Beach, SC", "par": 71, "yards": 7450, "difficulty": -1.5, "style": "Resort golf with teeth on the Waterloo finish", "holes": [[4, 420, 1, -0.0498], [4, 435, 1, -0.0284], [5, 560, 1, -0.3698], [3, 180, 1, -0.0315], [4, 440, 1, -0.0213], [4, 415, 1, -0.057], [3, 195, 1, -0.0065], [4, 430, 1, -0.0356], [5, 575, 1, -0.3511], [4, 425, 1, -0.0427], [4, 410, 1, -0.0641], [3, 170, 1, -0.0482], [5, 590, 2, -0.2723], [4, 445, 1, -0.0141], [4, 420, 1, -0.0498], [3, 205, 1, 0.0102], [4, 435, 1, -0.0284], [4, 419, 1, -0.0513]] }, { "name": "Tahoe Mountain Club (Old Greenwood)", "event": "Barracuda Championship", "location": "Truckee, CA", "par": 72, "yards": 7422, "difficulty": -1.0, "style": "Altitude golf in the Sierras \u2014 the ball flies forever, birdies pile up", "holes": [[4, 423, 1, -0.0154], [4, 446, 1, 0.0175], [3, 195, 1, 0.0237], [5, 595, 1, -0.2959], [4, 472, 1, 0.0546], [4, 439, 1, 0.0075], [3, 176, 1, -0.008], [4, 449, 1, 0.0218], [5, 555, 1, -0.3459], [4, 425, 1, -0.0125], [3, 215, 1, 0.057], [5, 583, 1, -0.3109], [4, 440, 1, 0.0089], [4, 380, 1, -0.0768], [3, 165, 1, -0.0263], [4, 461, 1, 0.0389], [4, 442, 1, 0.0118], [5, 561, 1, -0.3384]] }, { "name": "Hurstbourne Country Club", "event": "ISCO Championship", "location": "Louisville, KY", "par": 70, "yards": 7048, "difficulty": -1.0, "style": "Classic parkland Kentucky golf \u2014 wedges and putts decide it", "holes": [[4, 426, 1, -0.0241], [3, 195, 1, 0.0107], [4, 414, 1, -0.0412], [5, 575, 1, -0.3339], [4, 430, 1, -0.0183], [3, 165, 1, -0.0393], [4, 450, 1, 0.0102], [4, 397, 1, -0.0655], [4, 419, 1, -0.0341], [4, 442, 1, -0.0012], [4, 380, 1, -0.0898], [3, 205, 1, 0.0274], [4, 425, 1, -0.0255], [5, 555, 1, -0.3589], [4, 410, 1, -0.0469], [3, 180, 1, -0.0143], [4, 455, 1, 0.0174], [4, 425, 1, -0.0255]] }, { "name": "Keene Trace Golf Club", "event": "Barbasol Championship", "location": "Nicholasville, KY", "par": 72, "yards": 7328, "difficulty": -2.0, "style": "The biggest birdie-fest on the calendar \u2014 20 under might not win", "holes": [[4, 405, 1, -0.0685], [5, 540, 1, -0.3921], [4, 430, 1, -0.0328], [3, 185, 1, -0.0204], [4, 415, 1, -0.0542], [4, 380, 1, -0.1042], [5, 580, 1, -0.3421], [3, 165, 1, -0.0537], [4, 440, 1, -0.0185], [4, 410, 1, -0.0614], [4, 445, 1, -0.0114], [3, 195, 1, -0.0037], [5, 555, 1, -0.3733], [4, 372, 1, -0.1156], [4, 428, 2, 0.0244], [3, 220, 1, 0.0379], [5, 535, 1, -0.3983], [4, 428, 1, -0.0356]] }, { "name": "Bellerive Country Club", "event": "BMW Championship", "location": "St. Louis, MO", "par": 71, "yards": 7547, "difficulty": 0.5, "style": "Big, brawny mid-America championship golf \u2014 the 50-man pressure cooker", "holes": [[4, 433, 1, 0.0509], [4, 470, 1, 0.1037], [3, 165, 1, 0.0256], [4, 460, 1, 0.0894], [4, 470, 1, 0.1037], [3, 213, 1, 0.1056], [4, 371, 1, -0.0377], [5, 597, 2, -0.1815], [4, 433, 1, 0.0509], [4, 506, 1, 0.1551], [4, 355, 1, -0.0606], [5, 603, 1, -0.234], [3, 219, 1, 0.1156], [4, 480, 1, 0.118], [4, 446, 1, 0.0694], [3, 237, 1, 0.1456], [5, 558, 2, -0.2302], [4, 459, 1, 0.088]] }];
 const LEGEND_WINS = [["Sam Snead", 82], ["Tiger Woods", 82], ["Jack Nicklaus", 73], ["Ben Hogan", 64], ["Arnold Palmer", 62], ["Byron Nelson", 52], ["Billy Casper", 51], ["Phil Mickelson", 45], ["Cary Middlecoff", 40], ["Tom Watson", 39], ["Gene Sarazen", 38], ["Lloyd Mangrum", 36], ["Walter Hagen", 32], ["Horton Smith", 32], ["Harry Cooper", 31], ["Jimmy Demaret", 31], ["Leo Diegel", 30], ["Gene Littler", 29], ["Paul Runyan", 29], ["Lee Trevino", 29], ["Henry Picard", 26], ["Vijay Singh", 34], ["Johnny Miller", 25], ["Tommy Armour", 25], ["Macdonald Smith", 25]];
 const LEGEND_MAJORS = [["Jack Nicklaus", 18], ["Tiger Woods", 15], ["Walter Hagen", 11], ["Ben Hogan", 9], ["Gary Player", 9], ["Tom Watson", 8], ["Arnold Palmer", 7], ["Sam Snead", 7], ["Gene Sarazen", 7], ["Bobby Jones", 7], ["Harry Vardon", 7], ["Nick Faldo", 6], ["Lee Trevino", 6], ["Phil Mickelson", 6], ["Seve Ballesteros", 5], ["Byron Nelson", 5], ["Brooks Koepka", 5], ["Rory McIlroy", 5], ["Peter Thomson", 5], ["James Braid", 5]];
+const TEAM_NAMES = [
+    "Carolina Cardinals", "Tokyo Storm", "London Lions", "Sydney Swell", "Cape Town Kings", "Madrid Matadors",
+    "Dublin Drovers", "Phoenix Heat", "Aspen Frost", "Miami Tide", "Berlin Iron", "Seoul Sabres",
+    "Toronto North", "Paris Royals", "Rome Centurions", "Vegas Aces", "Dubai Falcons", "Oslo Vikings",
+    "Mumbai Monsoon", "Shanghai Dragons", "Austin Outlaws", "Denver Summit", "Glasgow Tartan", "Lisbon Surge",
+    "Mexico Sol", "Bogota Altitude", "Stockholm Ice", "Auckland Current", "Manila Typhoon", "Cairo Mirage",
+    "Houston Drive", "Chicago Gale", "Brisbane Reef", "Edinburgh Thistle", "Geneva Peaks", "Nairobi Pride",
+];
+const buildTeams = (proName, proOverall) => {
+    // sort all AI by overall desc, snake-draft into 4-player teams so tiers are balanced-ish but top teams are strongest
+    const ai = PLAYERS.slice().sort((a, b) => b.overall - a.overall).map((p) => p.name);
+    const NT = Math.floor(ai.length / 4); // ~37 with 200; cap names
+    const nTeams = Math.min(NT, TEAM_NAMES.length);
+    const teams = Array.from({ length: nTeams }, (_, i) => ({ id: i, name: TEAM_NAMES[i], members: [] }));
+    // pure tiering: team 0 gets top 4, team 1 next 4, etc (so clear strong→weak ladder to climb)
+    let idx = 0;
+    for (let t = 0; t < nTeams; t++) {
+        for (let s = 0; s < 4 && idx < ai.length; s++)
+            teams[t].members.push(ai[idx++]);
+    }
+    // YOU start by bumping the weakest member of the LAST (weakest) team
+    const last = teams[nTeams - 1];
+    last.members[last.members.length - 1] = proName + " (YOU)";
+    return teams;
+};
+const teamOverall = (team, ovrOf) => Math.round(team.members.reduce((a, n) => a + ovrOf(n), 0) / team.members.length);
+const ALLTIME_FIELD = [
+    // name, country, [drvAcc, drvDist, longApp, shortApp, chip, putt, recovery, bunker]
+    ["Tiger Woods (2000)", "USA", [90, 95, 97, 96, 95, 95, 97, 92]],
+    ["Jack Nicklaus (1972)", "USA", [91, 94, 96, 93, 90, 94, 93, 90]],
+    ["Ben Hogan (1953)", "USA", [98, 86, 97, 95, 90, 89, 92, 90]],
+    ["Sam Snead (1950)", "USA", [92, 93, 93, 92, 93, 91, 93, 92]],
+    ["Arnold Palmer (1960)", "USA", [86, 92, 91, 90, 91, 90, 93, 88]],
+    ["Gary Player (1965)", "RSA", [88, 85, 90, 93, 95, 92, 96, 97]],
+    ["Tom Watson (1977)", "USA", [89, 88, 92, 93, 93, 93, 92, 90]],
+    ["Seve Ballesteros (1984)", "ESP", [80, 90, 88, 95, 98, 93, 99, 96]],
+    ["Nick Faldo (1990)", "ENG", [94, 86, 94, 92, 90, 92, 89, 88]],
+    ["Greg Norman (1986)", "AUS", [88, 95, 93, 89, 88, 88, 90, 89]],
+    ["Phil Mickelson (2006)", "USA", [83, 92, 90, 96, 98, 92, 95, 96]],
+    ["Rory McIlroy (2014)", "NIR", [88, 97, 95, 90, 89, 90, 90, 88]],
+    ["Scottie Scheffler (2024)", "USA", [92, 90, 97, 97, 93, 89, 95, 92]],
+    ["Lee Trevino (1971)", "USA", [96, 84, 93, 94, 92, 90, 91, 90]],
+    ["Byron Nelson (1945)", "USA", [95, 87, 95, 92, 90, 91, 90, 88]],
+    ["Gene Sarazen (1932)", "USA", [90, 84, 90, 91, 90, 89, 90, 95]],
+    ["Walter Hagen (1925)", "USA", [85, 85, 87, 90, 92, 92, 93, 88]],
+    ["Bobby Jones (1930)", "USA", [93, 87, 92, 91, 90, 93, 89, 86]],
+    ["Vijay Singh (2004)", "FIJ", [88, 92, 94, 90, 88, 86, 88, 90]],
+    ["Ernie Els (2002)", "RSA", [89, 92, 93, 90, 89, 89, 89, 89]],
+    ["Nick Price (1994)", "ZIM", [91, 89, 93, 91, 89, 90, 88, 87]],
+    ["Raymond Floyd (1976)", "USA", [86, 86, 89, 92, 93, 92, 91, 89]],
+    ["Johnny Miller (1975)", "USA", [90, 88, 95, 92, 88, 87, 87, 86]],
+    ["Payne Stewart (1991)", "USA", [89, 87, 90, 91, 91, 92, 88, 87]],
+    ["Curtis Strange (1988)", "USA", [90, 87, 90, 90, 89, 89, 88, 86]],
+];
 const GOAT_LEGENDS = (() => {
     const map = new Map();
     LEGEND_WINS.forEach(([n, w]) => map.set(n, { w, m: 0 }));
@@ -854,9 +908,10 @@ const freshStats = () => ({ events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 
     careerMoney: 0, careerWins: 0, careerMajors: 0, careerBirdies: 0, careerEagles: 0, careerAlbatrosses: 0, careerAces: 0,
     fedexTitles: 0, careerTop10s: 0, reachedNo1: false, rc: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, pc: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] } });
 function GolfCareerSim() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3;
     const [g, setG] = useState(null);
     const [screen, setScreen] = useState("loading");
+    const [mode, setMode] = useState("standard");
     const [name, setName] = useState("");
     const [nation, setNation] = useState("");
     const [attrs, setAttrs] = useState({});
@@ -902,7 +957,7 @@ function GolfCareerSim() {
                 }
             }
             catch (e) { }
-            setScreen("identity");
+            setScreen("landing");
         })();
         return () => clearInterval(spinIv.current);
     }, []);
@@ -976,6 +1031,17 @@ function GolfCareerSim() {
         return { ...base, ...e.attrs, name: e.displayName || base.name, country: e.country || base.country, overall: e.overall, age: e.age, rookie: e.rookie, tier: e.tier };
     };
     const ROSTER = (st = g) => PLAYERS.map((p) => aiP(p.name, st)).filter(Boolean);
+    const ovrOf = (name, st = g) => {
+        const clean = name.replace(" (YOU)", "");
+        if (clean === st.pro.name)
+            return calcOverall(effAttrs(st));
+        const ai = aiP(clean, st);
+        return ai ? ai.overall : 75;
+    };
+    const myTeam = (st = g) => (st.teams || []).find((t) => t.members.some((mn) => mn.includes("(YOU)")));
+    const teamTable = (st = g) => (st.teams || []).map((t) => ({
+        ...t, ovr: teamOverall(t, (n) => ovrOf(n, st)), pts: (st.teamSeasonPts || {})[t.id] || 0,
+    })).sort((a, b) => b.pts - a.pts || b.ovr - a.ovr);
     const evolveAI = (g = gRef) => {
         const cur = g.ai || {};
         const out = {};
@@ -1083,7 +1149,23 @@ function GolfCareerSim() {
         if (Object.keys(nx).length >= 8) {
             const pro = { name: name.trim(), nation, age: 17, attrs: nx, overall: calcOverall(nx),
                 wx: [68 + Math.floor(Math.random() * 23), 68 + Math.floor(Math.random() * 23), 68 + Math.floor(Math.random() * 23)] };
-            const st = { pro, season: 1, evIdx: 0,
+            const allTime = mode === "alltime";
+            let aiSeed = null;
+            if (allTime) {
+                const keys = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
+                aiSeed = {};
+                PLAYERS.forEach((p, idx) => {
+                    const leg = ALLTIME_FIELD[idx];
+                    if (leg) {
+                        const attrs = Object.fromEntries(keys.map((k, i) => [k, leg[2][i]]));
+                        aiSeed[p.name] = { displayName: leg[0], country: leg[1], age: 28 + (idx % 8), attrs, overall: calcOverall(attrs), pot: 97, legend: true };
+                    }
+                });
+            }
+            const teams0 = mode === "team" ? buildTeams(pro.name, pro.overall) : null;
+            const st = { pro, season: 1, evIdx: 0, mode,
+                ...(aiSeed ? { ai: aiSeed } : {}),
+                ...(teams0 ? { teams: teams0, teamSeasonPts: {} } : {}),
                 standings: Object.fromEntries([...PLAYERS.map((p) => [p.name, { pts: 0, money: 0 }]), [pro.name, { pts: 0, money: 0 }]]),
                 myStats: freshStats(), history: [], seasonLog: [], tally: {}, ryderHolder: "USA", lastRyder: null,
                 eventHistory: {}, courseXP: {}, rcRace: {}, pastWinners: {}, owgrBase: { ...OWGR_SEED }, xp: 0, bank: 0, wxXP: [0, 0, 0], earned: {}, ownedGear: ["ball_std", "drv_std", "irn_std", "wdg_std", "put_std"], coach: null, badges: [], badgeNews: [], caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: false };
@@ -1106,7 +1188,7 @@ function GolfCareerSim() {
         setTour(null);
         setRyder(null);
         setZOffers(null);
-        setScreen("identity");
+        setScreen("landing");
     };
     const hireCaddie = async (c) => {
         const st = { ...g, caddie: c, caddieOffers: null, prevCaddie: null };
@@ -1575,6 +1657,18 @@ function GolfCareerSim() {
                         st.myStats.bestFinish = myLine.pos;
                 }
             }
+            if (g.mode === "team" && st.teams) {
+                const teamOf = {};
+                st.teams.forEach((t) => t.members.forEach((mn) => { teamOf[mn.replace(" (YOU)", "")] = t.id; }));
+                const tsp = { ...(st.teamSeasonPts || {}) };
+                tour.results.finishers.forEach((r) => {
+                    var _a;
+                    const tid = (_a = teamOf[r.name]) !== null && _a !== void 0 ? _a : teamOf[r.name + " (YOU)"];
+                    if (tid != null)
+                        tsp[tid] = (tsp[tid] || 0) + (r.pts || 0);
+                });
+                st.teamSeasonPts = tsp;
+            }
             if (tour.inField) {
                 const meEnt = tour.scores.find((s2) => s2.isYou);
                 const played = meEnt ? meEnt.rounds.length : 0;
@@ -1785,13 +1879,43 @@ function GolfCareerSim() {
             owgrBase: Object.fromEntries([...rosterNames, g.pro.name].map((n) => { var _a; return [n, Math.round(((g.owgrBase || OWGR_SEED)[n] || 0) * 0.4 + (((_a = g.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0))]; })), ai: evo.ai };
         if (newAge >= 45)
             st.retired = true;
+        // TEAM MODE: reset season pts; generate transfer offers if you've outgrown your team
+        if (g.mode === "team" && g.teams) {
+            st.teamSeasonPts = {};
+            const myOvr = calcOverall(g.pro.attrs);
+            const mt = (g.teams || []).find((t) => t.members.some((mn) => mn.includes("(YOU)")));
+            const tOvr = (t) => Math.round(t.members.reduce((a, n) => {
+                var _a;
+                const clean = n.replace(" (YOU)", "");
+                if (clean === g.pro.name)
+                    return a + myOvr;
+                const ap = (g.ai && g.ai[clean]) ? g.ai[clean].overall : (((_a = PLAYERS.find((p) => p.name === clean)) === null || _a === void 0 ? void 0 : _a.overall) || 75);
+                return a + ap;
+            }, 0) / t.members.length);
+            // teams stronger than your current one, whose weakest member you'd beat, may bid
+            const offers = (g.teams || [])
+                .filter((t) => !t.members.some((mn) => mn.includes("(YOU)")))
+                .filter((t) => {
+                const weakest = Math.min(...t.members.map((n) => {
+                    var _a;
+                    const ap = (g.ai && g.ai[n]) ? g.ai[n].overall : (((_a = PLAYERS.find((p) => p.name === n)) === null || _a === void 0 ? void 0 : _a.overall) || 75);
+                    return ap;
+                }));
+                return myOvr > weakest + 1 && tOvr(t) > (mt ? tOvr(mt) : 0);
+            })
+                .sort((a, b) => tOvr(b) - tOvr(a))
+                .slice(0, 3)
+                .map((t) => t.id);
+            if (offers.length)
+                st.teamOffers = offers;
+        }
         return st;
     };
     const newSeason = async () => {
         const st = buildNextSeason(g);
         setG(st);
         await save(st);
-        setScreen(st.retired ? "retired" : "hub");
+        setScreen(st.retired ? "retired" : (st.teamOffers && st.teamOffers.length ? "teamOffers" : "hub"));
     };
     const insights = () => {
         const log = (g.seasonLog || []).filter((l) => l.myR.length > 0);
@@ -1842,10 +1966,41 @@ function GolfCareerSim() {
     if (screen === "loading")
         return React.createElement(Shell, null,
             React.createElement("div", null));
+    if (screen === "landing") {
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "pt-16 text-center" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, letterSpacing: 6, color: C.gold } }, "\u26F3 SUNDAY PINS"),
+                React.createElement("h1", { style: { fontFamily: FONT, fontSize: 56, color: C.chalk, lineHeight: 0.95 }, className: "mt-1" },
+                    "A GOLF",
+                    React.createElement("br", null),
+                    "CAREER"),
+                React.createElement("p", { className: "text-sm mt-3 mb-8 px-4", style: { color: C.muted } }, "Build a player from nothing. Climb the world rankings, win majors, make the cup teams, and chase the greatest careers of all time \u2014 hole by hole."),
+                React.createElement("div", { className: "px-2" },
+                    React.createElement(Btn, { onClick: () => setScreen("modeSelect") }, "\u25B6 NEW CAREER")),
+                React.createElement("p", { className: "text-[10px] mt-6", style: { color: C.muted, opacity: 0.6 } }, "v2 \u00B7 saves in your browser"))));
+    }
+    if (screen === "modeSelect") {
+        const MODES = [
+            { id: "standard", emoji: "🏆", name: "TOUR CAREER", desc: "The real modern tour. Start as a 17-year-old nobody ranked outside the world top 200 and grind your way to greatness against today's pros." },
+            { id: "alltime", emoji: "👑", name: "ALL-TIME GREATS", desc: "Fantasy mode. The field is golf's 25 greatest players at their absolute primes — Tiger '00, Jack '72, Hogan '53, Seve '84. Can you beat the legends and top the GOAT board yourself?" },
+            { id: "team", emoji: "🤝", name: "TEAM TOUR", desc: "Franchise mode. 36 four-man teams ranked by talent. You start on the weakest squad — play well, and stronger teams come calling. Every result scores for your club in the season-long team title race." },
+        ];
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen("landing") }),
+            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk } }, "CHOOSE YOUR WORLD"),
+            React.createElement("p", { className: "text-xs mb-3", style: { color: C.muted } }, "Pick the field you want to test yourself against. More modes coming."),
+            MODES.map((md) => (React.createElement("button", { key: md.id, onClick: () => { setMode(md.id); setScreen("identity"); }, className: "w-full mb-3 p-4 rounded-xl text-left active:scale-[0.99]", style: { background: md.id === "alltime" ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card, border: md.id === "alltime" ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.2)" } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 24, color: md.id === "alltime" ? C.gold : C.chalk } },
+                    md.emoji,
+                    " ",
+                    md.name),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, md.desc))))));
+    }
     if (screen === "identity") {
         return (React.createElement(Shell, null,
             React.createElement("div", { className: "pt-10 text-center" },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, letterSpacing: 5, color: C.gold } }, "\u26F3 SUNDAY PINS"),
+                React.createElement("button", { onClick: () => setScreen("modeSelect"), className: "mb-2 px-3 py-1 rounded-md", style: { background: C.panel, color: C.chalk, fontFamily: FONT, fontSize: 13, letterSpacing: 2, border: "1px solid rgba(244,247,242,0.25)" } }, "\u2039 MODE"),
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, letterSpacing: 5, color: C.gold } }, mode === "alltime" ? "👑 ALL-TIME GREATS" : "⛳ SUNDAY PINS"),
                 React.createElement("h1", { style: { fontFamily: FONT, fontSize: 50, color: C.chalk, lineHeight: 1 } }, "BUILD YOUR PRO"),
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 11, letterSpacing: 3, color: C.muted } }, "SUNDAY PINS \u00B7 A GOLF CAREER"),
                 React.createElement("p", { className: "text-sm mt-2 mb-6", style: { color: C.muted } }, "Eight spins, one random pro each \u2014 take what you can get and grind the rest. Then chase wins, majors, the FedEx Cup, the Ryder Cup, and the all-time records \u2014 hole by hole."),
@@ -1999,6 +2154,8 @@ function GolfCareerSim() {
                     g.pro.overall,
                     " OVR")),
             React.createElement("div", { className: "text-xs mb-2", style: { color: C.muted } },
+                g.mode === "alltime" ? "👑 ALL-TIME · " : "",
+                g.mode === "team" && myTeam() ? `🤝 ${myTeam().name} · ` : "",
                 g.pro.nation,
                 " \u00B7 Age ", (_c = g.pro.age) !== null && _c !== void 0 ? _c : 22,
                 " \u00B7 Season ",
@@ -2106,6 +2263,7 @@ function GolfCareerSim() {
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("cabinet") }, "\uD83C\uDFC6 CABINET"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setSelSched(null); setScreen("schedule"); } }, "\uD83D\uDCC5 SCHEDULE"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("world") }, "\uD83C\uDF10 WORLD RANKINGS"),
+                g.mode === "team" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("team") }, "\uD83E\uDD1D MY TEAM"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("coaches") }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHES"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("equipment") }, "\uD83C\uDFCC\uFE0F EQUIPMENT")),
             (() => {
@@ -2242,12 +2400,106 @@ function GolfCareerSim() {
                 }))))),
             React.createElement(Btn, { onClick: () => setScreen("hub"), kind: "panel" }, "BACK")));
     }
+    // ---------- team tour ----------
+    if (screen === "team") {
+        const table = teamTable();
+        const mt = myTeam();
+        const myRank = table.findIndex((t) => t.id === (mt === null || mt === void 0 ? void 0 : mt.id)) + 1;
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83E\uDD1D TEAM TOUR"),
+            mt && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { className: "flex justify-between items-baseline" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 24, color: C.gold } }, mt.name),
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 18, color: C.chalk } },
+                        ordinal(myRank),
+                        " of ",
+                        table.length)),
+                React.createElement("div", { className: "text-xs mb-2", style: { color: C.muted } },
+                    "Team rating ",
+                    teamOverall(mt, (n) => ovrOf(n)),
+                    " \u00B7 ",
+                    (g.teamSeasonPts || {})[mt.id] || 0,
+                    " pts this season"),
+                mt.members.map((mn) => {
+                    const you = mn.includes("(YOU)");
+                    return (React.createElement("div", { key: mn, className: "flex justify-between text-xs mb-0.5", style: { color: you ? C.gold : C.chalk } },
+                        React.createElement("span", null, mn),
+                        React.createElement("span", { style: { color: tint(ovrOf(mn)) } }, ovrOf(mn))));
+                }))),
+            React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "TEAM STANDINGS \u00B7 THIS SEASON"),
+                table.slice(0, 12).map((t, i) => {
+                    const mine = t.id === (mt === null || mt === void 0 ? void 0 : mt.id);
+                    return (React.createElement("div", { key: t.id, className: "flex justify-between text-xs mb-0.5", style: { color: mine ? C.gold : C.chalk, fontWeight: mine ? 700 : 400 } },
+                        React.createElement("span", { className: "truncate pr-2" },
+                            i + 1,
+                            ". ",
+                            t.name,
+                            mine ? " (YOURS)" : "",
+                            " ",
+                            React.createElement("span", { style: { color: C.muted, fontSize: 10 } },
+                                "\u00B7 ovr ",
+                                t.ovr)),
+                        React.createElement("span", null, t.pts)));
+                }),
+                myRank > 12 && mt && (React.createElement("div", { className: "flex justify-between text-xs mt-1 pt-1", style: { color: C.gold, borderTop: "1px solid rgba(244,247,242,0.15)" } },
+                    React.createElement("span", null,
+                        myRank,
+                        ". ",
+                        mt.name,
+                        " (YOURS)"),
+                    React.createElement("span", null, (g.teamSeasonPts || {})[mt.id] || 0)))),
+            React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "Every member's finish scores FedEx points for the club. Play well and stronger teams will come knocking between seasons \u2014 your spot isn't forever.")));
+    }
+    // ---------- team transfer offers (off-season) ----------
+    if (screen === "teamOffers" && g.teamOffers) {
+        const accept = async (tid) => {
+            const teams = g.teams.map((t) => {
+                const m = t.members.map((mn) => mn.includes("(YOU)") ? mn.replace(" (YOU)", "") : mn);
+                return { ...t, members: m };
+            });
+            // place you on the chosen team, bumping their weakest non-you member
+            const tgt = teams.find((t) => t.id === tid);
+            let weakestIdx = 0, weakestOvr = 999;
+            tgt.members.forEach((mn, i) => { const o = ovrOf(mn); if (o < weakestOvr) {
+                weakestOvr = o;
+                weakestIdx = i;
+            } });
+            tgt.members[weakestIdx] = g.pro.name + " (YOU)";
+            const st = { ...g, teams, teamOffers: null };
+            setG(st);
+            await save(st);
+            setScreen("hub");
+        };
+        const decline = async () => { const st = { ...g, teamOffers: null }; setG(st); await save(st); setScreen("hub"); };
+        return (React.createElement(Shell, null,
+            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83D\uDCDE TRANSFER WINDOW"),
+            React.createElement("p", { className: "text-sm mb-3", style: { color: C.muted } },
+                "Your form has turned heads. Stronger teams want your signature for next season \u2014 or stay loyal to ", (_f = myTeam()) === null || _f === void 0 ? void 0 :
+                _f.name,
+                "."),
+            g.teamOffers.map((tid) => {
+                const t = g.teams.find((x) => x.id === tid);
+                return (React.createElement("button", { key: tid, onClick: () => accept(tid), className: "w-full mb-2 p-3 rounded-xl text-left active:scale-[0.99]", style: { background: C.card, border: `1.5px solid ${C.gold}` } },
+                    React.createElement("div", { className: "flex justify-between items-baseline" },
+                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: C.gold } }, t.name),
+                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.chalk } },
+                            "ovr ",
+                            teamOverall(t, (n) => ovrOf(n)))),
+                    React.createElement("div", { className: "text-xs", style: { color: C.muted } }, t.members.filter((m) => !m.includes("(YOU)")).join(" · ")),
+                    React.createElement("div", { className: "text-xs mt-1", style: { color: C.green } }, "Sign here \u25B8")));
+            }),
+            React.createElement(Btn, { kind: "panel", onClick: decline },
+                "STAY WITH ",
+                (((_g = myTeam()) === null || _g === void 0 ? void 0 : _g.name) || "MY TEAM").toUpperCase())));
+    }
     // ---------- world ranking ----------
     if (screen === "world") {
         const list = owgrList();
         const myIdx = list.findIndex((x) => x.name === g.pro.name);
         const ovrList = [...ROSTER().map((p) => { var _a; return ({ name: p.name, ovr: p.overall, age: (_a = p.age) !== null && _a !== void 0 ? _a : aiAgeOf(p.name), country: p.country, rookie: p.rookie }); }),
-            { name: g.pro.name, ovr: calcOverall(effAttrs(g)), age: (_f = g.pro.age) !== null && _f !== void 0 ? _f : 22, country: NATION_CODE[g.pro.nation] || "INT", isYou: true }]
+            { name: g.pro.name, ovr: calcOverall(effAttrs(g)), age: (_h = g.pro.age) !== null && _h !== void 0 ? _h : 22, country: NATION_CODE[g.pro.nation] || "INT", isYou: true }]
             .sort((a, b) => b.ovr - a.ovr);
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
@@ -2371,7 +2623,7 @@ function GolfCareerSim() {
     }
     // ---------- coaching staff ----------
     if (screen === "coaches") {
-        const bank = (_g = g.bank) !== null && _g !== void 0 ? _g : g.myStats.careerMoney;
+        const bank = (_j = g.bank) !== null && _j !== void 0 ? _j : g.myStats.careerMoney;
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHING STAFF"),
@@ -2405,7 +2657,7 @@ function GolfCareerSim() {
     if (screen === "equipment") {
         const equip = g.equip || {};
         const owned = g.ownedGear || ["ball_std", "drv_std", "irn_std", "wdg_std", "put_std"];
-        const bank = (_h = g.bank) !== null && _h !== void 0 ? _h : g.myStats.careerMoney;
+        const bank = (_k = g.bank) !== null && _k !== void 0 ? _k : g.myStats.careerMoney;
         const buyGear = async (item) => {
             if ((g.ownedGear || []).includes(item.id))
                 return;
@@ -2477,7 +2729,7 @@ function GolfCareerSim() {
             React.createElement("div", { className: "text-xs", style: { color: C.muted } },
                 "Won: ",
                 w.seasons.map((s) => `Season ${s}`).join(" · "))));
-        const empty = wins.length === 0 && g.myStats.fedexTitles === 0 && g.myStats.rc.teamWins === 0 && (((_j = g.myStats.pc) === null || _j === void 0 ? void 0 : _j.teamWins) || 0) === 0;
+        const empty = wins.length === 0 && g.myStats.fedexTitles === 0 && g.myStats.rc.teamWins === 0 && (((_l = g.myStats.pc) === null || _l === void 0 ? void 0 : _l.teamWins) || 0) === 0;
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk } }, "\uD83C\uDFC6 TROPHY CABINET"),
@@ -2501,7 +2753,7 @@ function GolfCareerSim() {
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold }, className: "float-right" },
                         "\u00D7",
                         g.myStats.fedexTitles))),
-                (((_k = g.myStats.pc) === null || _k === void 0 ? void 0 : _k.teamWins) || 0) > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: "1.5px solid rgba(159,217,139,0.6)" } },
+                (((_m = g.myStats.pc) === null || _m === void 0 ? void 0 : _m.teamWins) || 0) > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: "1.5px solid rgba(159,217,139,0.6)" } },
                     React.createElement("div", { className: "flex justify-between items-baseline" },
                         React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: C.green } }, "\uD83C\uDF0F PRESIDENTS CUP (team)"),
                         React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } },
@@ -2644,8 +2896,8 @@ function GolfCareerSim() {
         if (sideR)
             rows.push(["Ryder Cups played", m.rc.apps], ["Ryder Cup record", `${m.rc.w}-${m.rc.l}-${m.rc.h}`], ["Ryder Cup team wins", m.rc.teamWins]);
         if (sideP)
-            rows.push(["Presidents Cups played", ((_l = m.pc) === null || _l === void 0 ? void 0 : _l.apps) || 0], ["Presidents Cup record", `${((_m = m.pc) === null || _m === void 0 ? void 0 : _m.w) || 0}-${((_o = m.pc) === null || _o === void 0 ? void 0 : _o.l) || 0}-${((_p = m.pc) === null || _p === void 0 ? void 0 : _p.h) || 0}`], ["Presidents Cup team wins", ((_q = m.pc) === null || _q === void 0 ? void 0 : _q.teamWins) || 0]);
-        rows.push(["Bank (spendable)", fmtMoney((_r = g.bank) !== null && _r !== void 0 ? _r : m.careerMoney)]);
+            rows.push(["Presidents Cups played", ((_o = m.pc) === null || _o === void 0 ? void 0 : _o.apps) || 0], ["Presidents Cup record", `${((_p = m.pc) === null || _p === void 0 ? void 0 : _p.w) || 0}-${((_q = m.pc) === null || _q === void 0 ? void 0 : _q.l) || 0}-${((_r = m.pc) === null || _r === void 0 ? void 0 : _r.h) || 0}`], ["Presidents Cup team wins", ((_s = m.pc) === null || _s === void 0 ? void 0 : _s.teamWins) || 0]);
+        rows.push(["Bank (spendable)", fmtMoney((_t = g.bank) !== null && _t !== void 0 ? _t : m.careerMoney)]);
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, g.pro.name.toUpperCase()),
@@ -2662,7 +2914,7 @@ function GolfCareerSim() {
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: tint(calcOverall(effAttrs(g))) } },
                         calcOverall(effAttrs(g)),
                         " OVR",
-                        ((_s = g.caddie) === null || _s === void 0 ? void 0 : _s.perks) ? " (w/ caddie)" : "")),
+                        ((_u = g.caddie) === null || _u === void 0 ? void 0 : _u.perks) ? " (w/ caddie)" : "")),
                 SLOTS.map((s) => {
                     var _a, _b;
                     const base = g.pro.attrs[s.key];
@@ -2779,7 +3031,7 @@ function GolfCareerSim() {
                             React.createElement(Btn, { onClick: closeEvent }, "CONTINUE")))));
         }
         if (round === 0 && !live) {
-            const myRecord = ((_t = g.eventHistory) === null || _t === void 0 ? void 0 : _t[ev.e]) || [];
+            const myRecord = ((_v = g.eventHistory) === null || _v === void 0 ? void 0 : _v[ev.e]) || [];
             return (React.createElement(Shell, null,
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, ev.type === "major" ? "★ MAJOR CHAMPIONSHIP ★" : ev.e.toUpperCase()),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1 } }, course.name),
@@ -3583,7 +3835,7 @@ function GolfCareerSim() {
                             g.myStats.eagles),
                         React.createElement("span", null,
                             "Earnings: ",
-                            fmtMoney(((_u = g.standings[g.pro.name]) === null || _u === void 0 ? void 0 : _u.money) || 0)),
+                            fmtMoney(((_w = g.standings[g.pro.name]) === null || _w === void 0 ? void 0 : _w.money) || 0)),
                         React.createElement("span", null,
                             "Career: ",
                             fmtMoney(g.myStats.careerMoney)))),
@@ -3598,16 +3850,16 @@ function GolfCareerSim() {
                 React.createElement(Btn, { onClick: newSeason },
                     "START SEASON ",
                     g.season + 1,
-                    ((_v = g.pro.age) !== null && _v !== void 0 ? _v : 22) + 1 >= 32 ? ` · AGE ${((_w = g.pro.age) !== null && _w !== void 0 ? _w : 22) + 1}` : ""),
-                ((_x = g.pro.age) !== null && _x !== void 0 ? _x : 22) + 1 >= 32 && React.createElement("p", { className: "text-xs mt-1", style: { color: C.bogey } }, "\u23F3 The body slows past 31 \u2014 distance and recovery fade a touch each year. Skill holds."),
-                ((_y = g.pro.age) !== null && _y !== void 0 ? _y : 22) >= 38 && React.createElement("div", { className: "mt-2" },
+                    ((_x = g.pro.age) !== null && _x !== void 0 ? _x : 22) + 1 >= 32 ? ` · AGE ${((_y = g.pro.age) !== null && _y !== void 0 ? _y : 22) + 1}` : ""),
+                ((_z = g.pro.age) !== null && _z !== void 0 ? _z : 22) + 1 >= 32 && React.createElement("p", { className: "text-xs mt-1", style: { color: C.bogey } }, "\u23F3 The body slows past 31 \u2014 distance and recovery fade a touch each year. Skill holds."),
+                ((_0 = g.pro.age) !== null && _0 !== void 0 ? _0 : 22) >= 38 && React.createElement("div", { className: "mt-2" },
                     React.createElement(Btn, { small: true, kind: "red", onClick: async () => { const st = { ...g, retired: true }; setG(st); await save(st); setScreen("retired"); } }, "\uD83C\uDFC1 RETIRE \u2014 END YOUR CAREER")),
                 React.createElement("button", { onClick: resetAll, className: "w-full text-xs mt-3", style: { color: C.muted } }, "Delete career & start over"))));
     }
     // ---------- retirement & hall of fame ----------
     if (screen === "retired") {
         const m = g.myStats;
-        const hofScore = m.careerWins * 2 + m.careerMajors * 8 + m.fedexTitles * 6 + (m.rc.teamWins + (((_z = m.pc) === null || _z === void 0 ? void 0 : _z.teamWins) || 0)) * 2 + Math.floor(m.careerMoney / 2e7);
+        const hofScore = m.careerWins * 2 + m.careerMajors * 8 + m.fedexTitles * 6 + (m.rc.teamWins + (((_1 = m.pc) === null || _1 === void 0 ? void 0 : _1.teamWins) || 0)) * 2 + Math.floor(m.careerMoney / 2e7);
         const hof = hofScore >= 30;
         return (React.createElement(Shell, null,
             React.createElement("div", { className: "pt-8 text-center" },
@@ -3616,7 +3868,7 @@ function GolfCareerSim() {
                     g.pro.name.toUpperCase(),
                     " RETIRES"),
                 React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } },
-                    "Age ", (_0 = g.pro.age) !== null && _0 !== void 0 ? _0 : 22,
+                    "Age ", (_2 = g.pro.age) !== null && _2 !== void 0 ? _2 : 22,
                     " \u00B7 ",
                     g.season,
                     " seasons on tour"),
@@ -3646,7 +3898,7 @@ function GolfCareerSim() {
                             m.rc.teamWins),
                         React.createElement("span", null,
                             "Presidents Cup wins: ",
-                            ((_1 = m.pc) === null || _1 === void 0 ? void 0 : _1.teamWins) || 0)),
+                            ((_3 = m.pc) === null || _3 === void 0 ? void 0 : _3.teamWins) || 0)),
                     React.createElement("p", { className: "text-xs mt-2", style: { color: C.muted } }, hof ? "Your locker goes to St Augustine. They'll talk about your era for decades." :
                         m.careerMajors > 0 ? "A major champion's career — the Hall wanted more, but the trophy doesn't care." :
                             m.careerWins > 0 ? "A winner on the biggest tour in the world. Most never manage one." :
