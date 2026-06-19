@@ -1660,23 +1660,27 @@ function GolfCareerSim() {
             if (g.mode === "team" && st.teams) {
                 const teamOf = {};
                 st.teams.forEach((t) => t.members.forEach((mn) => { teamOf[mn.replace(" (YOU)", "")] = t.id; }));
-                const tsp = { ...(st.teamSeasonPts || {}) };
-                const mt2 = st.teams.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
-                const myMembers = mt2 ? mt2.members.map((mn) => mn.replace(" (YOU)", "")) : [];
-                const weekMine = [];
+                // gather every team's finishers this week, then score ONLY each team's best 2
+                const perTeam = {};
                 tour.results.finishers.forEach((r) => {
                     var _a;
                     const tid = (_a = teamOf[r.name]) !== null && _a !== void 0 ? _a : teamOf[r.name + " (YOU)"];
-                    if (tid != null)
-                        tsp[tid] = (tsp[tid] || 0) + (r.pts || 0);
-                    if (myMembers.includes(r.name))
-                        weekMine.push({ name: r.name, pos: r.pos, pts: r.pts, isYou: r.isYou });
+                    if (tid == null)
+                        return;
+                    (perTeam[tid] = perTeam[tid] || []).push({ name: r.name, pos: r.pos, pts: r.pts || 0, isYou: r.isYou });
+                });
+                const tsp = { ...(st.teamSeasonPts || {}) };
+                Object.entries(perTeam).forEach(([tid, arr]) => {
+                    const best2 = arr.slice().sort((a, b) => b.pts - a.pts).slice(0, 2);
+                    const add = best2.reduce((s, x) => s + x.pts, 0);
+                    tsp[tid] = (tsp[tid] || 0) + add;
                 });
                 st.teamSeasonPts = tsp;
-                // weekly team-result snapshot for the results screen
-                let weekTeamPts = 0;
-                tour.results.finishers.forEach((r) => { if (mt2 && (teamOf[r.name] === mt2.id))
-                    weekTeamPts += (r.pts || 0); });
+                const mt2 = st.teams.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
+                const mine = mt2 ? (perTeam[mt2.id] || []) : [];
+                const counted = mine.slice().sort((a, b) => b.pts - a.pts).slice(0, 2).map((x) => x.name);
+                const weekMine = mine.map((x) => ({ ...x, counted: counted.includes(x.name) }));
+                const weekTeamPts = weekMine.filter((x) => x.counted).reduce((s, x) => s + x.pts, 0);
                 st.lastTeamWeek = { teamName: mt2 ? mt2.name : "", teamId: mt2 ? mt2.id : null, event: ev.e, members: weekMine, weekPts: weekTeamPts };
             }
             if (tour.inField) {
@@ -1994,7 +1998,7 @@ function GolfCareerSim() {
         const MODES = [
             { id: "standard", emoji: "🏆", name: "TOUR CAREER", desc: "The real modern tour. Start as a 17-year-old nobody ranked outside the world top 200 and grind your way to greatness against today's pros." },
             { id: "alltime", emoji: "👑", name: "ALL-TIME GREATS", desc: "Fantasy mode. The field is golf's 25 greatest players at their absolute primes — Tiger '00, Jack '72, Hogan '53, Seve '84. Can you beat the legends and top the GOAT board yourself?" },
-            { id: "team", emoji: "🤝", name: "TEAM TOUR", desc: "Franchise mode. 36 four-man teams ranked by talent. You start on the weakest squad — play well, and stronger teams come calling. Every result scores for your club in the season-long team title race." },
+            { id: "team", emoji: "🤝", name: "TEAM TOUR", desc: "Franchise mode. 36 four-man teams ranked by talent. You start on the weakest squad — play well, and stronger teams come calling. Your best two finishers each week score for the club in the season-long title race." },
         ];
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("landing") }),
@@ -2430,15 +2434,17 @@ function GolfCareerSim() {
             React.createElement("div", { className: "p-3 rounded-xl my-2", style: { background: C.card, border: "1px solid rgba(244,247,242,0.2)" } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "YOUR FOUR THIS WEEK"),
                 wk.members.length === 0 && React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "No team members made the field this week."),
-                wk.members.sort((a, b) => (a.pos || 999) - (b.pos || 999)).map((mb) => (React.createElement("div", { key: mb.name, className: "flex justify-between text-sm mb-0.5", style: { color: mb.isYou ? C.gold : C.chalk } },
+                wk.members.slice().sort((a, b) => (a.pos || 999) - (b.pos || 999)).map((mb) => (React.createElement("div", { key: mb.name, className: "flex justify-between text-sm mb-0.5", style: { color: mb.counted ? (mb.isYou ? C.gold : C.chalk) : "rgba(244,247,242,0.4)" } },
                     React.createElement("span", null,
                         mb.pos ? ordinal(mb.pos) : "MC",
                         " \u00B7 ",
                         mb.name,
-                        mb.isYou ? " (YOU)" : ""),
-                    React.createElement("span", { style: { color: C.muted } },
+                        mb.isYou ? " (YOU)" : "",
+                        mb.counted ? " ✓" : ""),
+                    React.createElement("span", { style: { color: mb.counted ? C.green : "rgba(244,247,242,0.3)" } },
                         "+",
-                        mb.pts || 0))))),
+                        mb.counted ? (mb.pts || 0) : 0)))),
+                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u2713 = counted toward the team. Only your best two finishers score each week.")),
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } }, "TEAM STANDINGS"),
@@ -2517,7 +2523,7 @@ function GolfCareerSim() {
                         mt.name,
                         " (YOURS)"),
                     React.createElement("span", null, (g.teamSeasonPts || {})[mt.id] || 0)))),
-            React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "Every member's finish scores FedEx points for the club. Play well and stronger teams will come knocking between seasons \u2014 your spot isn't forever.")));
+            React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "Each week only your team's BEST TWO finishers score \u2014 so one star can carry a weak squad, and field size never decides it. Play well and stronger teams will come knocking between seasons; your spot isn't forever.")));
     }
     // ---------- team transfer offers (off-season) ----------
     if (screen === "teamOffers" && g.teamOffers) {
