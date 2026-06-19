@@ -1662,12 +1662,13 @@ function GolfCareerSim() {
                 st.teams.forEach((t) => t.members.forEach((mn) => { teamOf[mn.replace(" (YOU)", "")] = t.id; }));
                 // gather every team's finishers this week, then score ONLY each team's best 2
                 const perTeam = {};
+                const clean = (nm) => nm.replace(" (YOU)", "");
                 tour.results.finishers.forEach((r) => {
-                    var _a;
-                    const tid = (_a = teamOf[r.name]) !== null && _a !== void 0 ? _a : teamOf[r.name + " (YOU)"];
+                    const cn = clean(r.name);
+                    const tid = teamOf[cn];
                     if (tid == null)
                         return;
-                    (perTeam[tid] = perTeam[tid] || []).push({ name: r.name, pos: r.pos, pts: r.pts || 0, isYou: r.isYou });
+                    (perTeam[tid] = perTeam[tid] || []).push({ name: cn, pos: r.pos, pts: r.pts || 0, isYou: r.isYou });
                 });
                 const tsp = { ...(st.teamSeasonPts || {}) };
                 Object.entries(perTeam).forEach(([tid, arr]) => {
@@ -2574,18 +2575,25 @@ function GolfCareerSim() {
     // ---------- team transfer offers (off-season) ----------
     if (screen === "teamOffers" && g.teamOffers) {
         const accept = async (tid) => {
-            const teams = g.teams.map((t) => {
-                const m = t.members.map((mn) => mn.includes("(YOU)") ? mn.replace(" (YOU)", "") : mn);
-                return { ...t, members: m };
-            });
-            // place you on the chosen team, bumping their weakest non-you member
+            // work on a clean copy with your marker stripped
+            const teams = g.teams.map((t) => ({ ...t, members: t.members.map((mn) => mn.replace(" (YOU)", "")) }));
+            const oldTeam = teams.find((t) => t.members.includes(g.pro.name));
             const tgt = teams.find((t) => t.id === tid);
+            // find the target's weakest member — that's who you swap with
             let weakestIdx = 0, weakestOvr = 999;
             tgt.members.forEach((mn, i) => { const o = ovrOf(mn); if (o < weakestOvr) {
                 weakestOvr = o;
                 weakestIdx = i;
             } });
+            const displaced = tgt.members[weakestIdx];
+            // you take their seat
             tgt.members[weakestIdx] = g.pro.name + " (YOU)";
+            // displaced player fills the hole you left in your old team
+            if (oldTeam && oldTeam.id !== tgt.id) {
+                const mySeat = oldTeam.members.indexOf(g.pro.name);
+                if (mySeat >= 0)
+                    oldTeam.members[mySeat] = displaced;
+            }
             const st = { ...g, teams, teamOffers: null };
             setG(st);
             await save(st);
@@ -2600,14 +2608,26 @@ function GolfCareerSim() {
                 "."),
             g.teamOffers.map((tid) => {
                 const t = g.teams.find((x) => x.id === tid);
+                const cleanMembers = t.members.map((m) => m.replace(" (YOU)", ""));
+                let swapWith = cleanMembers[0], wOvr = 999;
+                cleanMembers.forEach((m) => { const o = ovrOf(m); if (o < wOvr) {
+                    wOvr = o;
+                    swapWith = m;
+                } });
                 return (React.createElement("button", { key: tid, onClick: () => accept(tid), className: "w-full mb-2 p-3 rounded-xl text-left active:scale-[0.99]", style: { background: C.card, border: `1.5px solid ${C.gold}` } },
                     React.createElement("div", { className: "flex justify-between items-baseline" },
                         React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: C.gold } }, t.name),
                         React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.chalk } },
                             "ovr ",
                             teamOverall(t, (n) => ovrOf(n)))),
-                    React.createElement("div", { className: "text-xs", style: { color: C.muted } }, t.members.filter((m) => !m.includes("(YOU)")).join(" · ")),
-                    React.createElement("div", { className: "text-xs mt-1", style: { color: C.green } }, "Sign here \u25B8")));
+                    React.createElement("div", { className: "text-xs", style: { color: C.muted } }, cleanMembers.join(" · ")),
+                    React.createElement("div", { className: "text-xs mt-1", style: { color: C.bogey } },
+                        "\u2194 You'd swap in for ",
+                        swapWith,
+                        " (",
+                        wOvr,
+                        " ovr), who moves to your old team"),
+                    React.createElement("div", { className: "text-xs mt-0.5", style: { color: C.green } }, "Sign here \u25B8")));
             }),
             React.createElement(Btn, { kind: "panel", onClick: decline },
                 "STAY WITH ",
