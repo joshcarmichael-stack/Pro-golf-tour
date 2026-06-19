@@ -1663,12 +1663,18 @@ function GolfCareerSim() {
                 // gather every team's finishers this week, then score ONLY each team's best 2
                 const perTeam = {};
                 const clean = (nm) => nm.replace(" (YOU)", "");
+                const myTeamObj = st.teams.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
+                const myTeamId = myTeamObj ? myTeamObj.id : null;
                 tour.results.finishers.forEach((r) => {
                     const cn = clean(r.name);
-                    const tid = teamOf[cn];
+                    // YOU always map to your own team, even if the name lookup ever misses
+                    let tid = r.isYou ? myTeamId : teamOf[cn];
+                    if (tid == null)
+                        tid = teamOf[cn];
                     if (tid == null)
                         return;
-                    (perTeam[tid] = perTeam[tid] || []).push({ name: cn, pos: r.pos, pts: r.pts || 0, isYou: r.isYou });
+                    const nm = r.isYou ? g.pro.name : cn;
+                    (perTeam[tid] = perTeam[tid] || []).push({ name: nm, pos: r.pos, pts: r.pts || 0, isYou: r.isYou });
                 });
                 const tsp = { ...(st.teamSeasonPts || {}) };
                 Object.entries(perTeam).forEach(([tid, arr]) => {
