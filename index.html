@@ -1625,6 +1625,29 @@ function GolfCareerSim() {
                 st.tally[w.name] = { ...tw, w: tw.w + 1, m: tw.m + (ev.type === "major" ? 1 : 0) };
             }
             const youRes = myLine ? ordinal(myLine.pos) : (tour.inField ? "MC" : "DNQ");
+            // accumulate season form for ALL players (drives Player of the Year vote)
+            {
+                const sf = { ...(st.seasonForm || {}) };
+                const isMaj = ev.type === "major";
+                tour.results.finishers.forEach((r) => {
+                    if (r.cut)
+                        return;
+                    const nm = (r.name || "").replace(" (YOU)", "");
+                    const e2 = sf[nm] || { w: 0, r2: 0, t10: 0, maj: 0, pts: 0 };
+                    if (r.pos === 1) {
+                        e2.w += 1;
+                        if (isMaj)
+                            e2.maj += 1;
+                    }
+                    else if (r.pos === 2)
+                        e2.r2 += 1;
+                    if (r.pos <= 10)
+                        e2.t10 += 1;
+                    e2.pts += r.pts || 0;
+                    sf[nm] = e2;
+                });
+                st.seasonForm = sf;
+            }
             st.lastFullBoard = { event: ev.e, par: tour.course.par, course: tour.course.name,
                 rows: tour.results.finishers.map((r) => ({ name: clean2(r.name), pos: r.pos, total: r.total, cut: r.cut, isYou: r.isYou, rounds: r.rounds })) };
             st.history.push({ event: ev.e, winner: w.name, score: toPar(w.total, tour.course.par, 4), you: youRes });
@@ -1932,6 +1955,56 @@ function GolfCareerSim() {
         if (newAge >= 45)
             st.retired = true;
         // TEAM MODE: reset season pts; generate transfer offers if you've outgrown your team
+        // ===== SEASON AWARDS (all modes; team-specific ones only in team mode) =====
+        {
+            const sf = g.seasonForm || {};
+            // Player of the Year vote score: wins*10 + runner-ups*4 + top10s*1.5 + majors*8 + points/200
+            const poyScore = (n) => {
+                const e = sf[n] || { w: 0, r2: 0, t10: 0, maj: 0, pts: 0 };
+                return e.w * 10 + e.r2 * 4 + e.t10 * 1.5 + e.maj * 8 + (e.pts || 0) / 200;
+            };
+            const allNames = Object.keys(sf);
+            let poy = null, poyBest = -1;
+            allNames.forEach((n) => { const s = poyScore(n); if (s > poyBest) {
+                poyBest = s;
+                poy = n;
+            } });
+            const myPoy = poyScore(g.pro.name);
+            const awards = { season: g.season, poy, poyIsYou: poy === g.pro.name, myPoyScore: Math.round(myPoy),
+                myLine: sf[g.pro.name] || { w: 0, r2: 0, t10: 0, maj: 0, pts: 0 } };
+            if (g.mode === "team" && g.teams) {
+                const mt = g.teams.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
+                // team title
+                const table = (g.teams || []).map((t) => ({ id: t.id, name: t.name, pts: (g.teamSeasonPts || {})[t.id] || 0 })).sort((a, b) => b.pts - a.pts);
+                awards.teamChampion = table[0];
+                awards.myTeamRank = mt ? table.findIndex((t) => t.id === mt.id) + 1 : null;
+                awards.wonTitle = mt && table[0] && table[0].id === mt.id;
+                // team MVP = top season points among your team members
+                if (mt) {
+                    const mp = g.teamMemberPts || {};
+                    let mvp = null, mvpPts = -1;
+                    mt.members.forEach((mn) => { const cn = mn.replace(" (YOU)", ""); const p = mp[cn] || 0; if (p > mvpPts) {
+                        mvpPts = p;
+                        mvp = cn;
+                    } });
+                    awards.teamMvp = mvp;
+                    awards.teamMvpPts = mvpPts;
+                    awards.mvpIsYou = mvp === g.pro.name;
+                    awards.teamName = mt.name;
+                }
+            }
+            st.seasonAwards = awards;
+            st.seasonForm = {};
+            // persist trophies
+            const tro = { ...(st.teamTrophies || g.teamTrophies || {}) };
+            if (awards.wonTitle)
+                tro.titles = (tro.titles || 0) + 1;
+            if (awards.mvpIsYou)
+                tro.mvps = (tro.mvps || 0) + 1;
+            if (awards.poyIsYou)
+                tro.poys = (tro.poys || 0) + 1;
+            st.teamTrophies = tro;
+        }
         if (g.mode === "team" && g.teams) {
             st.teamSeasonPts = {};
             st.teamMemberPts = {};
@@ -1974,9 +2047,11 @@ function GolfCareerSim() {
     };
     const newSeason = async () => {
         const st = buildNextSeason(g);
+        const nextScreen = st.retired ? "retired" : (st.teamOffers && st.teamOffers.length ? "teamOffers" : (st.teamNoOffer ? "teamNoOffer" : "hub"));
+        st.awardsThenScreen = nextScreen;
         setG(st);
         await save(st);
-        setScreen(st.retired ? "retired" : (st.teamOffers && st.teamOffers.length ? "teamOffers" : (st.teamNoOffer ? "teamNoOffer" : "hub")));
+        setScreen(st.seasonAwards ? "awards" : nextScreen);
     };
     const insights = () => {
         const log = (g.seasonLog || []).filter((l) => l.myR.length > 0);
@@ -2483,6 +2558,46 @@ function GolfCareerSim() {
                         r.rounds.join("-"),
                         ")") : null))))),
             React.createElement(Btn, { kind: "panel", onClick: () => setScreen(g.boardReturn || "hub") }, "BACK")));
+    }
+    // ---------- season awards ----------
+    if (screen === "awards" && g.seasonAwards) {
+        const a = g.seasonAwards;
+        const cont = async () => { const nx = g.awardsThenScreen || "hub"; const st = { ...g, seasonAwards: null }; setG(st); await save(st); setScreen(nx); };
+        const Award = ({ icon, label, winner, sub, you }) => (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: you ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.panel, border: you ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.15)" } },
+            React.createElement("div", { className: "text-[10px] mb-0.5", style: { color: C.gold, fontFamily: FONT, letterSpacing: 2 } },
+                icon,
+                " ",
+                label),
+            React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: you ? C.gold : C.chalk } },
+                winner || "—",
+                you ? " (YOU)" : ""),
+            sub && React.createElement("div", { className: "text-xs", style: { color: C.muted } }, sub)));
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center mb-3" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.muted } },
+                    "SEASON ",
+                    a.season,
+                    " \u00B7 WRAP-UP"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: C.chalk } }, "\uD83C\uDFC5 END OF SEASON AWARDS")),
+            React.createElement(Award, { icon: "\u2B50", label: "PLAYERS' PLAYER OF THE YEAR", winner: a.poy, you: a.poyIsYou, sub: a.poyIsYou ? `Voted the best in the game — ${a.myLine.w} wins, ${a.myLine.r2} runner-ups, ${a.myLine.t10} top-10s${a.myLine.maj ? `, ${a.myLine.maj} major${a.myLine.maj > 1 ? "s" : ""}` : ""}` : "Voted by the players as the season's standout" }),
+            g.mode === "team" && (React.createElement(React.Fragment, null,
+                React.createElement(Award, { icon: "\uD83C\uDFC6", label: "TEAM CHAMPIONS", winner: a.teamChampion ? a.teamChampion.name : null, you: a.wonTitle, sub: a.wonTitle ? "You won the team title! 🎉" : a.teamChampion ? `${a.teamChampion.pts} pts · your team finished ${ordinal(a.myTeamRank)}` : "" }),
+                React.createElement(Award, { icon: "\uD83E\uDD47", label: `${a.teamName || "TEAM"} MVP`, winner: a.teamMvp, you: a.mvpIsYou, sub: a.mvpIsYou ? `You led your team with ${a.teamMvpPts} pts this season` : `Top scorer for your team (${a.teamMvpPts} pts)` }))),
+            !a.poyIsYou && (React.createElement("p", { className: "text-xs text-center mb-2", style: { color: C.muted } },
+                "Your season: ",
+                a.myLine.w,
+                " wins \u00B7 ",
+                a.myLine.r2,
+                " runner-ups \u00B7 ",
+                a.myLine.t10,
+                " top-10s",
+                a.myLine.maj ? ` · ${a.myLine.maj} major${a.myLine.maj > 1 ? "s" : ""}` : "",
+                " \u00B7 POY vote score ",
+                a.myPoyScore)),
+            React.createElement(Btn, { onClick: cont },
+                "CONTINUE TO SEASON ",
+                a.season + 1,
+                " \u25B8")));
     }
     // ---------- no transfer offers this off-season ----------
     if (screen === "teamNoOffer") {
