@@ -1196,6 +1196,8 @@ function GolfCareerSim() {
             setTimeout(() => setScreen(st.mode === "league" && st.isFreeAgent ? "freeAgency" : "hub"), 700);
         }
     };
+    const [confirmNew, setConfirmNew] = useState(false);
+    const goHome = () => setScreen("landing");
     const resetAll = async () => {
         try {
             await window.storage.delete(SAVE_KEY);
@@ -2228,9 +2230,25 @@ function GolfCareerSim() {
                     React.createElement("br", null),
                     "CAREER"),
                 React.createElement("p", { className: "text-sm mt-3 mb-8 px-4", style: { color: C.muted } }, "Build a player from nothing. Climb the world rankings, win majors, make the cup teams, and chase the greatest careers of all time \u2014 hole by hole."),
-                React.createElement("div", { className: "px-2" },
-                    React.createElement(Btn, { onClick: () => setScreen("modeSelect") }, "\u25B6 NEW CAREER")),
-                React.createElement("p", { className: "text-[10px] mt-6", style: { color: C.muted, opacity: 0.6 } }, "v2 \u00B7 saves in your browser"))));
+                React.createElement("div", { className: "px-2" }, g && g.pro ? (React.createElement(React.Fragment, null,
+                    React.createElement(Btn, { onClick: () => setScreen(g.retired ? "retired" : "hub") }, "\u25B6 CONTINUE CAREER"),
+                    React.createElement("div", { className: "text-xs mt-1 mb-3", style: { color: C.muted } },
+                        g.pro.name,
+                        " \u00B7 ",
+                        g.mode === "alltime" ? "All-Time Greats" : g.mode === "team" ? "Team Tour" : g.mode === "league" ? "League System" : "Tour Career",
+                        " \u00B7 Season ",
+                        g.season),
+                    !confirmNew ? (React.createElement(Btn, { kind: "panel", onClick: () => setConfirmNew(true) }, "\uFF0B START A NEW CAREER")) : (React.createElement("div", { className: "p-3 rounded-xl", style: { background: C.panel, border: `1px solid ${C.red}` } },
+                        React.createElement("p", { className: "text-xs mb-2", style: { color: C.chalk } },
+                            "Starting a new career will ",
+                            React.createElement("b", { style: { color: C.red } }, "permanently erase"),
+                            " your current one (",
+                            g.pro.name,
+                            "). Are you sure?"),
+                        React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                            React.createElement(Btn, { small: true, kind: "red", onClick: async () => { setConfirmNew(false); await resetAll(); setScreen("modeSelect"); } }, "YES, ERASE"),
+                            React.createElement(Btn, { small: true, kind: "panel", onClick: () => setConfirmNew(false) }, "CANCEL")))))) : (React.createElement(Btn, { onClick: () => setScreen("modeSelect") }, "\u25B6 NEW CAREER"))),
+                React.createElement("p", { className: "text-[10px] mt-6", style: { color: C.muted, opacity: 0.6 } }, "v2 \u00B7 your progress saves automatically"))));
     }
     if (screen === "modeSelect") {
         const MODES = [
@@ -2401,11 +2419,12 @@ function GolfCareerSim() {
         const typeLabel = { regular: "PGA TOUR EVENT", signature: "SIGNATURE EVENT", players: "THE PLAYERS", major: "★ MAJOR CHAMPIONSHIP ★", playoff: "FEDEX CUP PLAYOFFS", tc: "TOUR CHAMPIONSHIP", team: "TEAM EVENT · PAIRS" };
         const myRecord = ev ? (((_b = g.eventHistory) === null || _b === void 0 ? void 0 : _b[ev.e]) || []) : [];
         return (React.createElement(Shell, null,
-            React.createElement("div", { className: "flex justify-between items-baseline" },
-                React.createElement("h1", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, g.pro.name),
+            React.createElement("div", { className: "flex justify-between items-center mb-1" },
+                React.createElement("button", { onClick: goHome, className: "px-2.5 py-1 rounded-md active:scale-95", style: { background: C.panel, color: C.chalk, fontFamily: FONT, fontSize: 12, letterSpacing: 2, border: "1px solid rgba(244,247,242,0.2)" } }, "\u2302 HOME"),
                 React.createElement("span", { style: { fontFamily: FONT, fontSize: 26, color: tint(g.pro.overall) } },
                     g.pro.overall,
                     " OVR")),
+            React.createElement("h1", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, g.pro.name),
             React.createElement("div", { className: "text-xs mb-2", style: { color: C.muted } },
                 g.mode === "alltime" ? "👑 ALL-TIME · " : "",
                 g.mode === "team" && myTeam() ? `🤝 ${myTeam().name} · ` : "",
