@@ -1511,6 +1511,22 @@ function GolfCareerSim() {
     };
     const startEvent = () => {
         const ev = SCHEDULE[g.evIdx];
+        // ===== BENCH CHECK (league mode): if you're below your squad's level, you may be left out =====
+        if (g.mode === "league" && g.leagues && ev.type !== "team") {
+            const mt = g.leagues.find((t) => t.members.some((m) => m.includes("(YOU)")));
+            if (mt) {
+                const mates = mt.members.filter((m) => !m.includes("(YOU)"));
+                const squadAvg = mates.length ? Math.round(mates.reduce((a, m) => a + ovrOf(m), 0) / mates.length) : 0;
+                const myOvr = calcOverall(g.pro.attrs);
+                const gap = squadAvg - myOvr;
+                // benched probability scales with how far below the squad you are (0 if you're at/above level)
+                const benchChance = gap >= 9 ? 0.6 : gap >= 6 ? 0.45 : gap >= 3 ? 0.28 : 0;
+                if (benchChance > 0 && Math.random() < benchChance) {
+                    benchThisWeek(ev);
+                    return;
+                }
+            }
+        }
         if (ev.type === "team") {
             buildZurichOffers(ev);
             return;
@@ -1533,6 +1549,18 @@ function GolfCareerSim() {
         const course = COURSES.find((c) => c.name === cname);
         setPrep({ ev: realEv, cname, course, filterNames, parallel, vitals: courseVitals(course) });
         setScreen("prep");
+    };
+    const benchThisWeek = async (ev) => {
+        // left out of the lineup: no points/money, small practice XP, advance the event
+        const practiceXP = 6 + Math.floor(Math.random() * 5);
+        const benchCount = (g.benchCount || 0) + 1;
+        const st = { ...g, evIdx: g.evIdx + 1, xp: (g.xp || 0) + practiceXP,
+            xpGainLast: practiceXP, xpBreakdown: [{ label: "Practice while benched", amt: practiceXP }],
+            benchCount, benchedNote: { event: ev.e, xp: practiceXP } };
+        // simulate the event for everyone else so standings/AI keep moving
+        setG(st);
+        await save(st);
+        setScreen("benched");
     };
     const launchTour = (pr, trainKey) => {
         const course = pr.course;
@@ -2530,18 +2558,32 @@ function GolfCareerSim() {
                     .filter((s) => s.wantsYou && s.canAfford);
                 // interest scales with form; need at least some form to attract bids
                 const interested = (formScore >= 3 || myOvr >= 82) ? suitors.sort((a, b) => a.t.division - b.t.division).slice(0, 3) : [];
-                if (interested.length) {
-                    st.playerOffers = interested.map((s) => ({
+                // ===== RESCUE OFFERS: if you've been benched a lot, smaller clubs offer regular golf =====
+                const benchedALot = (g.benchCount || 0) >= 4;
+                let rescues = [];
+                if (benchedALot) {
+                    rescues = leagues.filter((t) => t.division > newDiv && !t.members.some((m) => m.includes("(YOU)")))
+                        .map((t) => ({ t, weakest: Math.min(...t.members.map((m) => ovrOf(m, st))) }))
+                        .filter((s) => myOvr >= s.weakest - 4)
+                        .sort((a, b) => a.t.division - b.t.division).slice(0, 2)
+                        .map((s) => ({ teamId: s.t.id, teamName: s.t.name, division: s.t.division,
+                        fee: Math.round(myVal * 0.7 * 10) / 10, rescue: true,
+                        blurb: "Drop down for regular golf and real game time." }));
+                }
+                const combined = [...interested.map((s) => ({
                         teamId: s.t.id, teamName: s.t.name, division: s.t.division,
                         fee: Math.round(myVal * (0.9 + Math.random() * 0.4) * 10) / 10,
                         blurb: s.gap >= 2 ? "A major step up — top-flight ambition." : "A move up the divisions.",
-                    }));
+                    })), ...rescues];
+                if (combined.length) {
+                    st.playerOffers = combined;
                     st.playerOffersWhen = "off-season";
                 }
                 else {
                     st.playerOffers = null;
                 }
             }
+            st.benchCount = 0; // reset each season
         }
         // ===== SEASON AWARDS (all modes; team-specific ones only in team mode) =====
         {
@@ -3389,6 +3431,27 @@ function GolfCareerSim() {
             React.createElement(Btn, { onClick: () => setScreen("hub") }, "CONTINUE")));
     }
     // ---------- transfer window summary (league mode, off-season) ----------
+    if (screen === "benched" && g.benchedNote) {
+        const mt = myLeagueTeam();
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center pt-8" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.red } }, "LEFT OUT"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1.05 } }, "NOT IN THE LINEUP"),
+                React.createElement("p", { className: "text-sm mt-3 mb-2", style: { color: C.muted } },
+                    "The manager left you out for the ",
+                    g.benchedNote.event,
+                    ". ",
+                    mt ? mt.name : "The club",
+                    " went with more experienced names this week. You put in the practice hours instead."),
+                React.createElement("div", { className: "p-3 rounded-xl my-3 inline-block", style: { background: C.panel } },
+                    React.createElement("span", { style: { color: C.green, fontFamily: FONT, fontSize: 16 } },
+                        "+",
+                        g.benchedNote.xp,
+                        " XP"),
+                    React.createElement("span", { className: "text-xs ml-2", style: { color: C.muted } }, "from practice")),
+                React.createElement("p", { className: "text-xs mb-4", style: { color: C.muted } }, "Keep developing \u2014 close the gap to your squad and you'll force your way into the team. Or a smaller club may offer you regular golf."),
+                React.createElement(Btn, { onClick: async () => { const st = { ...g, benchedNote: null }; setG(st); await save(st); setScreen("hub"); } }, "CONTINUE \u25B8"))));
+    }
     if (screen === "playerOffers" && g.playerOffers && g.playerOffers.length) {
         const accept = async (offer) => {
             // move you to the new club: take their weakest non-you slot
@@ -3433,16 +3496,30 @@ function GolfCareerSim() {
                     "Your form has caught the eye of bigger clubs. Move up to chase the top flight \u2014 or stay and lead ",
                     mtNow ? mtNow.name : "your club",
                     ".")),
-            g.playerOffers.map((offer) => (React.createElement("div", { key: offer.teamId, className: "w-full mb-2 p-3 rounded-xl", style: { background: C.card, border: `1.5px solid ${C.gold}` } },
-                React.createElement("div", { className: "flex justify-between items-baseline" },
-                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: C.gold } }, offer.teamName),
-                    React.createElement("span", { className: "text-xs", style: { color: C.muted } }, divName(offer.division))),
-                React.createElement("div", { className: "text-xs mb-2", style: { color: C.green } },
-                    offer.blurb,
-                    " \u00B7 bid $",
-                    offer.fee,
-                    "m"),
-                React.createElement("button", { onClick: () => accept(offer), className: "w-full py-2 rounded-md active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 14, letterSpacing: 1 } }, "ACCEPT & SIGN \u25B8")))),
+            g.playerOffers.map((offer) => {
+                const tgt = (g.leagues || []).find((t) => t.id === offer.teamId);
+                const myOvr = calcOverall(g.pro.attrs);
+                const squadAvg = tgt ? Math.round(tgt.members.filter((m) => !m.includes("(YOU)")).reduce((a, m) => a + ovrOf(m), 0) / Math.max(1, tgt.members.filter((m) => !m.includes("(YOU)")).length)) : myOvr;
+                const gap = squadAvg - myOvr; // positive = you're below the squad
+                const benchRisk = gap >= 3;
+                return (React.createElement("div", { key: offer.teamId, className: "w-full mb-2 p-3 rounded-xl", style: { background: C.card, border: `1.5px solid ${offer.rescue ? C.blue : benchRisk ? C.red : C.gold}` } },
+                    React.createElement("div", { className: "flex justify-between items-baseline" },
+                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: offer.rescue ? C.blue : C.gold } }, offer.teamName),
+                        React.createElement("span", { className: "text-xs", style: { color: C.muted } }, divName(offer.division))),
+                    React.createElement("div", { className: "text-xs mb-1", style: { color: offer.rescue ? C.blue : C.green } },
+                        offer.blurb,
+                        " \u00B7 bid $",
+                        offer.fee,
+                        "m"),
+                    !offer.rescue && React.createElement("div", { className: "text-[11px] mb-2", style: { color: C.muted } },
+                        "Squad rated ~",
+                        squadAvg,
+                        " \u00B7 you're ",
+                        myOvr),
+                    offer.rescue && React.createElement("div", { className: "text-[11px] mb-2 p-2 rounded", style: { background: "rgba(127,183,217,0.12)", color: C.blue } }, "\uD83D\uDD04 You've spent too long on the bench. Drop down here and you'll play every week and develop faster."),
+                    benchRisk && !offer.rescue && (React.createElement("div", { className: "text-[11px] mb-2 p-2 rounded", style: { background: "rgba(217,108,79,0.12)", color: C.red } }, "\u26A0\uFE0F Big move, but you may not make the lineup. Expect to be benched often, earn less, and develop slower until your game catches up. Smaller clubs may come back in if you're not playing.")),
+                    React.createElement("button", { onClick: () => accept(offer), className: "w-full py-2 rounded-md active:scale-95", style: { background: offer.rescue ? C.blue : benchRisk ? "rgba(217,108,79,0.85)" : C.gold, color: C.bg, fontFamily: FONT, fontSize: 14, letterSpacing: 1 } }, offer.rescue ? "DROP DOWN & PLAY ▸" : benchRisk ? "SIGN ANYWAY ▸" : "ACCEPT & SIGN ▸")));
+            }),
             React.createElement(Btn, { kind: "panel", onClick: decline }, "DECLINE ALL \u00B7 STAY PUT")));
     }
     if (screen === "transferWindow" && g.leagueTransfers) {
