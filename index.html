@@ -1696,18 +1696,24 @@ function GolfCareerSim() {
                 const mt2 = st.teams.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
                 const finByName = {};
                 tour.results.finishers.forEach((r) => { finByName[clean(r.name)] = r; });
-                const playedNames = mt2 ? (perTeam[mt2.id] || []).map((x) => x.name) : [];
+                // the FULL field (everyone who teed it up), so we can tell "missed cut" from "didn't qualify"
+                const fieldByName = {};
+                (tour.scores || []).forEach((s) => { fieldByName[clean(s.name)] = s; });
                 const counted = mt2 ? (perTeam[mt2.id] || []).slice().sort((a, b) => b.pts - a.pts).slice(0, 2).map((x) => x.name) : [];
                 const allFour = mt2 ? mt2.members.map((mn) => {
                     const cn = clean(mn);
                     const isYouM = mn.includes("(YOU)");
-                    const fr = finByName[isYouM ? g.pro.name : cn] || finByName[cn];
-                    const inField = !!fr;
+                    const key = isYouM ? g.pro.name : cn;
+                    const fr = finByName[key] || finByName[cn]; // finish (made cut)
+                    const fld = fieldByName[key] || fieldByName[cn]; // was in the field at all
+                    const inField = !!fld;
+                    const madeCut = !!fr && !fr.cut;
                     return {
-                        name: isYouM ? g.pro.name : cn, isYou: isYouM, inField,
+                        name: key, isYou: isYouM, inField, madeCut,
                         pos: fr ? fr.pos : null, pts: fr ? (fr.pts || 0) : 0,
-                        total: fr ? fr.total : null, cut: fr ? fr.cut : false,
-                        counted: counted.includes(isYouM ? g.pro.name : cn),
+                        total: fr ? fr.total : (fld ? fld.total : null),
+                        cut: inField && !madeCut,
+                        counted: counted.includes(key),
                     };
                 }) : [];
                 const weekMine = allFour;
@@ -2515,6 +2521,8 @@ function GolfCareerSim() {
                 wk.members.slice().sort((a, b) => {
                     if (a.inField !== b.inField)
                         return a.inField ? -1 : 1;
+                    if (a.cut !== b.cut)
+                        return a.cut ? 1 : -1;
                     return (a.pos || 999) - (b.pos || 999);
                 }).map((mb) => (React.createElement("div", { key: mb.name, className: "flex justify-between items-baseline text-sm mb-1", style: { color: !mb.inField ? "rgba(244,247,242,0.35)" : mb.counted ? (mb.isYou ? C.gold : C.chalk) : "rgba(244,247,242,0.6)" } },
                     React.createElement("span", null,
@@ -2526,9 +2534,10 @@ function GolfCareerSim() {
                         mb.inField && !mb.cut && mb.total != null && React.createElement("span", { style: { color: C.muted, fontSize: 11 } },
                             " \u00B7 ",
                             toPar(mb.total, wk.par, 4)),
+                        mb.inField && mb.cut && React.createElement("span", { style: { color: C.muted, fontSize: 11 } }, " \u00B7 missed cut"),
                         !mb.inField && React.createElement("span", { style: { color: C.muted, fontSize: 11 } }, " \u00B7 didn't qualify")),
                     React.createElement("span", { style: { color: mb.counted ? C.green : "rgba(244,247,242,0.3)" } }, mb.counted ? "+" + (mb.pts || 0) : mb.inField ? "+0" : "")))),
-                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u2713 = counted (best two score) \u00B7 score shown is the 72-hole total \u00B7 \"didn't qualify\" = field was capped by world ranking that week.")),
+                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u2713 = counted (best two score) \u00B7 \"missed cut\" = played but didn't make the weekend \u00B7 \"didn't qualify\" = field was capped by world ranking that week.")),
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } }, "TEAM STANDINGS"),
