@@ -1465,6 +1465,15 @@ function GolfCareerSim() {
     };
     // ---------- Zurich (team) ----------
     const buildZurichOffers = (ev) => {
+        // TEAM / LEAGUE: your partner choices are your three squad-mates
+        const squad = g.mode === "team" ? myTeam() : g.mode === "league" ? myLeagueTeam() : null;
+        if (squad) {
+            const mates = squad.members.map((mn) => mn.replace(" (YOU)", "")).filter((n) => n !== g.pro.name);
+            const cands = mates.map((n) => aiP(n, g)).filter(Boolean);
+            setZOffers({ ev, cands, squadMode: true });
+            setScreen("partner");
+            return;
+        }
         const sorted = Object.entries(g.standings).sort((a, b) => b[1].pts - a[1].pts).map(([n]) => n);
         const myRank = sorted.indexOf(g.pro.name);
         const myCode = NATION_CODE[g.pro.nation] || "INT";
@@ -1491,9 +1500,23 @@ function GolfCareerSim() {
         const weather = [0, 1, 2, 3].map(() => rollWeather(CLIMATE[ev.c] || [1, 1, 0]));
         const myTeam = { name: `${g.pro.name.split(" ").slice(-1)[0]} / ${partner.name.split(" ").slice(-1)[0]}`,
             members: [{ name: g.pro.name, attrs: effAttrs(g), wx: effWx(g) }, { name: partner.name, attrs: partner, wx: wxOf(partner.name) }], isYou: true };
-        const rest = ROSTER().filter((p) => p.name !== partner.name)
-            .sort((a, b) => { var _a, _b; return (((_a = g.standings[b.name]) === null || _a === void 0 ? void 0 : _a.pts) || 0) - (((_b = g.standings[a.name]) === null || _b === void 0 ? void 0 : _b.pts) || 0); });
+        const squad = g.mode === "team" ? myTeam() : g.mode === "league" ? myLeagueTeam() : null;
+        let squadPairExclude = [partner.name];
         const teams = [myTeam];
+        if (squad) {
+            // the remaining two squad-mates pair up as your team's second duo
+            const mates = squad.members.map((mn) => mn.replace(" (YOU)", "")).filter((n) => n !== g.pro.name && n !== partner.name);
+            if (mates.length >= 2) {
+                const a = aiP(mates[0], g), b = aiP(mates[1], g);
+                if (a && b) {
+                    teams.push({ name: `${mates[0].split(" ").slice(-1)[0]} / ${mates[1].split(" ").slice(-1)[0]}`,
+                        members: [{ name: a.name, attrs: a, wx: wxOf(a.name) }, { name: b.name, attrs: b, wx: wxOf(b.name) }], isYou: false, isYourSquad: true });
+                    squadPairExclude.push(mates[0], mates[1]);
+                }
+            }
+        }
+        const rest = ROSTER().filter((p) => !squadPairExclude.includes(p.name))
+            .sort((a, b) => { var _a, _b; return (((_a = g.standings[b.name]) === null || _a === void 0 ? void 0 : _a.pts) || 0) - (((_b = g.standings[a.name]) === null || _b === void 0 ? void 0 : _b.pts) || 0); });
         for (let i = 0; i + 1 < rest.length; i += 2) {
             teams.push({ name: `${rest[i].name.split(" ").slice(-1)[0]} / ${rest[i + 1].name.split(" ").slice(-1)[0]}`,
                 members: [{ name: rest[i].name, attrs: rest[i], wx: wxOf(rest[i].name) }, { name: rest[i + 1].name, attrs: rest[i + 1], wx: wxOf(rest[i + 1].name) }], isYou: false });
@@ -3637,7 +3660,9 @@ function GolfCareerSim() {
         return (React.createElement(Shell, null,
             React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "ZURICH CLASSIC \u00B7 TEAM EVENT"),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1 } }, "YOUR PHONE IS BUZZING"),
-            React.createElement("p", { className: "text-sm my-2", style: { color: C.muted } }, "Three pros want to partner with you in New Orleans \u2014 players near you in the FedEx race, with a nod to shared allegiances. Four-ball Rounds 1 & 3, alternate-shot 2 & 4. Pick your man."),
+            React.createElement("p", { className: "text-sm my-2", style: { color: C.muted } }, zOffers.squadMode
+                ? "It's your squad's week in New Orleans. Pick one team-mate to partner — the other two pair up as your club's second team. Four-ball Rounds 1 & 3, alternate-shot 2 & 4."
+                : "Three pros want to partner with you in New Orleans — players near you in the FedEx race, with a nod to shared allegiances. Four-ball Rounds 1 & 3, alternate-shot 2 & 4. Pick your man."),
             zOffers.cands.map((p) => (React.createElement("button", { key: p.name, onClick: () => confirmPartner(p), className: "w-full mb-3 p-3 rounded-xl text-left active:scale-[0.99]", style: { background: C.card, border: "1px solid rgba(244,247,242,0.2)" } },
                 React.createElement("div", { className: "flex justify-between items-baseline" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk } }, p.name),
@@ -3652,7 +3677,7 @@ function GolfCareerSim() {
                     (() => { const ks = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"]; const top = ks.reduce((a, k) => p[k] > p[a] ? k : a, ks[0]); return `${PERK_LABEL[top]} ${p[top]}`; })()),
                 React.createElement("p", { className: "text-xs italic mt-0.5", style: { color: C.green } },
                     "\"",
-                    NATION_CODE[g.pro.nation] === p.country ? "Let's fly the flag together." : "Our games fit. Let's go win this thing.",
+                    zOffers.squadMode ? "Team-mates. Let's do the club proud." : (NATION_CODE[g.pro.nation] === p.country ? "Let's fly the flag together." : "Our games fit. Let's go win this thing."),
                     "\""))))));
     }
     // ---------- range session (pre-tournament prep) ----------
