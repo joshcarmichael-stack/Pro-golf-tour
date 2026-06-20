@@ -70,7 +70,7 @@ const playerValue = (p) => {
 };
 const buildLeagues = (proName) => {
     const ai = PLAYERS.slice().sort((a, b) => b.overall - a.overall).map((p) => p.name);
-    const N = 40, SIZE = 4;
+    const N = 40, SIZE = 5;
     const teams = Array.from({ length: N }, (_, i) => ({
         id: i, name: ALL_TEAM_NAMES[i] || `Team ${i + 1}`, members: [], division: Math.floor(i / 10), budget: 0,
     }));
@@ -1511,16 +1511,22 @@ function GolfCareerSim() {
     };
     const startEvent = () => {
         const ev = SCHEDULE[g.evIdx];
-        // ===== BENCH CHECK (league mode): if you're below your squad's level, you may be left out =====
+        // ===== BENCH CHECK (league mode): 5-man squad, best 4 play — only the weakest may sit =====
         if (g.mode === "league" && g.leagues && ev.type !== "team") {
             const mt = g.leagues.find((t) => t.members.some((m) => m.includes("(YOU)")));
             if (mt) {
                 const mates = mt.members.filter((m) => !m.includes("(YOU)"));
-                const squadAvg = mates.length ? Math.round(mates.reduce((a, m) => a + ovrOf(m), 0) / mates.length) : 0;
                 const myOvr = calcOverall(g.pro.attrs);
-                const gap = squadAvg - myOvr;
-                // benched probability scales with how far below the squad you are (0 if you're at/above level)
-                const benchChance = gap >= 9 ? 0.6 : gap >= 6 ? 0.45 : gap >= 3 ? 0.28 : 0;
+                // rank everyone in the squad by overall; with best-4-play, only the 5th-ranked risks the bench
+                const ratings = mates.map((m) => ovrOf(m)).sort((a, b) => b - a);
+                // how many teammates are clearly better than you (by 1+)?
+                const betterThanMe = mates.filter((m) => ovrOf(m) > myOvr + 1).length;
+                // you only risk benching if 4+ teammates are clearly better (i.e. you're the clear 5th man)
+                let benchChance = 0;
+                if (betterThanMe >= 4) {
+                    const gapToFourth = (ratings[3] || 0) - myOvr; // how far below the 4th-best you are
+                    benchChance = gapToFourth >= 6 ? 0.5 : gapToFourth >= 3 ? 0.32 : gapToFourth >= 1 ? 0.15 : 0.05;
+                }
                 if (benchChance > 0 && Math.random() < benchChance) {
                     benchThisWeek(ev);
                     return;
@@ -2053,8 +2059,8 @@ function GolfCareerSim() {
                 }
                 const tsp = { ...(st.teamSeasonPts || {}) };
                 Object.entries(perTeam).forEach(([tid, arr]) => {
-                    const best2 = arr.slice().sort((a, b) => b.pts - a.pts).slice(0, 2);
-                    tsp[tid] = (tsp[tid] || 0) + best2.reduce((s, x) => s + x.pts, 0);
+                    const best4 = arr.slice().sort((a, b) => b.pts - a.pts).slice(0, 4);
+                    tsp[tid] = (tsp[tid] || 0) + best4.reduce((s, x) => s + x.pts, 0);
                 });
                 st.teamSeasonPts = tsp;
                 if (myTeamObj) {
@@ -2075,7 +2081,7 @@ function GolfCareerSim() {
                         tour.results.finishers.forEach((r) => { finByName[clean(r.name)] = r; });
                         (tour.scores || []).forEach((s) => { fieldByName[clean(s.name)] = s; });
                     }
-                    const counted = (perTeam[myTeamObj.id] || []).slice().sort((a, b) => b.pts - a.pts).slice(0, 2).map((x) => x.name);
+                    const counted = (perTeam[myTeamObj.id] || []).slice().sort((a, b) => b.pts - a.pts).slice(0, 4).map((x) => x.name);
                     const allFour = myTeamObj.members.map((mn) => {
                         const cn = clean(mn);
                         const isYouM = mn.includes("(YOU)");
@@ -2435,7 +2441,7 @@ function GolfCareerSim() {
             }
             else {
                 // no retirements affecting teams — clear any stray nulls defensively
-                leagues.forEach((t) => { t.members = t.members.filter((m) => m !== null); while (t.members.length < 4)
+                leagues.forEach((t) => { t.members = t.members.filter((m) => m !== null); while (t.members.length < 5)
                     t.members.push("Tour Rookie"); });
             }
             // snapshot each team's finishing position IN ITS DIVISION before any promotion/relegation
@@ -2761,6 +2767,7 @@ function GolfCareerSim() {
                     "A GOLF",
                     React.createElement("br", null),
                     "CAREER"),
+                React.createElement("p", { className: "text-xs mt-2", style: { color: C.gold, letterSpacing: 2 } }, "GOLF'S ANSWER TO FOOTBALL MANAGER"),
                 React.createElement("p", { className: "text-sm mt-3 mb-8 px-4", style: { color: C.muted } }, "Build a player from nothing. Climb the world rankings, win majors, make the cup teams, and chase the greatest careers of all time \u2014 hole by hole."),
                 React.createElement("div", { className: "px-2" }, g && g.pro ? (React.createElement(React.Fragment, null,
                     React.createElement(Btn, { onClick: () => setScreen(g.retired ? "retired" : "hub") }, "\u25B6 CONTINUE CAREER"),
@@ -3399,7 +3406,7 @@ function GolfCareerSim() {
                         mb.inField && mb.cut && React.createElement("span", { style: { color: C.muted, fontSize: 11 } }, " \u00B7 missed cut"),
                         !mb.inField && React.createElement("span", { style: { color: C.muted, fontSize: 11 } }, " \u00B7 didn't qualify")),
                     React.createElement("span", { style: { color: mb.counted ? C.green : "rgba(244,247,242,0.3)" } }, mb.counted ? "+" + (mb.pts || 0) : mb.inField ? "+0" : "")))),
-                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u2713 = counted (best two score) \u00B7 \"missed cut\" = played but didn't make the weekend \u00B7 \"didn't qualify\" = field was capped by world ranking that week.")),
+                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u2713 = counted (best four score) \u00B7 \"missed cut\" = played but didn't make the weekend \u00B7 \"didn't qualify\" = field was capped by world ranking that week.")),
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } }, wk.isLeague ? "DIVISION TABLE" : "TEAM STANDINGS"),
@@ -3473,9 +3480,13 @@ function GolfCareerSim() {
                 if (yi >= 0)
                     old.members[yi] = displaced;
             }
+            const movedUp = tgt && old && tgt.division < old.division;
+            // a pending promotion spin only stands if this move is itself upward; signing sideways/down cancels it
+            const keepReroll = g.rerollAvailable && movedUp;
             const st = { ...g, leagues, playerOffers: null, myDivision: tgt ? tgt.division : g.myDivision,
-                everPromoted: (tgt && old && tgt.division < old.division) ? true : g.everPromoted,
+                everPromoted: movedUp ? true : g.everPromoted,
                 bestDivision: Math.min(g.bestDivision != null ? g.bestDivision : 3, tgt ? tgt.division : 3),
+                rerollAvailable: keepReroll, promotedNote: keepReroll ? g.promotedNote : null,
                 signingNews: { team: offer.teamName, division: offer.division, fee: offer.fee } };
             setG(st);
             await save(st);
@@ -3652,7 +3663,7 @@ function GolfCareerSim() {
                         React.createElement("span", null, t.pts)));
                 }),
                 React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u25B2 promotion \u00B7 \u25BC relegation (applied at season end \u2014 coming in the next update)")),
-            React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "4 divisions \u00B7 10 teams each. Your best two finishers score for the club weekly. Off-season, clubs trade by player value within their budgets \u2014 and you may get an offer to move up.")));
+            React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "4 divisions \u00B7 10 teams each, five players per squad. Your best four finishers score for the club weekly. Off-season, clubs trade by player value within their budgets \u2014 and you may get an offer to move up.")));
     }
     // ---------- team tour ----------
     if (screen === "team") {
