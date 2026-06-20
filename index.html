@@ -214,15 +214,15 @@ const CADDIES = [
     { name: "★ Aoife Brennan", desc: "Links savant from Lahinch. Wind is her first language.", special: true, wxPerks: [9, 6, 5], perks: { bunker: 1 } },
 ];
 const PERK_LABEL = { ALL: "EVERY ATTRIBUTE", drivingAccuracy: "DRV ACC", drivingDistance: "DRV DIST", longApproach: "LONG APP", shortApproach: "SHORT APP", chipping: "CHIPPING", putting: "PUTTING", recovery: "RECOVERY", bunker: "BUNKER" };
-const pickCaddieOffers = () => {
-    const specials = CADDIES.filter((c) => c.special);
-    const normals = CADDIES.filter((c) => !c.special);
+const pickCaddieOffers = (excludeName = null) => {
+    const specials = CADDIES.filter((c) => c.special && c.name !== excludeName);
+    const normals = CADDIES.filter((c) => !c.special && c.name !== excludeName);
     const offers = [];
     const pool = [...normals].sort(() => Math.random() - .5);
     for (let i = 0; i < 3; i++) {
         if (Math.random() < 0.12 && specials.length && !offers.some((o) => o.special))
             offers.push(specials[Math.floor(Math.random() * specials.length)]);
-        else
+        else if (pool.length)
             offers.push(pool.pop());
     }
     return offers;
@@ -1127,12 +1127,21 @@ function GolfCareerSim() {
     }
     catch (e) { } };
     // ---------- effective (caddie-boosted) attrs ----------
+    // chemistry adds a fraction of extra perk value: +1 per perk at chem>=3, +2 at chem>=5
+    const caddieChemBonus = (chem) => (chem >= 5 ? 2 : chem >= 3 ? 1 : 0);
     const effAttrs = (st) => {
         var _a;
         const a = { ...st.pro.attrs };
-        if ((_a = st.caddie) === null || _a === void 0 ? void 0 : _a.perks)
+        if ((_a = st.caddie) === null || _a === void 0 ? void 0 : _a.perks) {
+            const cb = caddieChemBonus(st.caddie.chem || 0);
             for (const k in st.caddie.perks)
-                a[k] = a[k] + st.caddie.perks[k];
+                a[k] = a[k] + st.caddie.perks[k] + (st.caddie.perks[k] > 0 ? cb : 0);
+        }
+        // high-chemistry bonus perk: at chem>=4 the caddie sharpens your single best scoring area a touch more
+        if (st.caddie && (st.caddie.chem || 0) >= 4 && st.caddie.bonusPerk) {
+            for (const k in st.caddie.bonusPerk)
+                a[k] = a[k] + st.caddie.bonusPerk[k];
+        }
         const em = equipMods(st.equip);
         for (const k in em)
             a[k] = a[k] + em[k];
@@ -1140,7 +1149,13 @@ function GolfCareerSim() {
             a[k] = clampN(a[k], 50, 99);
         return a;
     };
-    const effWx = (st) => { var _a; return ((_a = st.caddie) === null || _a === void 0 ? void 0 : _a.wxPerks) ? st.pro.wx.map((v, i) => Math.min(95, v + st.caddie.wxPerks[i])) : st.pro.wx; };
+    const effWx = (st) => {
+        var _a;
+        if (!((_a = st.caddie) === null || _a === void 0 ? void 0 : _a.wxPerks))
+            return st.pro.wx;
+        const cb = caddieChemBonus(st.caddie.chem || 0);
+        return st.pro.wx.map((v, i) => Math.min(95, v + st.caddie.wxPerks[i] + (st.caddie.wxPerks[i] > 0 ? cb : 0)));
+    };
     // preview: given a set of attribute mods, return [{key, label, from, to, delta}] vs current EFFECTIVE attrs
     const overallWithMods = (mods) => {
         const cur = effAttrs(g);
@@ -1392,7 +1407,17 @@ function GolfCareerSim() {
         setScreen("landing");
     };
     const hireCaddie = async (c) => {
-        const st = { ...g, caddie: c, caddieOffers: null, prevCaddie: null };
+        // if re-signing the same caddie (from prevCaddie), keep their accumulated chemistry; a new hire starts at 0
+        const keepingChem = g.prevCaddie && g.prevCaddie.name === c.name ? (g.prevCaddie.chem || 0) : 0;
+        // bonus perk unlocked at high chemistry = strengthen their strongest existing perk area
+        let bonusPerk = c.bonusPerk;
+        if (!bonusPerk && c.perks) {
+            const best = Object.entries(c.perks).sort((a, b) => b[1] - a[1])[0];
+            if (best)
+                bonusPerk = { [best[0]]: 1 };
+        }
+        const caddie = { ...c, chem: keepingChem, bonusPerk };
+        const st = { ...g, caddie, caddieOffers: null, prevCaddie: null };
         setG(st);
         await save(st);
     };
@@ -1945,8 +1970,17 @@ function GolfCareerSim() {
                 }
                 if (myLine) {
                     st.myStats.cutsMade++;
-                    st.bank = ((_a = g.bank) !== null && _a !== void 0 ? _a : g.myStats.careerMoney) + myLine.money;
-                    st.myStats.careerMoney += myLine.money;
+                    // CADDIE WAGES: a caddie takes a cut of prize money — elite caddies cost more. No earnings, no wage.
+                    let netMoney = myLine.money;
+                    if (g.caddie) {
+                        const cutPct = g.caddie.special ? 0.10 : 0.06; // 10% for legends, 6% standard (real-world caddie cuts)
+                        const wage = Math.round(myLine.money * cutPct);
+                        netMoney = myLine.money - wage;
+                        st.caddieWageLast = wage;
+                        st.caddiePaidSeason = (g.caddiePaidSeason || 0) + wage;
+                    }
+                    st.bank = ((_a = g.bank) !== null && _a !== void 0 ? _a : g.myStats.careerMoney) + netMoney;
+                    st.myStats.careerMoney += netMoney;
                     // DUAL POT: in team/league modes your winnings also build your club's prize pot
                     if ((g.mode === "team" && st.teams) || (g.mode === "league" && st.leagues)) {
                         const pool = g.mode === "league" ? st.leagues : st.teams;
@@ -2436,7 +2470,7 @@ function GolfCareerSim() {
         setScreen("seasonEnd");
     };
     const buildNextSeason = (g) => {
-        var _a;
+        var _a, _b;
         const evo = evolveAI(g);
         const rosterNames = PLAYERS.map((p) => { var _a; return ((_a = evo.ai[p.name]) === null || _a === void 0 ? void 0 : _a.displayName) || p.name; });
         const newAge = ((_a = g.pro.age) !== null && _a !== void 0 ? _a : 22) + 1;
@@ -2459,12 +2493,31 @@ function GolfCareerSim() {
             pro: { ...g.pro, age: newAge, attrs: newAttrs, overall: calcOverall(newAttrs) }, agedNote: declined,
             standings: Object.fromEntries([...rosterNames.filter((n) => n !== g.pro.name).map((n) => [n, { pts: 0, money: 0 }]), [g.pro.name, { pts: 0, money: 0 }]]),
             retiredNews: evo.news,
-            myStats: { ...g.myStats, events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 0, bestFinish: null, birdies: 0, eagles: 0, albatrosses: 0, aces: 0 },
-            history: [], seasonLog: [], lastRyder: null, prevCaddie: g.caddie, caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: g.mode !== "league",
+            myStats: { ...g.myStats, events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 0, bestFinish: null, birdies: 0, eagles: 0, albatrosses: 0, aces: 0 }, caddiePaidSeason: 0,
+            history: [], seasonLog: [], lastRyder: null, prevCaddie: g.caddie, caddie: null, caddieOffers: pickCaddieOffers(g.caddie ? g.caddie.name : null), rerollAvailable: g.mode !== "league",
             rcRace: g.season % 2 === 1 ? Object.fromEntries([...rosterNames, g.pro.name].map((n) => { var _a; return [n, ((g.rcRace || {})[n] || 0) + (((_a = g.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0)]; })) : {},
             owgrBase: Object.fromEntries([...rosterNames, g.pro.name].map((n) => { var _a; return [n, Math.round(((g.owgrBase || OWGR_SEED)[n] || 0) * 0.4 + (((_a = g.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0))]; })), ai: evo.ai };
         if (newAge >= 45)
             st.retired = true;
+        // ===== CADDIE: morale (did you deliver?) and whether they re-sign =====
+        if (g.caddie) {
+            const seasonMoney = ((_b = g.standings[g.pro.name]) === null || _b === void 0 ? void 0 : _b.money) || 0;
+            // an elite (special) caddie expects big money; a normal caddie is happier with less
+            const expectation = g.caddie.special ? 8e6 : 2.5e6;
+            const delivered = seasonMoney >= expectation;
+            const chem = (g.caddie.chem || 0);
+            // a caddie walks if you under-deliver AND there isn't strong chemistry holding them
+            const willLeave = !delivered && (g.caddie.special ? chem < 3 : chem < 2) && Math.random() < (g.caddie.special ? 0.7 : 0.4);
+            if (willLeave) {
+                st.caddieLeftNote = { name: g.caddie.name, special: !!g.caddie.special };
+                st.prevCaddie = null; // they're gone — no "stay" option, lost chemistry
+            }
+            else {
+                // they re-sign; chemistry grows if you kept them and delivered
+                const newChem = Math.min(5, chem + (delivered ? 1 : 0.5));
+                st.prevCaddie = { ...g.caddie, chem: newChem };
+            }
+        }
         // TEAM MODE: reset season pts; generate transfer offers if you've outgrown your team
         // ===== LEAGUE MODE: promotion/relegation + AI transfer window =====
         if (g.mode === "league" && g.leagues) {
@@ -3009,12 +3062,24 @@ function GolfCareerSim() {
                         p.from,
                         "\u2192",
                         p.to))),
-                    c.wxPerks && React.createElement("span", { className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: "rgba(127,183,217,0.15)", color: C.blue } }, "WEATHER GUIDANCE"))))),
+                    c.wxPerks && React.createElement("span", { className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: "rgba(127,183,217,0.15)", color: C.blue } }, "WEATHER GUIDANCE")),
+                React.createElement("p", { className: "text-[10px] mt-1.5", style: { color: C.bogey } },
+                    "\uD83D\uDCB7 Takes ",
+                    c.special ? "10%" : "6%",
+                    " of prize money \u00B7 ",
+                    c.special ? "expects you to contend (elite)" : "easygoing on results")))),
             g.prevCaddie && (React.createElement("button", { onClick: () => hireCaddie(g.prevCaddie), className: "w-full mb-3 p-3 rounded-xl text-left active:scale-[0.99]", style: { background: "rgba(127,183,217,0.08)", border: "1.5px dashed rgba(127,183,217,0.5)" } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: C.blue } },
-                    "\uD83E\uDD1D STAY WITH ",
-                    g.prevCaddie.name.toUpperCase()),
-                React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "Loyalty matters. Keep the partnership going for another season."),
+                React.createElement("div", { className: "flex justify-between items-baseline" },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: C.blue } },
+                        "\uD83E\uDD1D STAY WITH ",
+                        g.prevCaddie.name.toUpperCase()),
+                    React.createElement("span", { className: "text-[10px]", style: { color: C.gold } },
+                        "★".repeat(Math.floor(g.prevCaddie.chem || 0)),
+                        "☆".repeat(5 - Math.floor(g.prevCaddie.chem || 0)))),
+                React.createElement("p", { className: "text-xs", style: { color: C.muted } },
+                    "Chemistry ",
+                    (g.prevCaddie.chem || 0) >= 5 ? "is unbreakable — perks at maximum" : (g.prevCaddie.chem || 0) >= 4 ? "has unlocked a bonus perk!" : (g.prevCaddie.chem || 0) >= 3 ? "is strong — perks boosted" : "keeps building the longer you stay",
+                    "."),
                 React.createElement("div", { className: "flex gap-1.5 flex-wrap mt-1" },
                     g.prevCaddie.perks && previewMods(g.prevCaddie.perks).map((p) => (React.createElement("span", { key: p.key, className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: "rgba(159,217,139,0.15)", color: C.green } },
                         p.label,
@@ -3110,13 +3175,26 @@ function GolfCareerSim() {
                     "START SEASON ",
                     g.season + 1,
                     " \u25B8"))),
+            g.caddieLeftNote && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(217,108,79,0.1)", border: `1.5px solid ${C.red}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.red }, className: "mb-1" }, "\uD83C\uDF92 CADDIE DEPARTURE"),
+                React.createElement("p", { className: "text-sm", style: { color: C.chalk } },
+                    React.createElement("b", null, g.caddieLeftNote.name),
+                    " has walked away",
+                    g.caddieLeftNote.special ? " — a legend doesn't carry a bag that isn't contending" : ", looking for a player who delivers",
+                    ". Any chemistry you'd built is gone. Pick a new looper this pre-season."),
+                React.createElement("button", { onClick: async () => { const st = { ...g, caddieLeftNote: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))),
             g.caddie && (React.createElement("div", { className: "px-3 py-2 rounded-lg mb-3 flex items-center justify-between", style: { background: "rgba(232,195,90,0.08)", border: "1px solid rgba(232,195,90,0.3)" } },
                 React.createElement("span", { className: "text-xs", style: { color: C.chalk } },
-                    "\uD83C\uDF92 On the bag: ",
-                    React.createElement("b", { style: { color: g.caddie.special ? C.gold : C.chalk } }, g.caddie.name)),
+                    "\uD83C\uDF92 ",
+                    React.createElement("b", { style: { color: g.caddie.special ? C.gold : C.chalk } }, g.caddie.name),
+                    " ",
+                    React.createElement("span", { style: { color: C.gold, fontSize: 10 } }, "★".repeat(Math.floor(g.caddie.chem || 0)))),
                 React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
-                    g.caddie.perks ? Object.entries(g.caddie.perks).map(([k, v]) => `+${v} ${PERK_LABEL[k]}`).join(" · ") : "",
-                    g.caddie.wxPerks ? (g.caddie.perks ? " · " : "") + "weather" : ""))),
+                    g.caddie.perks ? Object.entries(g.caddie.perks).map(([k, v]) => `+${v + ((g.caddie.chem || 0) >= 5 ? 2 : (g.caddie.chem || 0) >= 3 ? 1 : 0)} ${PERK_LABEL[k]}`).join(" · ") : "",
+                    g.caddie.wxPerks ? (g.caddie.perks ? " · " : "") + "weather" : "",
+                    " \u00B7 ",
+                    g.caddie.special ? "10%" : "6%",
+                    " cut"))),
             g.isFreeAgent && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: `1.5px solid ${C.gold}` } },
                 React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } }, "\uD83C\uDF92 FREE AGENT"),
