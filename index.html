@@ -1398,14 +1398,14 @@ function GolfCareerSim() {
     const applyReroll = async (value, from) => {
         const bonus = (g.earned || {})[rrAttr] || 0;
         const newAttrs = { ...g.pro.attrs, [rrAttr]: Math.min(99, value + bonus) };
-        const st = { ...g, pro: { ...g.pro, attrs: newAttrs, overall: calcOverall(newAttrs) }, rerollAvailable: false };
+        const st = { ...g, pro: { ...g.pro, attrs: newAttrs, overall: calcOverall(newAttrs) }, rerollAvailable: false, promotedNote: null };
         setG(st);
         await save(st);
         setRrAttr(null);
         setRrPair(null);
     };
     const skipReroll = async () => {
-        const st = { ...g, rerollAvailable: false };
+        const st = { ...g, rerollAvailable: false, promotedNote: null };
         setG(st);
         await save(st);
         setRrAttr(null);
@@ -2330,7 +2330,7 @@ function GolfCareerSim() {
             standings: Object.fromEntries([...rosterNames.filter((n) => n !== g.pro.name).map((n) => [n, { pts: 0, money: 0 }]), [g.pro.name, { pts: 0, money: 0 }]]),
             retiredNews: evo.news,
             myStats: { ...g.myStats, events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 0, bestFinish: null, birdies: 0, eagles: 0, albatrosses: 0, aces: 0 },
-            history: [], seasonLog: [], lastRyder: null, prevCaddie: g.caddie, caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: true,
+            history: [], seasonLog: [], lastRyder: null, prevCaddie: g.caddie, caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: g.mode !== "league",
             rcRace: g.season % 2 === 1 ? Object.fromEntries([...rosterNames, g.pro.name].map((n) => { var _a; return [n, ((g.rcRace || {})[n] || 0) + (((_a = g.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0)]; })) : {},
             owgrBase: Object.fromEntries([...rosterNames, g.pro.name].map((n) => { var _a; return [n, Math.round(((g.owgrBase || OWGR_SEED)[n] || 0) * 0.4 + (((_a = g.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0))]; })), ai: evo.ai };
         if (newAge >= 45)
@@ -2473,8 +2473,11 @@ function GolfCareerSim() {
             const newDiv = mt ? mt.division : 3;
             // achievement tracking: promotion, best division reached, division title
             const prevDiv = g.myDivision != null ? g.myDivision : 3;
-            if (newDiv < prevDiv)
+            if (newDiv < prevDiv) {
                 st.everPromoted = true;
+                st.rerollAvailable = true;
+                st.promotedNote = newDiv;
+            }
             else
                 st.everPromoted = g.everPromoted || false;
             st.bestDivision = Math.min(g.bestDivision != null ? g.bestDivision : 3, newDiv);
@@ -2874,16 +2877,15 @@ function GolfCareerSim() {
             React.createElement("p", { className: "text-xs text-center", style: { color: C.muted } }, "Weather-guidance caddies improve your hidden weather skills \u2014 you'll feel it, not see it.")));
     }
     // ---------- pre-season attribute re-roll ----------
-    if (g && g.caddie && g.rerollAvailable && screen === "hub") {
+    if (g && g.rerollAvailable && screen === "hub") {
+        const promoted = g.mode === "league" && g.promotedNote != null;
         return (React.createElement(Shell, null,
             React.createElement("div", { className: "pt-6 text-center" },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 4, color: C.gold } },
-                    "SEASON ",
-                    g.season,
-                    " \u00B7 PRE-SEASON"),
-                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: C.chalk, lineHeight: 1 } }, "WINTER REBUILD"),
-                React.createElement("p", { className: "text-sm mt-2 mb-3", style: { color: C.muted } }, !rrPair ? "You've rebuilt one part of your game this winter. Pick ONE attribute to re-roll — once you spin, you MUST take one of the values dealt. Weaker attributes attract more suitors: below 80 deals 4 cards, the 80s deal 3, the 90s just 2. Earned boosts (training, coaches, milestones) always carry over." :
-                    "No backing out now. Take one of these numbers.")),
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 4, color: C.gold } }, promoted ? "PROMOTION REWARD" : `SEASON ${g.season} · PRE-SEASON`),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: C.chalk, lineHeight: 1 } }, promoted ? "STEPPING UP" : "WINTER REBUILD"),
+                React.createElement("p", { className: "text-sm mt-2 mb-3", style: { color: C.muted } }, promoted && !rrPair ? `You earned promotion to ${divName(g.promotedNote)}! As a reward, re-roll ONE attribute for a potential big boost. Once you spin, you MUST take one of the values dealt. Weaker attributes deal more cards. Earned boosts always carry over.` :
+                    !rrPair ? "You've rebuilt one part of your game this winter. Pick ONE attribute to re-roll — once you spin, you MUST take one of the values dealt. Weaker attributes attract more suitors: below 80 deals 4 cards, the 80s deal 3, the 90s just 2. Earned boosts (training, coaches, milestones) always carry over." :
+                        "No backing out now. Take one of these numbers.")),
             !rrPair && (React.createElement("div", null,
                 React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3" }, SLOTS.map((s) => (React.createElement("button", { key: s.key, onClick: () => spinReroll(s.key), className: "p-2.5 rounded-lg text-left active:scale-95", style: { background: C.card, border: "1px solid rgba(244,247,242,0.2)" } },
                     React.createElement("div", { className: "flex justify-between items-baseline" },
