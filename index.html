@@ -2020,15 +2020,32 @@ function GolfCareerSim() {
                 const myTeamObj = st.leagues.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
                 const myTeamId = myTeamObj ? myTeamObj.id : null;
                 const perTeam = {};
-                tour.results.finishers.forEach((r) => {
-                    const cn = clean(r.name);
-                    let tid = r.isYou ? myTeamId : teamOf[cn];
-                    if (tid == null)
-                        tid = teamOf[cn];
-                    if (tid == null)
-                        return;
-                    (perTeam[tid] = perTeam[tid] || []).push({ name: r.isYou ? g.pro.name : cn, pos: r.pos, pts: r.pts || 0, isYou: r.isYou });
-                });
+                if (tour.team) {
+                    // Zurich pairs: finishers are PAIRINGS with .members; both your squad's pairs belong to your club
+                    tour.results.finishers.forEach((r) => {
+                        (r.members || []).forEach((m) => {
+                            const cn = clean(m.name);
+                            let tid = (m.isYou || cn === g.pro.name) ? myTeamId : teamOf[cn];
+                            if (tid == null)
+                                tid = teamOf[cn];
+                            if (tid == null)
+                                return;
+                            // each member of the pairing gets the pairing's finish position & points
+                            (perTeam[tid] = perTeam[tid] || []).push({ name: (m.isYou || cn === g.pro.name) ? g.pro.name : cn, pos: r.pos, pts: r.pts || 0, isYou: m.isYou || cn === g.pro.name });
+                        });
+                    });
+                }
+                else {
+                    tour.results.finishers.forEach((r) => {
+                        const cn = clean(r.name);
+                        let tid = r.isYou ? myTeamId : teamOf[cn];
+                        if (tid == null)
+                            tid = teamOf[cn];
+                        if (tid == null)
+                            return;
+                        (perTeam[tid] = perTeam[tid] || []).push({ name: r.isYou ? g.pro.name : cn, pos: r.pos, pts: r.pts || 0, isYou: r.isYou });
+                    });
+                }
                 const tsp = { ...(st.teamSeasonPts || {}) };
                 Object.entries(perTeam).forEach(([tid, arr]) => {
                     const best2 = arr.slice().sort((a, b) => b.pts - a.pts).slice(0, 2);
@@ -2041,9 +2058,18 @@ function GolfCareerSim() {
                     st.teamMemberPts = mp;
                     // build a weekly report (all 4 members, scores, qualified state) like team mode
                     const finByName = {};
-                    tour.results.finishers.forEach((r) => { finByName[clean(r.name)] = r; });
                     const fieldByName = {};
-                    (tour.scores || []).forEach((s) => { fieldByName[clean(s.name)] = s; });
+                    if (tour.team) {
+                        // Zurich: each pairing's members share the pairing's position/total
+                        tour.results.finishers.forEach((r) => {
+                            (r.members || []).forEach((m) => { finByName[clean(m.name)] = { pos: r.pos, pts: r.pts || 0, total: r.total, cut: r.cut }; });
+                        });
+                        (tour.scores || []).forEach((s) => { (s.members || []).forEach((m) => { fieldByName[clean(m.name)] = { total: s.total }; }); });
+                    }
+                    else {
+                        tour.results.finishers.forEach((r) => { finByName[clean(r.name)] = r; });
+                        (tour.scores || []).forEach((s) => { fieldByName[clean(s.name)] = s; });
+                    }
                     const counted = (perTeam[myTeamObj.id] || []).slice().sort((a, b) => b.pts - a.pts).slice(0, 2).map((x) => x.name);
                     const allFour = myTeamObj.members.map((mn) => {
                         const cn = clean(mn);
