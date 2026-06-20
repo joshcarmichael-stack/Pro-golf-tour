@@ -1517,11 +1517,20 @@ function GolfCareerSim() {
             if (mt) {
                 const mates = mt.members.filter((m) => !m.includes("(YOU)"));
                 const myOvr = calcOverall(g.pro.attrs);
+                const mp = g.teamMemberPts || {};
+                const myPts = mp[g.pro.name] || 0;
                 // rank everyone in the squad by overall; with best-4-play, only the 5th-ranked risks the bench
                 const ratings = mates.map((m) => ovrOf(m)).sort((a, b) => b - a);
-                // how many teammates are clearly better than you (by 1+)?
-                const betterThanMe = mates.filter((m) => ovrOf(m) > myOvr + 1).length;
-                // you only risk benching if 4+ teammates are clearly better (i.e. you're the clear 5th man)
+                // teammates clearly better than you. When overall is even (within 1), the one with MORE season points is picked ahead
+                const betterThanMe = mates.filter((m) => {
+                    const o = ovrOf(m);
+                    if (o > myOvr + 1)
+                        return true;
+                    if (Math.abs(o - myOvr) <= 1)
+                        return (mp[m.replace(" (YOU)", "")] || 0) > myPts; // even on rating → points decide
+                    return false;
+                }).length;
+                // you only risk benching if 4+ teammates are ahead of you (i.e. you're the clear 5th man)
                 let benchChance = 0;
                 if (betterThanMe >= 4) {
                     const gapToFourth = (ratings[3] || 0) - myOvr; // how far below the 4th-best you are
@@ -2348,6 +2357,37 @@ function GolfCareerSim() {
                 rec.winSeasons = [...(rec.winSeasons || []), g.season];
             }
         }
+        // ===== XP for the cup: appearing, winning matches, and lifting the cup =====
+        let cupXP = 0;
+        const cupXpParts = [];
+        if (ryder.youIn) {
+            let mw = 0, mh = 0;
+            ryder.sessions.forEach((s) => s.matches.forEach((m) => {
+                if (!m.youIn)
+                    return;
+                const won = (m.youSideA && m.out === "A") || (!m.youSideA && m.out === "B");
+                if (m.out === "H")
+                    mh++;
+                else if (won)
+                    mw++;
+            }));
+            cupXP += 12;
+            cupXpParts.push({ label: "Cup appearance", amt: 12 });
+            if (mw > 0) {
+                const a = mw * 6;
+                cupXP += a;
+                cupXpParts.push({ label: `${mw} match${mw > 1 ? "es" : ""} won`, amt: a });
+            }
+            if (mh > 0) {
+                const a = mh * 2;
+                cupXP += a;
+                cupXpParts.push({ label: `${mh} match${mh > 1 ? "es" : ""} halved`, amt: a });
+            }
+            if (winner === ryder.side) {
+                cupXP += 15;
+                cupXpParts.push({ label: "Lifted the cup", amt: 15 });
+            }
+        }
         const st = ryder.kind === "pres"
             ? { ...g, presHolder: winner, presCupNo: (g.presCupNo || 0) + 1,
                 lastRyder: { kind: "pres", usaPts: ttU, eurPts: ttE, winner, youIn: ryder.youIn, venue: ryder.venue },
@@ -2355,6 +2395,11 @@ function GolfCareerSim() {
             : { ...g, ryderHolder: winner, ryderCupNo: (g.ryderCupNo || 0) + 1,
                 lastRyder: { kind: "ryder", usaPts: ttU, eurPts: ttE, winner, youIn: ryder.youIn, venue: ryder.venue },
                 myStats: { ...g.myStats, rc: rec } };
+        if (cupXP > 0) {
+            st.xp = (st.xp || 0) + cupXP;
+            st.xpGainLast = cupXP;
+            st.xpBreakdown = cupXpParts;
+        }
         let st2 = applyBadges(st);
         setG(st2);
         await save(st2);
@@ -2451,6 +2496,8 @@ function GolfCareerSim() {
                 const divField = leagues.filter((t) => t.division === d).sort((a, b) => ((g.teamSeasonPts || {})[b.id] || 0) - ((g.teamSeasonPts || {})[a.id] || 0));
                 divField.forEach((t, i) => { finishSnapshot[t.id] = i + 1; preDivision[t.id] = d; });
             }
+            st.lastSeasonFinish = finishSnapshot;
+            st.lastSeasonDivision = preDivision;
             // promotion/relegation by final standings per division
             for (let d = 0; d < 4; d++) {
                 const divTeams = leagues.filter((t) => t.division === d).sort((a, b) => ((g.teamSeasonPts || {})[b.id] || 0) - ((g.teamSeasonPts || {})[a.id] || 0));
@@ -2606,7 +2653,9 @@ function GolfCareerSim() {
                 poy = n;
             } });
             const myPoy = poyScore(g.pro.name);
+            const poyLine = sf[poy] || { w: 0, r2: 0, t10: 0, maj: 0, pts: 0 };
             const awards = { season: g.season, poy, poyIsYou: poy === g.pro.name, myPoyScore: Math.round(myPoy),
+                poyHonours: { wins: poyLine.w || 0, runnerUps: poyLine.r2 || 0, top10s: poyLine.t10 || 0, majors: poyLine.maj || 0, points: Math.round(poyLine.pts || 0) },
                 myLine: sf[g.pro.name] || { w: 0, r2: 0, t10: 0, maj: 0, pts: 0 } };
             if ((g.mode === "team" && g.teams) || (g.mode === "league" && g.leagues)) {
                 const pool = g.mode === "league" ? g.leagues : g.teams;
@@ -3330,7 +3379,7 @@ function GolfCareerSim() {
                     a.season,
                     " \u00B7 WRAP-UP"),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: C.chalk } }, "\uD83C\uDFC5 END OF SEASON AWARDS")),
-            React.createElement(Award, { icon: "\u2B50", label: "PLAYERS' PLAYER OF THE YEAR", winner: a.poy, you: a.poyIsYou, sub: a.poyIsYou ? `Voted the best in the game — ${a.myLine.w} wins, ${a.myLine.r2} runner-ups, ${a.myLine.t10} top-10s${a.myLine.maj ? `, ${a.myLine.maj} major${a.myLine.maj > 1 ? "s" : ""}` : ""}` : "Voted by the players as the season's standout" }),
+            React.createElement(Award, { icon: "\u2B50", label: "PLAYERS' PLAYER OF THE YEAR", winner: a.poy, you: a.poyIsYou, sub: a.poyIsYou ? `Voted the best in the game — ${a.myLine.w} wins, ${a.myLine.r2} runner-ups, ${a.myLine.t10} top-10s${a.myLine.maj ? `, ${a.myLine.maj} major${a.myLine.maj > 1 ? "s" : ""}` : ""}` : (a.poyHonours ? `${a.poyHonours.wins} wins, ${a.poyHonours.runnerUps} runner-ups, ${a.poyHonours.top10s} top-10s${a.poyHonours.majors ? `, ${a.poyHonours.majors} major${a.poyHonours.majors > 1 ? "s" : ""}` : ""} — the season's standout` : "Voted by the players as the season's standout") }),
             g.mode === "team" && (React.createElement(React.Fragment, null,
                 React.createElement(Award, { icon: "\uD83C\uDFC6", label: "TEAM CHAMPIONS", winner: a.teamChampion ? a.teamChampion.name : null, you: a.wonTitle, sub: a.wonTitle ? "You won the team title! 🎉" : a.teamChampion ? `${a.teamChampion.pts} pts · your team finished ${ordinal(a.myTeamRank)}` : "" }),
                 React.createElement(Award, { icon: "\uD83E\uDD47", label: `${a.teamName || "TEAM"} MVP`, winner: a.teamMvp, you: a.mvpIsYou, sub: a.mvpIsYou ? `You led your team with ${a.teamMvpPts} pts this season` : `Top scorer for your team (${a.teamMvpPts} pts)` }))),
@@ -3527,6 +3576,11 @@ function GolfCareerSim() {
                         squadAvg,
                         " \u00B7 you're ",
                         myOvr),
+                    tgt && (React.createElement("div", { className: "mb-2 p-2 rounded", style: { background: "rgba(244,247,242,0.05)" } },
+                        React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.muted, letterSpacing: 1 } }, "CURRENT SQUAD"),
+                        tgt.members.filter((m) => !m.includes("(YOU)")).slice().sort((a, b) => ovrOf(b) - ovrOf(a)).map((m) => (React.createElement("div", { key: m, className: "flex justify-between text-[11px]", style: { color: C.chalk } },
+                            React.createElement("span", { className: "truncate pr-2" }, m.replace(" (YOU)", "")),
+                            React.createElement("span", { style: { color: tint(ovrOf(m)) } }, ovrOf(m))))))),
                     offer.rescue && React.createElement("div", { className: "text-[11px] mb-2 p-2 rounded", style: { background: "rgba(127,183,217,0.12)", color: C.blue } }, "\uD83D\uDD04 You've spent too long on the bench. Drop down here and you'll play every week and develop faster."),
                     benchRisk && !offer.rescue && (React.createElement("div", { className: "text-[11px] mb-2 p-2 rounded", style: { background: "rgba(217,108,79,0.12)", color: C.red } }, "\u26A0\uFE0F Big move, but you may not make the lineup. Expect to be benched often, earn less, and develop slower until your game catches up. Smaller clubs may come back in if you're not playing.")),
                     React.createElement("button", { onClick: () => accept(offer), className: "w-full py-2 rounded-md active:scale-95", style: { background: offer.rescue ? C.blue : benchRisk ? "rgba(217,108,79,0.85)" : C.gold, color: C.bg, fontFamily: FONT, fontSize: 14, letterSpacing: 1 } }, offer.rescue ? "DROP DOWN & PLAY ▸" : benchRisk ? "SIGN ANYWAY ▸" : "ACCEPT & SIGN ▸")));
@@ -3555,6 +3609,31 @@ function GolfCareerSim() {
                     "TRANSFER BUDGET $",
                     (mt.budget || 0).toFixed(1),
                     "m"))),
+            mt && g.lastSeasonFinish && g.lastSeasonDivision && (() => {
+                // show how the teams in your PRE-PROMOTION division finished last season
+                const myPrevDiv = g.lastSeasonDivision[mt.id] != null ? g.lastSeasonDivision[mt.id] : mt.division;
+                const rows = (g.leagues || []).filter((t) => g.lastSeasonDivision[t.id] === myPrevDiv)
+                    .map((t) => ({ id: t.id, name: t.name, fin: g.lastSeasonFinish[t.id] || 99 }))
+                    .sort((a, b) => a.fin - b.fin);
+                if (!rows.length)
+                    return null;
+                return (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" },
+                        "LAST SEASON \u00B7 ",
+                        divName(myPrevDiv)),
+                    rows.map((r) => {
+                        const mine = r.id === mt.id;
+                        const promo = r.fin <= 2 && myPrevDiv > 0, releg = r.fin >= rows.length - 1 && myPrevDiv < 3;
+                        return (React.createElement("div", { key: r.id, className: "flex justify-between text-xs mb-0.5", style: { color: mine ? C.gold : C.chalk, fontWeight: mine ? 700 : 400 } },
+                            React.createElement("span", { className: "truncate pr-2" },
+                                r.fin,
+                                ". ",
+                                r.name,
+                                mine ? " (YOURS)" : "",
+                                " ",
+                                promo ? React.createElement("span", { style: { color: C.green } }, "\u25B2") : releg ? React.createElement("span", { style: { color: C.red } }, "\u25BC") : "")));
+                    })));
+            })(),
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "AROUND THE MARKET"),
                 g.leagueTransfers.length === 0 && React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "A quiet window \u2014 no major moves this off-season."),
@@ -3631,22 +3710,32 @@ function GolfCareerSim() {
                     "m \u00B7 budget $",
                     (mt.budget || 0).toFixed(1),
                     "m"),
-                mt.members.map((mn) => {
-                    const you = mn.includes("(YOU)");
-                    return (React.createElement("div", { key: mn, className: "flex justify-between text-xs mb-0.5", style: { color: you ? C.gold : C.chalk } },
+                (() => {
+                    const mp = g.teamMemberPts || {};
+                    const rows = mt.members.map((mn) => ({ mn, clean: mn.replace(" (YOU)", ""), you: mn.includes("(YOU)"), ovr: ovrOf(mn) }))
+                        .map((r) => ({ ...r, pts: mp[r.clean] || 0 }))
+                        .sort((a, b) => b.pts - a.pts || b.ovr - a.ovr);
+                    const topName = rows.length && rows[0].pts > 0 ? rows[0].clean : null;
+                    return rows.map((r) => (React.createElement("div", { key: r.mn, className: "flex justify-between text-xs mb-0.5", style: { color: r.you ? C.gold : C.chalk } },
                         React.createElement("span", null,
-                            mn.replace(" (YOU)", ""),
-                            you ? " (YOU)" : "",
+                            r.clean,
+                            r.you ? " (YOU)" : "",
+                            topName === r.clean ? " ⭐" : "",
+                            " ",
+                            React.createElement("span", { style: { color: tint(r.ovr), fontSize: 10 } },
+                                "\u00B7 ",
+                                r.ovr,
+                                " ovr"),
                             " ",
                             React.createElement("span", { style: { color: C.muted, fontSize: 10 } },
-                                "\u00B7 ",
-                                ovrOf(mn),
-                                " ovr")),
-                        React.createElement("span", { style: { color: C.muted } },
-                            "$",
-                            valOf(mn).toFixed(1),
-                            "m")));
-                }))),
+                                "\u00B7 $",
+                                valOf(r.mn).toFixed(1),
+                                "m")),
+                        React.createElement("span", { style: { color: r.pts > 0 ? C.green : C.muted } },
+                            r.pts,
+                            " pts"))));
+                })(),
+                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u2B50 = squad's top scorer \u00B7 season points decide lineup ties"))),
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "TABLE \u00B7 THIS SEASON"),
                 table.map((t, i) => {
