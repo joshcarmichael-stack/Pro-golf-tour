@@ -1100,6 +1100,26 @@ function GolfCareerSim() {
         return a;
     };
     const effWx = (st) => { var _a; return ((_a = st.caddie) === null || _a === void 0 ? void 0 : _a.wxPerks) ? st.pro.wx.map((v, i) => Math.min(95, v + st.caddie.wxPerks[i])) : st.pro.wx; };
+    // preview: given a set of attribute mods, return [{key, label, from, to, delta}] vs current EFFECTIVE attrs
+    const overallWithMods = (mods) => {
+        const cur = effAttrs(g);
+        const a = { ...cur };
+        if (mods)
+            for (const k in mods)
+                a[k] = clampN((a[k] != null ? a[k] : 75) + mods[k], 50, 99);
+        return calcOverall(a);
+    };
+    const previewMods = (mods) => {
+        if (!mods)
+            return [];
+        const cur = effAttrs(g);
+        return Object.entries(mods).map(([k, v]) => {
+            var _a;
+            const from = cur[k] != null ? cur[k] : 75;
+            const to = clampN(from + v, 50, 99);
+            return { key: k, label: PERK_LABEL[k] || ((_a = SLOTS.find((s) => s.key === k)) === null || _a === void 0 ? void 0 : _a.label) || k, from, to, delta: v };
+        });
+    };
     const aiP = (name, st = g) => {
         const ai = (st && st.ai) || {};
         let base = PLAYERS.find((x) => x.name === name);
@@ -2633,24 +2653,32 @@ function GolfCareerSim() {
             g.caddieOffers.map((c) => (React.createElement("button", { key: c.name, onClick: () => hireCaddie(c), className: "w-full mb-3 p-3 rounded-xl text-left active:scale-[0.99]", style: { background: c.special ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card, border: c.special ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.2)" } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: c.special ? C.gold : C.chalk } }, c.name),
                 React.createElement("p", { className: "text-xs mb-1", style: { color: C.muted } }, c.desc),
+                c.perks && React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold } },
+                    "Your overall would be ",
+                    overallWithMods(c.perks),
+                    " (now ",
+                    g.pro.overall,
+                    ")"),
                 React.createElement("div", { className: "flex gap-1.5 flex-wrap" },
-                    c.perks && Object.entries(c.perks).map(([k, v]) => (React.createElement("span", { key: k, className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: "rgba(159,217,139,0.15)", color: C.green } },
-                        "+",
-                        v,
+                    c.perks && previewMods(c.perks).map((p) => (React.createElement("span", { key: p.key, className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: "rgba(159,217,139,0.15)", color: C.green } },
+                        p.label,
                         " ",
-                        PERK_LABEL[k]))),
-                    c.wxPerks && React.createElement("span", { className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: "rgba(127,183,217,0.15)", color: C.blue } }, "WEATHER GUIDANCE (effect hidden)"))))),
+                        p.from,
+                        "\u2192",
+                        p.to))),
+                    c.wxPerks && React.createElement("span", { className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: "rgba(127,183,217,0.15)", color: C.blue } }, "WEATHER GUIDANCE"))))),
             g.prevCaddie && (React.createElement("button", { onClick: () => hireCaddie(g.prevCaddie), className: "w-full mb-3 p-3 rounded-xl text-left active:scale-[0.99]", style: { background: "rgba(127,183,217,0.08)", border: "1.5px dashed rgba(127,183,217,0.5)" } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: C.blue } },
                     "\uD83E\uDD1D STAY WITH ",
                     g.prevCaddie.name.toUpperCase()),
                 React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "Loyalty matters. Keep the partnership going for another season."),
                 React.createElement("div", { className: "flex gap-1.5 flex-wrap mt-1" },
-                    g.prevCaddie.perks && Object.entries(g.prevCaddie.perks).map(([k, v]) => (React.createElement("span", { key: k, className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: "rgba(159,217,139,0.15)", color: C.green } },
-                        "+",
-                        v,
+                    g.prevCaddie.perks && previewMods(g.prevCaddie.perks).map((p) => (React.createElement("span", { key: p.key, className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: "rgba(159,217,139,0.15)", color: C.green } },
+                        p.label,
                         " ",
-                        PERK_LABEL[k]))),
+                        p.from,
+                        "\u2192",
+                        p.to))),
                     g.prevCaddie.wxPerks && React.createElement("span", { className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: "rgba(127,183,217,0.15)", color: C.blue } }, "WEATHER GUIDANCE")))),
             React.createElement("p", { className: "text-xs text-center", style: { color: C.muted } }, "Weather-guidance caddies improve your hidden weather skills \u2014 you'll feel it, not see it.")));
     }
@@ -3578,12 +3606,19 @@ function GolfCareerSim() {
                                 on ? " ✓ IN BAG" : ""),
                             item.price > 0 && !isOwned && React.createElement("span", { className: "text-[10px]", style: { color: canBuy ? C.green : C.red } }, fmtMoney(item.price))),
                         React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.muted } }, item.desc),
+                        Object.keys(item.mods).length > 0 && !on && (React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold } },
+                            "Your overall would be ",
+                            overallWithMods(item.mods),
+                            " (now ",
+                            g.pro.overall,
+                            ")")),
                         React.createElement("div", { className: "flex gap-1 flex-wrap mb-1.5" }, Object.keys(item.mods).length === 0 ? React.createElement("span", { className: "text-[10px]", style: { color: C.muted } }, "No modifiers") :
-                            Object.entries(item.mods).map(([k, v]) => (React.createElement("span", { key: k, className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: v > 0 ? "rgba(159,217,139,0.12)" : "rgba(217,108,79,0.12)", color: v > 0 ? C.green : C.red } },
-                                v > 0 ? "+" : "",
-                                v,
+                            previewMods(item.mods).map((p) => (React.createElement("span", { key: p.key, className: "px-1.5 py-0.5 rounded text-[10px]", style: { background: p.delta > 0 ? "rgba(159,217,139,0.12)" : "rgba(217,108,79,0.12)", color: p.delta > 0 ? C.green : C.red } },
+                                p.label,
                                 " ",
-                                PERK_LABEL[k])))),
+                                p.from,
+                                "\u2192",
+                                p.to)))),
                         isOwned ? (React.createElement("button", { onClick: () => setEquip(slot, item.id), disabled: on, className: `px-3 py-1.5 rounded-md ${on ? "opacity-40" : "active:scale-95"}`, style: { background: on ? "rgba(244,247,242,0.1)" : C.gold, color: on ? C.muted : C.bg, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, on ? "EQUIPPED" : "PUT IN BAG")) : (React.createElement("button", { onClick: () => buyGear(item), disabled: !canBuy, className: `px-3 py-1.5 rounded-md ${canBuy ? "active:scale-95" : "opacity-40"}`, style: { background: canBuy ? "#2E7D4F" : "rgba(244,247,242,0.1)", color: canBuy ? C.chalk : C.muted, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, bank < item.price ? `NEED ${fmtMoney(item.price)}` : `BUY · ${fmtMoney(item.price)}`))));
                 })))),
             React.createElement(Btn, { onClick: () => setScreen("hub"), kind: "panel" }, "BACK")));
