@@ -1030,6 +1030,7 @@ function GolfCareerSim() {
             return base;
         return { ...base, ...e.attrs, name: e.displayName || base.name, country: e.country || base.country, overall: e.overall, age: e.age, rookie: e.rookie, tier: e.tier };
     };
+    const clean2 = (nm) => (nm || "").replace(" (YOU)", "");
     const ROSTER = (st = g) => PLAYERS.map((p) => aiP(p.name, st)).filter(Boolean);
     const ovrOf = (name, st = g) => {
         const clean = name.replace(" (YOU)", "");
@@ -1624,6 +1625,8 @@ function GolfCareerSim() {
                 st.tally[w.name] = { ...tw, w: tw.w + 1, m: tw.m + (ev.type === "major" ? 1 : 0) };
             }
             const youRes = myLine ? ordinal(myLine.pos) : (tour.inField ? "MC" : "DNQ");
+            st.lastFullBoard = { event: ev.e, par: tour.course.par, course: tour.course.name,
+                rows: tour.results.finishers.map((r) => ({ name: clean2(r.name), pos: r.pos, total: r.total, cut: r.cut, isYou: r.isYou, rounds: r.rounds })) };
             st.history.push({ event: ev.e, winner: w.name, score: toPar(w.total, tour.course.par, 4), you: youRes });
             st.pastWinners[ev.e] = [...(st.pastWinners[ev.e] || []), { s: g.season, w: w.name, sc: toPar(w.total, tour.course.par, 4), you: youRes, c: tour.course.name }];
             const eh = st.eventHistory[ev.e] || [];
@@ -1691,11 +1694,25 @@ function GolfCareerSim() {
                     st.teamMemberPts = mp;
                 }
                 const mt2 = st.teams.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
-                const mine = mt2 ? (perTeam[mt2.id] || []) : [];
-                const counted = mine.slice().sort((a, b) => b.pts - a.pts).slice(0, 2).map((x) => x.name);
-                const weekMine = mine.map((x) => ({ ...x, counted: counted.includes(x.name) }));
+                const finByName = {};
+                tour.results.finishers.forEach((r) => { finByName[clean(r.name)] = r; });
+                const playedNames = mt2 ? (perTeam[mt2.id] || []).map((x) => x.name) : [];
+                const counted = mt2 ? (perTeam[mt2.id] || []).slice().sort((a, b) => b.pts - a.pts).slice(0, 2).map((x) => x.name) : [];
+                const allFour = mt2 ? mt2.members.map((mn) => {
+                    const cn = clean(mn);
+                    const isYouM = mn.includes("(YOU)");
+                    const fr = finByName[isYouM ? g.pro.name : cn] || finByName[cn];
+                    const inField = !!fr;
+                    return {
+                        name: isYouM ? g.pro.name : cn, isYou: isYouM, inField,
+                        pos: fr ? fr.pos : null, pts: fr ? (fr.pts || 0) : 0,
+                        total: fr ? fr.total : null, cut: fr ? fr.cut : false,
+                        counted: counted.includes(isYouM ? g.pro.name : cn),
+                    };
+                }) : [];
+                const weekMine = allFour;
                 const weekTeamPts = weekMine.filter((x) => x.counted).reduce((s, x) => s + x.pts, 0);
-                st.lastTeamWeek = { teamName: mt2 ? mt2.name : "", teamId: mt2 ? mt2.id : null, event: ev.e, members: weekMine, weekPts: weekTeamPts };
+                st.lastTeamWeek = { teamName: mt2 ? mt2.name : "", teamId: mt2 ? mt2.id : null, event: ev.e, members: weekMine, weekPts: weekTeamPts, par: tour.course.par };
             }
             if (tour.inField) {
                 const meEnt = tour.scores.find((s2) => s2.isYou);
@@ -2438,6 +2455,29 @@ function GolfCareerSim() {
                 }))))),
             React.createElement(Btn, { onClick: () => setScreen("hub"), kind: "panel" }, "BACK")));
     }
+    // ---------- full final leaderboard (reusable) ----------
+    if (screen === "fullBoard" && g.lastFullBoard) {
+        const fb = g.lastFullBoard;
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen(g.boardReturn || "hub") }),
+            React.createElement("div", { className: "text-center mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "FINAL LEADERBOARD"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk, lineHeight: 1.05 } }, fb.event),
+                React.createElement("div", { className: "text-xs", style: { color: C.muted } }, fb.course)),
+            React.createElement("div", { className: "p-2 rounded-xl mb-3", style: { background: C.panel } }, fb.rows.map((r, i) => (React.createElement("div", { key: i, className: "flex justify-between items-baseline text-xs py-0.5 px-1", style: { color: r.isYou ? C.gold : C.chalk, fontWeight: r.isYou ? 700 : 400, background: r.isYou ? "rgba(232,195,90,0.08)" : "transparent", borderRadius: 4 } },
+                React.createElement("span", { className: "truncate pr-2" },
+                    r.cut ? "MC" : ordinal(r.pos),
+                    " \u00B7 ",
+                    r.name,
+                    r.isYou ? " (YOU)" : ""),
+                React.createElement("span", { style: { color: C.muted } },
+                    r.cut ? "—" : toPar(r.total, fb.par, 4),
+                    r.rounds && r.rounds.length ? React.createElement("span", { style: { fontSize: 9 } },
+                        " (",
+                        r.rounds.join("-"),
+                        ")") : null))))),
+            React.createElement(Btn, { kind: "panel", onClick: () => setScreen(g.boardReturn || "hub") }, "BACK")));
+    }
     // ---------- no transfer offers this off-season ----------
     if (screen === "teamNoOffer") {
         const mt = myTeam();
@@ -2471,18 +2511,24 @@ function GolfCareerSim() {
                     " TEAM PTS")),
             React.createElement("div", { className: "p-3 rounded-xl my-2", style: { background: C.card, border: "1px solid rgba(244,247,242,0.2)" } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "YOUR FOUR THIS WEEK"),
-                wk.members.length === 0 && React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "No team members made the field this week."),
-                wk.members.slice().sort((a, b) => (a.pos || 999) - (b.pos || 999)).map((mb) => (React.createElement("div", { key: mb.name, className: "flex justify-between text-sm mb-0.5", style: { color: mb.counted ? (mb.isYou ? C.gold : C.chalk) : "rgba(244,247,242,0.4)" } },
+                wk.members.length === 0 && React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "No team members in this week's field."),
+                wk.members.slice().sort((a, b) => {
+                    if (a.inField !== b.inField)
+                        return a.inField ? -1 : 1;
+                    return (a.pos || 999) - (b.pos || 999);
+                }).map((mb) => (React.createElement("div", { key: mb.name, className: "flex justify-between items-baseline text-sm mb-1", style: { color: !mb.inField ? "rgba(244,247,242,0.35)" : mb.counted ? (mb.isYou ? C.gold : C.chalk) : "rgba(244,247,242,0.6)" } },
                     React.createElement("span", null,
-                        mb.pos ? ordinal(mb.pos) : "MC",
+                        !mb.inField ? "—" : mb.cut ? "MC" : ordinal(mb.pos),
                         " \u00B7 ",
                         mb.name,
                         mb.isYou ? " (YOU)" : "",
-                        mb.counted ? " ✓" : ""),
-                    React.createElement("span", { style: { color: mb.counted ? C.green : "rgba(244,247,242,0.3)" } },
-                        "+",
-                        mb.counted ? (mb.pts || 0) : 0)))),
-                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u2713 = counted toward the team. Only your best two finishers score each week.")),
+                        mb.counted ? " ✓" : "",
+                        mb.inField && !mb.cut && mb.total != null && React.createElement("span", { style: { color: C.muted, fontSize: 11 } },
+                            " \u00B7 ",
+                            toPar(mb.total, wk.par, 4)),
+                        !mb.inField && React.createElement("span", { style: { color: C.muted, fontSize: 11 } }, " \u00B7 didn't qualify")),
+                    React.createElement("span", { style: { color: mb.counted ? C.green : "rgba(244,247,242,0.3)" } }, mb.counted ? "+" + (mb.pts || 0) : mb.inField ? "+0" : "")))),
+                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u2713 = counted (best two score) \u00B7 score shown is the 72-hole total \u00B7 \"didn't qualify\" = field was capped by world ranking that week.")),
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } }, "TEAM STANDINGS"),
@@ -2509,6 +2555,8 @@ function GolfCareerSim() {
                         wk.teamName,
                         " (YOURS)"),
                     React.createElement("span", null, (g.teamSeasonPts || {})[wk.teamId] || 0)))),
+            g.lastFullBoard && React.createElement("div", { className: "mb-2" },
+                React.createElement(Btn, { kind: "panel", onClick: () => { setG({ ...g, boardReturn: "teamResults" }); setScreen("fullBoard"); } }, "\uD83D\uDCCB VIEW FULL LEADERBOARD")),
             React.createElement(Btn, { onClick: () => setScreen("hub") }, "CONTINUE")));
     }
     // ---------- team tour ----------
@@ -3638,6 +3686,13 @@ function GolfCareerSim() {
                             toPar(r.total, par, 4),
                             " \u00B7 ",
                             fmtMoney(r.money)))))),
+                React.createElement("div", { className: "mb-2" },
+                    React.createElement(Btn, { kind: "panel", onClick: () => {
+                            const fb = { event: ev.e, par: tour.course.par, course: tour.course.name,
+                                rows: results.finishers.map((r) => ({ name: (r.name || "").replace(" (YOU)", ""), pos: r.pos, total: r.total, cut: r.cut, isYou: r.isYou, rounds: r.rounds })) };
+                            setG({ ...g, lastFullBoard: fb, boardReturn: "event" });
+                            setScreen("fullBoard");
+                        } }, "\uD83D\uDCCB VIEW FULL LEADERBOARD")),
                 React.createElement(Btn, { onClick: closeEvent }, "CONTINUE"))));
     }
     const cupCourseOf = () => COURSES.find((c) => c.name === (CUP_COURSE_OF[ryder.venue] || "Muirfield Village"));
