@@ -542,7 +542,24 @@ const COACHES = [
     { name: "Sandy McTavish", title: "Bunker specialist", attr: "bunker", price: 1.5e6 },
     { name: "Gus Romero", title: "Scrambling coach", attr: "recovery", price: 1.5e6 },
 ];
-const trainCost = (v) => v >= 94 ? 20 : v >= 90 ? 14 : v >= 88 ? 9 : v >= 80 ? 6 : 4;
+const trainCost = (v) => {
+    // XP to raise an attribute by 1, scaled by that attribute's current level
+    if (v < 70)
+        return 50;
+    if (v < 75)
+        return 70;
+    if (v < 80)
+        return 100;
+    if (v < 84)
+        return 150;
+    if (v < 88)
+        return 220;
+    if (v < 91)
+        return 320;
+    if (v < 94)
+        return 450;
+    return 600;
+};
 const EQUIPMENT = {
     ball: [
         { id: "ball_std", name: "Stock ball", desc: "What they hand out for free", mods: {}, price: 0 },
@@ -1970,47 +1987,7 @@ function GolfCareerSim() {
                     st.xp = (st.xp || 0) + xpGain;
                     st.xpGainLast = xpGain;
                     st.xpBreakdown = xpParts;
-                    // XP cost per attribute point SCALES with your overall: cheap as a prospect, dear as a star
-                    const xpThreshold = (ovr) => {
-                        if (ovr < 75)
-                            return 70;
-                        if (ovr < 80)
-                            return 100;
-                        if (ovr < 84)
-                            return 150;
-                        if (ovr < 88)
-                            return 220;
-                        if (ovr < 91)
-                            return 320;
-                        if (ovr < 94)
-                            return 450;
-                        return 600;
-                    };
-                    let levelUps = [];
-                    let attrs2 = { ...st.pro.attrs };
-                    const HEAVY = ["drivingDistance", "drivingAccuracy", "longApproach", "shortApproach", "putting", "chipping"];
-                    const ALL8 = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
-                    let guard = 0;
-                    while ((st.xp || 0) >= xpThreshold(calcOverall(attrs2)) && guard++ < 20) {
-                        st.xp -= xpThreshold(calcOverall(attrs2));
-                        const pool = Math.random() < 0.6 ? HEAVY : ALL8;
-                        const ranked = pool.slice().sort((a, b) => (attrs2[b] || 0) - (attrs2[a] || 0));
-                        const pick = Math.random() < 0.5 ? ranked[Math.floor(Math.random() * Math.min(3, ranked.length))] : pool[Math.floor(Math.random() * pool.length)];
-                        if (attrs2[pick] < 96) {
-                            attrs2[pick] = attrs2[pick] + 1;
-                            levelUps.push(pick);
-                        }
-                        else
-                            break;
-                    }
-                    st.xpNextCost = xpThreshold(calcOverall(attrs2));
-                    if (levelUps.length) {
-                        st.pro = { ...st.pro, attrs: attrs2, overall: calcOverall(attrs2) };
-                        st.xpLevelUps = levelUps;
-                    }
-                    else {
-                        st.xpLevelUps = null;
-                    }
+                    st.xpLevelUps = null; // growth is now manual — you spend banked XP yourself in the Develop screen
                 }
             }
             if (g.mode === "league" && st.leagues) {
@@ -3024,7 +3001,7 @@ function GolfCareerSim() {
                     g.signingNews.fee,
                     "m. A fresh challenge \u2014 go prove you belong."),
                 React.createElement("button", { onClick: async () => { const st = { ...g, signingNews: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))),
-            (g.xpLevelUps && g.xpLevelUps.length > 0) || (g.xpBreakdown && g.xpBreakdown.length > 0) ? (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+            g.xpBreakdown && g.xpBreakdown.length > 0 ? (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
                 React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } },
                         "\uD83D\uDCC8 EXPERIENCE \u00B7 +",
@@ -3032,25 +3009,14 @@ function GolfCareerSim() {
                         " XP"),
                     React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
                         g.xp || 0,
-                        "/",
-                        g.xpNextCost || 100,
-                        " to next point")),
-                g.xpBreakdown && g.xpBreakdown.map((p, i) => (React.createElement("div", { key: i, className: "flex justify-between text-xs", style: { color: C.chalk } },
+                        " XP banked")),
+                g.xpBreakdown.map((p, i) => (React.createElement("div", { key: i, className: "flex justify-between text-xs", style: { color: C.chalk } },
                     React.createElement("span", null, p.label),
                     React.createElement("span", { style: { color: C.green } },
                         "+",
                         p.amt)))),
-                React.createElement("div", { className: "h-1.5 rounded-full mt-1.5 mb-1 overflow-hidden", style: { background: "rgba(244,247,242,0.12)" } },
-                    React.createElement("div", { style: { width: `${Math.min(100, ((g.xp || 0) / (g.xpNextCost || 100)) * 100)}%`, height: "100%", background: C.gold } })),
-                g.xpLevelUps && g.xpLevelUps.length > 0 && (React.createElement("div", { className: "mt-1 pt-1", style: { borderTop: "1px solid rgba(232,195,90,0.3)" } }, Object.entries(g.xpLevelUps.reduce((acc, k) => { acc[k] = (acc[k] || 0) + 1; return acc; }, {})).map(([k, n]) => {
-                    var _a;
-                    return (React.createElement("p", { key: k, className: "text-sm", style: { color: C.gold } },
-                        "\u25B2 ATTRIBUTE UP \u2014 ",
-                        ((_a = SLOTS.find((s) => s.key === k)) === null || _a === void 0 ? void 0 : _a.label) || k,
-                        " +",
-                        n));
-                }))),
-                React.createElement("button", { onClick: async () => { const st = { ...g, xpLevelUps: null, xpBreakdown: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))) : null,
+                React.createElement("button", { onClick: () => setScreen("develop"), className: "w-full mt-2 py-1.5 rounded-md active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 12, letterSpacing: 1 } }, "\uD83D\uDCAA SPEND XP TO DEVELOP \u25B8"),
+                React.createElement("button", { onClick: async () => { const st = { ...g, xpBreakdown: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))) : null,
             (g.badgeNews || []).length > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(232,195,90,0.08)", border: `1.5px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\uD83C\uDF96\uFE0F MILESTONE UNLOCKED"),
                 g.badgeNews.map((b, i2) => (React.createElement("p", { key: i2, className: "text-xs mb-0.5", style: { color: C.chalk } },
@@ -3134,7 +3100,10 @@ function GolfCareerSim() {
                 g.mode === "league" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("league") }, "\uD83C\uDFDF\uFE0F MY LEAGUE"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("coaches") }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHES"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("equipment") }, "\uD83C\uDFCC\uFE0F EQUIPMENT"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("achievements") }, "\uD83C\uDF96\uFE0F ACHIEVEMENTS")),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("achievements") }, "\uD83C\uDF96\uFE0F ACHIEVEMENTS"),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("develop") },
+                    "\uD83D\uDCAA DEVELOP",
+                    (g.xp || 0) > 0 ? ` · ${g.xp} XP` : "")),
             (() => {
                 const m = g.myStats;
                 const wIdx = owgrList().findIndex((x) => x.name === g.pro.name) + 1;
@@ -3957,6 +3926,40 @@ function GolfCareerSim() {
             React.createElement(Btn, { onClick: () => setScreen("hub"), kind: "panel" }, "BACK")));
     }
     // ---------- trophy cabinet ----------
+    if (screen === "develop") {
+        const xp = g.xp || 0;
+        const cur = effAttrs(g);
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement("div", { className: "mb-2" },
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83D\uDCAA DEVELOP"),
+                React.createElement("div", { className: "flex justify-between items-baseline" },
+                    React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "Spend banked XP to raise an attribute. Costs scale with each attribute's level."),
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: C.gold } },
+                        xp,
+                        " XP"))),
+            React.createElement("div", { className: "grid gap-2" }, SLOTS.map((s) => {
+                const base = g.pro.attrs[s.key] != null ? g.pro.attrs[s.key] : 70;
+                const eff = cur[s.key] != null ? cur[s.key] : base;
+                const cost = trainCost(base);
+                const maxed = base >= 96;
+                const canAfford = xp >= cost && !maxed;
+                const bonus = eff - base; // from gear/caddie
+                return (React.createElement("div", { key: s.key, className: "p-3 rounded-xl flex justify-between items-center", style: { background: C.panel } },
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: C.chalk } }, s.label),
+                        React.createElement("div", { className: "text-xs", style: { color: C.muted } },
+                            React.createElement("span", { style: { color: tint(base) } }, base),
+                            bonus !== 0 ? React.createElement("span", { style: { color: bonus > 0 ? C.green : C.red } },
+                                " (",
+                                bonus > 0 ? "+" : "",
+                                bonus,
+                                " gear)") : "",
+                            maxed ? " · maxed" : ` · next costs ${cost} XP`)),
+                    React.createElement("button", { onClick: () => canAfford && trainAttr(s.key), disabled: !canAfford, className: `px-3 py-2 rounded-md ${canAfford ? "active:scale-95" : "opacity-40"}`, style: { background: canAfford ? C.gold : "rgba(244,247,242,0.1)", color: canAfford ? C.bg : C.muted, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, maxed ? "MAX" : "+1")));
+            })),
+            React.createElement("p", { className: "text-[11px] mt-3 text-center", style: { color: C.muted } }, "Earn XP by playing \u2014 every start counts, and finishing well earns more. Gear and caddie bonuses stack on top of your trained level.")));
+    }
     if (screen === "achievements") {
         const have = g.badges || [];
         // group: which are relevant to this mode (team ones only show meaningfully in team/league)
