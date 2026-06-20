@@ -507,6 +507,30 @@ const BADGES = [
     { id: "albatross", name: "Rare Bird", desc: "Make an albatross", attr: "drivingDistance", test: (m) => m.careerAlbatrosses >= 1 },
     { id: "money100", name: "Centurion", desc: "$100M career earnings", attr: "ALL", test: (m) => m.careerMoney >= 1e8 },
     { id: "cups5", name: "Cup Hero", desc: "Win 5 team cups", attr: "putting", test: (m) => { var _a; return (m.rc.teamWins + (((_a = m.pc) === null || _a === void 0 ? void 0 : _a.teamWins) || 0)) >= 5; } },
+    // --- new individual milestones (small boosts, slow climb) ---
+    { id: "firstcut", name: "Weekend Regular", desc: "Make your first cut", attr: "drivingAccuracy", test: (m) => m.cutsMade >= 1 },
+    { id: "firsttop10", name: "In the Mix", desc: "First career top-10", attr: "putting", test: (m) => (m.careerTop10s || 0) >= 1 },
+    { id: "top10_10", name: "Contender", desc: "10 career top-10s", attr: "longApproach", test: (m) => (m.careerTop10s || 0) >= 10 },
+    { id: "top10_25", name: "Mr. Reliable", desc: "25 career top-10s", attr: "shortApproach", test: (m) => (m.careerTop10s || 0) >= 25 },
+    { id: "wins3", name: "Multiple Winner", desc: "3 career wins", attr: "chipping", test: (m) => m.careerWins >= 3 },
+    { id: "majors2", name: "Double Major", desc: "2 career majors", attr: "recovery", test: (m) => m.careerMajors >= 2 },
+    { id: "money10", name: "First Millions", desc: "$10M career earnings", attr: "drivingDistance", test: (m) => m.careerMoney >= 1e7 },
+    { id: "money25", name: "Established", desc: "$25M career earnings", attr: "bunker", test: (m) => m.careerMoney >= 2.5e7 },
+    { id: "eagles25", name: "Eagle Eye", desc: "25 career eagles", attr: "drivingDistance", test: (m) => m.careerEagles >= 25 },
+    { id: "birdies250", name: "Red Numbers", desc: "250 career birdies", attr: "putting", test: (m) => m.careerBirdies >= 250 },
+    // --- team / league achievements (only fire in those modes) ---
+    { id: "t_promo", name: "On the Up", desc: "Win promotion to a higher division", attr: "ALL",
+        test: (m, st) => (st === null || st === void 0 ? void 0 : st.mode) === "league" && !!(st === null || st === void 0 ? void 0 : st.everPromoted) },
+    { id: "t_topflight", name: "Top Flight", desc: "Reach the Premier Division", attr: "ALL",
+        test: (m, st) => (st === null || st === void 0 ? void 0 : st.mode) === "league" && ((st === null || st === void 0 ? void 0 : st.bestDivision) === 0) },
+    { id: "t_divtitle", name: "Division Champions", desc: "Win your division", attr: "longApproach",
+        test: (m, st) => { var _a; return (st === null || st === void 0 ? void 0 : st.mode) === "league" && (((_a = st === null || st === void 0 ? void 0 : st.teamTrophies) === null || _a === void 0 ? void 0 : _a.divTitles) || 0) >= 1; } },
+    { id: "t_title", name: "Club Glory", desc: "Win a team title", attr: "putting",
+        test: (m, st) => { var _a; return ((st === null || st === void 0 ? void 0 : st.mode) === "team" || (st === null || st === void 0 ? void 0 : st.mode) === "league") && (((_a = st === null || st === void 0 ? void 0 : st.teamTrophies) === null || _a === void 0 ? void 0 : _a.titles) || 0) >= 1; } },
+    { id: "t_mvp", name: "Team Talisman", desc: "Be named team MVP", attr: "shortApproach",
+        test: (m, st) => { var _a; return ((st === null || st === void 0 ? void 0 : st.mode) === "team" || (st === null || st === void 0 ? void 0 : st.mode) === "league") && (((_a = st === null || st === void 0 ? void 0 : st.teamTrophies) === null || _a === void 0 ? void 0 : _a.mvps) || 0) >= 1; } },
+    { id: "t_poy", name: "Players' Player", desc: "Win Player of the Year", attr: "ALL",
+        test: (m, st) => { var _a; return (((_a = st === null || st === void 0 ? void 0 : st.teamTrophies) === null || _a === void 0 ? void 0 : _a.poys) || 0) >= 1; } },
 ];
 const COACHES = [
     { name: "Dave Stockwell", title: "Putting guru", attr: "putting", price: 2.5e6 },
@@ -1792,7 +1816,7 @@ function GolfCareerSim() {
         setTour(t);
     };
     const closeEvent = async () => {
-        var _a;
+        var _a, _b;
         const ev = tour.ev;
         const st = { ...g, standings: { ...g.standings }, myStats: { ...g.myStats }, history: [...g.history],
             seasonLog: [...(g.seasonLog || [])], tally: { ...(g.tally || {}) }, eventHistory: { ...(g.eventHistory || {}) }, courseXP: { ...(g.courseXP || {}) }, pastWinners: { ...(g.pastWinners || {}) } };
@@ -1867,6 +1891,54 @@ function GolfCareerSim() {
                     st.myStats.cutsMade++;
                     st.bank = ((_a = g.bank) !== null && _a !== void 0 ? _a : g.myStats.careerMoney) + myLine.money;
                     st.myStats.careerMoney += myLine.money;
+                    // ===== XP FROM PERFORMANCE → auto-raises attributes at thresholds (slow climb) =====
+                    {
+                        let xpGain = 4; // made the cut / played the weekend
+                        const pos = myLine.pos;
+                        if (pos === 1)
+                            xpGain += 30;
+                        else if (pos <= 3)
+                            xpGain += 18;
+                        else if (pos <= 10)
+                            xpGain += 10;
+                        else if (pos <= 25)
+                            xpGain += 5;
+                        if (ev.type === "major" || ev.type === "tc")
+                            xpGain = Math.round(xpGain * 1.6); // big events teach more
+                        // youth learns faster; veterans plateau
+                        const ageNow = (_b = g.pro.age) !== null && _b !== void 0 ? _b : 22;
+                        if (ageNow <= 23)
+                            xpGain = Math.round(xpGain * 1.3);
+                        else if (ageNow >= 33)
+                            xpGain = Math.round(xpGain * 0.6);
+                        st.xp = (st.xp || 0) + xpGain;
+                        st.xpGainLast = xpGain;
+                        // auto-convert: every 100 XP banks one attribute point, placed on a weighted-random skill
+                        const THRESH = 100;
+                        let levelUps = [];
+                        let attrs2 = { ...st.pro.attrs };
+                        const HEAVY = ["drivingDistance", "drivingAccuracy", "longApproach", "shortApproach", "putting", "chipping"];
+                        const ALL8 = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
+                        while ((st.xp || 0) >= THRESH) {
+                            st.xp -= THRESH;
+                            // prefer raising your existing strengths a touch more often (archetype identity), capped at 96 via XP
+                            const pool = Math.random() < 0.6 ? HEAVY : ALL8;
+                            // bias toward the player's current best attributes so specialists stay specialists
+                            const ranked = pool.slice().sort((a, b) => (attrs2[b] || 0) - (attrs2[a] || 0));
+                            const pick = Math.random() < 0.5 ? ranked[Math.floor(Math.random() * Math.min(3, ranked.length))] : pool[Math.floor(Math.random() * pool.length)];
+                            if (attrs2[pick] < 96) {
+                                attrs2[pick] = attrs2[pick] + 1;
+                                levelUps.push(pick);
+                            }
+                        }
+                        if (levelUps.length) {
+                            st.pro = { ...st.pro, attrs: attrs2, overall: calcOverall(attrs2) };
+                            st.xpLevelUps = levelUps; // shown on results screen
+                        }
+                        else {
+                            st.xpLevelUps = null;
+                        }
+                    }
                     // DUAL POT: in team/league modes your winnings also build your club's prize pot
                     if ((g.mode === "team" && st.teams) || (g.mode === "league" && st.leagues)) {
                         const pool = g.mode === "league" ? st.leagues : st.teams;
@@ -2344,7 +2416,22 @@ function GolfCareerSim() {
             st.leagues = leagues;
             st.leagueTransfers = transfers.slice(0, 8);
             const mt = leagues.find((t) => t.members.some((m) => m.includes("(YOU)")));
-            st.myDivision = mt ? mt.division : 3;
+            const newDiv = mt ? mt.division : 3;
+            // achievement tracking: promotion, best division reached, division title
+            const prevDiv = g.myDivision != null ? g.myDivision : 3;
+            if (newDiv < prevDiv)
+                st.everPromoted = true;
+            else
+                st.everPromoted = g.everPromoted || false;
+            st.bestDivision = Math.min(g.bestDivision != null ? g.bestDivision : 3, newDiv);
+            // did you WIN your division this season (1st of 10 before promotion)?
+            const myFinish = finishSnapshot[mt ? mt.id : -1];
+            if (mt && myFinish === 1) {
+                const tro0 = { ...(st.teamTrophies || g.teamTrophies || {}) };
+                tro0.divTitles = (tro0.divTitles || 0) + 1;
+                st.teamTrophies = tro0;
+            }
+            st.myDivision = newDiv;
         }
         // ===== SEASON AWARDS (all modes; team-specific ones only in team mode) =====
         {
@@ -2791,6 +2878,18 @@ function GolfCareerSim() {
                 React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
                     g.caddie.perks ? Object.entries(g.caddie.perks).map(([k, v]) => `+${v} ${PERK_LABEL[k]}`).join(" · ") : "",
                     g.caddie.wxPerks ? (g.caddie.perks ? " · " : "") + "weather" : ""))),
+            g.xpLevelUps && g.xpLevelUps.length > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\uD83D\uDCC8 ATTRIBUTES IMPROVED"),
+                Object.entries(g.xpLevelUps.reduce((acc, k) => { acc[k] = (acc[k] || 0) + 1; return acc; }, {})).map(([k, n]) => {
+                    var _a;
+                    return (React.createElement("p", { key: k, className: "text-sm mb-0.5", style: { color: C.green } },
+                        "\u25B2 ",
+                        ((_a = SLOTS.find((s) => s.key === k)) === null || _a === void 0 ? void 0 : _a.label) || k,
+                        " +",
+                        n));
+                }),
+                React.createElement("p", { className: "text-[11px]", style: { color: C.muted } }, "Earned through experience on tour. Keep playing well to keep climbing."),
+                React.createElement("button", { onClick: async () => { const st = { ...g, xpLevelUps: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))),
             (g.badgeNews || []).length > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(232,195,90,0.08)", border: `1.5px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\uD83C\uDF96\uFE0F MILESTONE UNLOCKED"),
                 g.badgeNews.map((b, i2) => (React.createElement("p", { key: i2, className: "text-xs mb-0.5", style: { color: C.chalk } },
@@ -2873,7 +2972,8 @@ function GolfCareerSim() {
                 g.mode === "team" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("team") }, "\uD83E\uDD1D MY TEAM"),
                 g.mode === "league" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("league") }, "\uD83C\uDFDF\uFE0F MY LEAGUE"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("coaches") }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHES"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("equipment") }, "\uD83C\uDFCC\uFE0F EQUIPMENT")),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("equipment") }, "\uD83C\uDFCC\uFE0F EQUIPMENT"),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("achievements") }, "\uD83C\uDF96\uFE0F ACHIEVEMENTS")),
             (() => {
                 const m = g.myStats;
                 const wIdx = owgrList().findIndex((x) => x.name === g.pro.name) + 1;
@@ -3640,6 +3740,35 @@ function GolfCareerSim() {
             React.createElement(Btn, { onClick: () => setScreen("hub"), kind: "panel" }, "BACK")));
     }
     // ---------- trophy cabinet ----------
+    if (screen === "achievements") {
+        const have = g.badges || [];
+        // group: which are relevant to this mode (team ones only show meaningfully in team/league)
+        const isTeamBadge = (id) => ["t_promo", "t_topflight", "t_divtitle", "t_title", "t_mvp", "t_poy"].includes(id);
+        const visible = BADGES.filter((b) => !isTeamBadge(b.id) || g.mode === "team" || g.mode === "league");
+        const earnedCount = visible.filter((b) => have.includes(b.id)).length;
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83C\uDF96\uFE0F ACHIEVEMENTS"),
+            React.createElement("p", { className: "text-xs mb-3", style: { color: C.muted } },
+                earnedCount,
+                " of ",
+                visible.length,
+                " unlocked \u00B7 each grants a permanent attribute boost. Chase them to build your pro."),
+            React.createElement("div", { className: "grid gap-2" }, visible.map((b) => {
+                const got = have.includes(b.id);
+                const isAll = b.attr === "ALL";
+                return (React.createElement("div", { key: b.id, className: "p-3 rounded-xl flex justify-between items-center", style: {
+                        background: got ? (isAll ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card) : C.panel,
+                        border: got ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.12)", opacity: got ? 1 : 0.6
+                    } },
+                    React.createElement("div", { className: "pr-2" },
+                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: got ? (isAll ? C.gold : C.chalk) : "rgba(244,247,242,0.55)" } },
+                            got ? "✓ " : "🔒 ",
+                            b.name),
+                        React.createElement("div", { className: "text-xs", style: { color: C.muted } }, b.desc)),
+                    React.createElement("div", { className: "text-[10px] text-right whitespace-nowrap", style: { color: got ? C.green : "rgba(244,247,242,0.4)" } }, isAll ? "+1 ALL" : `+1 ${PERK_LABEL[b.attr]}`)));
+            }))));
+    }
     if (screen === "cabinet") {
         const wins = Object.entries(g.eventHistory || {}).map(([evName, list]) => {
             const seasons = list.filter((x) => x.r === "1st").map((x) => x.s);
