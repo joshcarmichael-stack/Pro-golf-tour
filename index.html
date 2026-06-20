@@ -453,9 +453,10 @@ const compFromName = (n) => { if (COMPOSURE_FIXED[n] != null)
     h = (h * 31 + n.charCodeAt(i)) % 9973; return 70 + (h % 18); };
 const compOf = (a) => (a && a.composure != null) ? a.composure : 78;
 const calcOverall = (a) => {
-    const driving = Math.round(0.45 * a.drivingAccuracy + 0.55 * a.drivingDistance);
-    return Math.round(driving * W.driving + a.longApproach * W.longApproach + a.shortApproach * W.shortApproach +
-        a.chipping * W.chipping + a.putting * W.putting + a.recovery * W.recovery + a.bunker * W.bunker);
+    const g = (k) => (a && typeof a[k] === "number" && !isNaN(a[k])) ? a[k] : 75;
+    const driving = Math.round(0.45 * g("drivingAccuracy") + 0.55 * g("drivingDistance"));
+    return Math.round(driving * W.driving + g("longApproach") * W.longApproach + g("shortApproach") * W.shortApproach +
+        g("chipping") * W.chipping + g("putting") * W.putting + g("recovery") * W.recovery + g("bunker") * W.bunker);
 };
 // pressure: composure shifts scoring when the moment is big (Sunday back-9 in contention, majors, cup).
 // returns a small per-hole stroke adjustment (negative = better). intensity 0..1.
@@ -1201,7 +1202,7 @@ function GolfCareerSim() {
                 clearInterval(spinIv.current);
                 const pkRaw = PLAYERS[Math.floor(Math.random() * PLAYERS.length)];
                 const pk = { ...pkRaw, composure: pkRaw.composure != null ? pkRaw.composure : compFromName(pkRaw.name) };
-                const pool = SLOTS.map((s) => s.key).filter((k) => !attrs[k]);
+                const pool = SLOTS.map((s) => s.key).filter((k) => k !== "composure" && !attrs[k]);
                 const avail = [...pool].sort(() => Math.random() - .5).slice(0, 3);
                 setPair([{ ...pk, _avail: avail }]);
                 setSpinning(false);
@@ -1213,7 +1214,11 @@ function GolfCareerSim() {
         setAttrs(nx);
         setLastTake({ key, value, from });
         setPair(null);
-        if (Object.keys(nx).length >= 8) {
+        const BASE8 = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
+        const baseFilled = BASE8.filter((k) => nx[k] != null).length;
+        if (baseFilled >= 8) {
+            if (nx.composure == null)
+                nx.composure = 70 + Math.floor(Math.random() * 16);
             const pro = { name: name.trim(), nation, age: 17, attrs: nx, overall: calcOverall(nx),
                 wx: [68 + Math.floor(Math.random() * 23), 68 + Math.floor(Math.random() * 23), 68 + Math.floor(Math.random() * 23)] };
             const allTime = mode === "alltime";
@@ -1797,6 +1802,25 @@ function GolfCareerSim() {
                     const mp = { ...(st.teamMemberPts || {}) };
                     (perTeam[myTeamObj.id] || []).forEach((x) => { mp[x.name] = (mp[x.name] || 0) + x.pts; });
                     st.teamMemberPts = mp;
+                    // build a weekly report (all 4 members, scores, qualified state) like team mode
+                    const finByName = {};
+                    tour.results.finishers.forEach((r) => { finByName[clean(r.name)] = r; });
+                    const fieldByName = {};
+                    (tour.scores || []).forEach((s) => { fieldByName[clean(s.name)] = s; });
+                    const counted = (perTeam[myTeamObj.id] || []).slice().sort((a, b) => b.pts - a.pts).slice(0, 2).map((x) => x.name);
+                    const allFour = myTeamObj.members.map((mn) => {
+                        const cn = clean(mn);
+                        const isYouM = mn.includes("(YOU)");
+                        const key = isYouM ? g.pro.name : cn;
+                        const fr = finByName[key] || finByName[cn];
+                        const fld = fieldByName[key] || fieldByName[cn];
+                        const inField = !!fld;
+                        const madeCut = !!fr && !fr.cut;
+                        return { name: key, isYou: isYouM, inField, madeCut, pos: fr ? fr.pos : null, pts: fr ? (fr.pts || 0) : 0,
+                            total: fr ? fr.total : (fld ? fld.total : null), cut: inField && !madeCut, counted: counted.includes(key) };
+                    });
+                    const weekPts = allFour.filter((x) => x.counted).reduce((s, x) => s + x.pts, 0);
+                    st.lastTeamWeek = { teamName: myTeamObj.name, teamId: myTeamObj.id, event: ev.e, members: allFour, weekPts, par: tour.course.par, isLeague: true, division: myTeamObj.division };
                 }
             }
             if (g.mode === "team" && st.teams) {
@@ -1943,7 +1967,7 @@ function GolfCareerSim() {
         if (wList.length && wList[0].n === st.pro.name)
             st.myStats.reachedNo1 = true;
         const stB = applyBadges(st);
-        const goTeam = stB.mode === "team" && stB.lastTeamWeek;
+        const goTeam = (stB.mode === "team" || stB.mode === "league") && stB.lastTeamWeek;
         setG(stB);
         await save(stB);
         setTour(null);
@@ -2385,12 +2409,13 @@ function GolfCareerSim() {
                         p.overall),
                     React.createElement("div", { className: "mb-1.5 leading-tight", style: { color: C.chalk, fontSize: 13, fontWeight: 700 } }, p.name),
                     SLOTS.map((s) => {
+                        const isComp = s.key === "composure";
                         const taken = !!attrs[s.key];
-                        const scouted = !p._avail || p._avail.includes(s.key);
-                        const locked = taken || !scouted;
+                        const scouted = !isComp && (!p._avail || p._avail.includes(s.key));
+                        const locked = taken || !scouted || isComp;
                         return (React.createElement("button", { key: s.key, onClick: () => !locked && take(s.key, p[s.key], p.name), disabled: locked, className: `w-full flex justify-between items-center px-1.5 py-1 mb-1 rounded ${locked ? "opacity-25" : "active:scale-95"}`, style: { background: locked ? "transparent" : "rgba(244,247,242,0.07)", border: locked ? "1px dashed rgba(244,247,242,0.15)" : "1px solid rgba(232,195,90,0.35)" } },
                             React.createElement("span", { style: { color: C.muted, fontSize: 9 } }, s.label),
-                            React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: !scouted && !taken ? "rgba(244,247,242,0.3)" : tint(p[s.key]) } }, !scouted && !taken ? "?" : p[s.key])));
+                            React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: isComp ? tint(p[s.key]) : (!scouted && !taken ? "rgba(244,247,242,0.3)" : tint(p[s.key])) } }, isComp ? p[s.key] : (!scouted && !taken ? "?" : p[s.key]))));
                     })))))))));
     }
     if (!g)
@@ -2821,14 +2846,17 @@ function GolfCareerSim() {
     // ---------- team results (after each event) ----------
     if (screen === "teamResults" && g.lastTeamWeek) {
         const wk = g.lastTeamWeek;
-        const table = teamTable();
+        const table = wk.isLeague
+            ? (g.leagues || []).filter((t) => t.division === wk.division).map((t) => ({ ...t, pts: (g.teamSeasonPts || {})[t.id] || 0, ovr: teamOverall(t, (n) => ovrOf(n)) })).sort((a, b) => b.pts - a.pts || b.ovr - a.ovr)
+            : teamTable();
         const myRank = table.findIndex((t) => t.id === wk.teamId) + 1;
-        const mt = myTeam();
+        const mt = wk.isLeague ? myLeagueTeam() : myTeam();
         return (React.createElement(Shell, null,
             React.createElement("div", { className: "text-center" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } },
                     wk.teamName.toUpperCase(),
-                    " \u00B7 TEAM REPORT"),
+                    " \u00B7 ",
+                    wk.isLeague ? divName(wk.division).toUpperCase() : "TEAM REPORT"),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 26, color: C.chalk, lineHeight: 1.05 } }, wk.event),
                 React.createElement("div", { className: "my-1", style: { fontFamily: FONT, fontSize: 30, color: C.gold } },
                     "+",
@@ -2859,7 +2887,7 @@ function GolfCareerSim() {
                 React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u2713 = counted (best two score) \u00B7 \"missed cut\" = played but didn't make the weekend \u00B7 \"didn't qualify\" = field was capped by world ranking that week.")),
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
-                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } }, "TEAM STANDINGS"),
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } }, wk.isLeague ? "DIVISION TABLE" : "TEAM STANDINGS"),
                     React.createElement("span", { className: "text-xs", style: { color: myRank <= 3 ? C.green : C.chalk } },
                         wk.teamName,
                         " ",
