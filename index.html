@@ -442,8 +442,15 @@ const shotStory = (hole, score, attrs) => {
 };
 // ============ MODEL CONSTANTS ============
 const W = { driving: 0.20, longApproach: 0.15, shortApproach: 0.20, chipping: 0.13, putting: 0.20, recovery: 0.05, bunker: 0.07 };
-const compFromName = (n) => { let h = 71; for (let i = 0; i < (n || "").length; i++)
-    h = (h * 31 + n.charCodeAt(i)) % 9973; return 68 + (h % 22); };
+const COMPOSURE_FIXED = {
+    "Scottie Scheffler": 95, "Rory McIlroy": 85, "Jon Rahm": 88, "Xander Schauffele": 90,
+    "Jordan Spieth": 82, "Justin Thomas": 84, "Viktor Hovland": 84, "Collin Morikawa": 90,
+    "Hideki Matsuyama": 88, "Patrick Cantlay": 90, "Tommy Fleetwood": 85, "Tyrrell Hatton": 74,
+    "Brooks Koepka": 94, "Shane Lowry": 85, "Ludvig Aberg": 86, "Wyndham Clark": 80,
+};
+const compFromName = (n) => { if (COMPOSURE_FIXED[n] != null)
+    return COMPOSURE_FIXED[n]; let h = 71; for (let i = 0; i < (n || "").length; i++)
+    h = (h * 31 + n.charCodeAt(i)) % 9973; return 70 + (h % 18); };
 const compOf = (a) => (a && a.composure != null) ? a.composure : 78;
 const calcOverall = (a) => {
     const driving = Math.round(0.45 * a.drivingAccuracy + 0.55 * a.drivingDistance);
@@ -942,6 +949,7 @@ const makeRegen = (slotCountry, taken) => {
     const keys = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
     const attrs = {};
     keys.forEach((k) => { attrs[k] = clampN(Math.round(base + gauss() * 3), 62, ceil); });
+    attrs.composure = clampN(Math.round(base + gauss() * 4), 62, 96);
     attrs[keys[Math.floor(Math.random() * keys.length)]] = Math.min(ceil, attrs[keys[Math.floor(Math.random() * keys.length)]] + 4);
     return { displayName: nm, country, age: 19 + Math.floor(Math.random() * 5), attrs, overall: calcOverall(attrs), rookie: true, pot: ceil, tier };
 };
@@ -1130,7 +1138,9 @@ function GolfCareerSim() {
                 } // established/declining
                 return clampN(Math.round(p.overall + Math.random() * ceilBonus + gauss() * (spread / 3)), p.overall, 97);
             })();
-            const e = cur[p.name] || { age: seedAge, attrs: Object.fromEntries(keys.map((k) => [k, p[k]])), pot: potSeed };
+            const baseAttrs = Object.fromEntries(keys.map((k) => [k, p[k]]));
+            baseAttrs.composure = p.composure != null ? p.composure : compFromName(p.name);
+            const e = cur[p.name] || { age: seedAge, attrs: baseAttrs, pot: potSeed };
             const age = e.age + 1;
             if (age > 45) {
                 const oldName = e.displayName || p.name;
@@ -1141,6 +1151,8 @@ function GolfCareerSim() {
                 return;
             }
             const attrs = { ...e.attrs };
+            if (attrs.composure == null)
+                attrs.composure = compFromName(p.name);
             const bump = (k, d) => { attrs[k] = clampN(attrs[k] + d, 60, 99); };
             const rk = () => keys[Math.floor(Math.random() * keys.length)];
             const curOvr = calcOverall(attrs);
@@ -1212,6 +1224,7 @@ function GolfCareerSim() {
                     const leg = ALLTIME_FIELD[idx];
                     if (leg) {
                         const attrs = Object.fromEntries(keys.map((k, i) => [k, leg[2][i]]));
+                        attrs.composure = clampN(88 + Math.round(gauss() * 4), 84, 97);
                         aiSeed[p.name] = { displayName: leg[0], country: leg[1], age: 28 + (idx % 8), attrs, overall: calcOverall(attrs), pot: 97, legend: true };
                     }
                 });
