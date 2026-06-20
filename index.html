@@ -1893,26 +1893,56 @@ function GolfCareerSim() {
                     st.myStats.careerMoney += myLine.money;
                     // ===== XP FROM PERFORMANCE → auto-raises attributes at thresholds (slow climb) =====
                     {
-                        let xpGain = 4; // made the cut / played the weekend
                         const pos = myLine.pos;
+                        const me2 = tour.scores.find((s) => s.isYou);
+                        // tally birdies/eagles and clean/sub-par rounds across YOUR rounds from the scorecard
+                        let birdies = 0, eagles = 0, bogeyFree = 0, subPar = 0, beatField = 0;
+                        if (me2 && me2.rounds && !tour.team) {
+                            me2.rounds.forEach((rsc, ri) => {
+                                // we only have round totals here, not per-hole; use round vs par and vs field
+                                const parTot = tour.course.par;
+                                if (rsc < parTot)
+                                    subPar++;
+                                if (tour.fieldRoundAvgs[ri] != null && rsc < tour.fieldRoundAvgs[ri] - 1.5)
+                                    beatField++;
+                            });
+                        }
+                        // birdies/eagles already counted into st.myStats this event via applyStatDeltas
+                        const xpParts = [];
+                        let xpGain = 0;
+                        const add = (label, amt) => { if (amt > 0) {
+                            xpParts.push({ label, amt });
+                            xpGain += amt;
+                        } };
+                        add("Played the weekend", 4);
                         if (pos === 1)
-                            xpGain += 30;
+                            add("WON the tournament", 30);
                         else if (pos <= 3)
-                            xpGain += 18;
+                            add("Top-3 finish", 18);
+                        else if (pos <= 5)
+                            add("Top-5 finish", 12);
                         else if (pos <= 10)
-                            xpGain += 10;
+                            add("Top-10 finish", 8);
                         else if (pos <= 25)
-                            xpGain += 5;
-                        if (ev.type === "major" || ev.type === "tc")
-                            xpGain = Math.round(xpGain * 1.6); // big events teach more
+                            add("Top-25 finish", 4);
+                        add(`${subPar} sub-par round${subPar !== 1 ? "s" : ""}`, subPar * 3);
+                        add(`Outplayed the field ×${beatField}`, beatField * 4);
+                        if (ev.type === "major" || ev.type === "tc") {
+                            const bonus = Math.round(xpGain * 0.5);
+                            add("Big-event bonus", bonus);
+                        }
                         // youth learns faster; veterans plateau
                         const ageNow = (_b = g.pro.age) !== null && _b !== void 0 ? _b : 22;
-                        if (ageNow <= 23)
-                            xpGain = Math.round(xpGain * 1.3);
-                        else if (ageNow >= 33)
-                            xpGain = Math.round(xpGain * 0.6);
+                        if (ageNow <= 23) {
+                            const yb = Math.round(xpGain * 0.3);
+                            add("Young talent", yb);
+                        }
+                        else if (ageNow >= 33) {
+                            xpGain = Math.round(xpGain * 0.7);
+                        }
                         st.xp = (st.xp || 0) + xpGain;
                         st.xpGainLast = xpGain;
+                        st.xpBreakdown = xpParts;
                         // auto-convert: every 100 XP banks one attribute point, placed on a weighted-random skill
                         const THRESH = 100;
                         let levelUps = [];
@@ -1921,9 +1951,7 @@ function GolfCareerSim() {
                         const ALL8 = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
                         while ((st.xp || 0) >= THRESH) {
                             st.xp -= THRESH;
-                            // prefer raising your existing strengths a touch more often (archetype identity), capped at 96 via XP
                             const pool = Math.random() < 0.6 ? HEAVY : ALL8;
-                            // bias toward the player's current best attributes so specialists stay specialists
                             const ranked = pool.slice().sort((a, b) => (attrs2[b] || 0) - (attrs2[a] || 0));
                             const pick = Math.random() < 0.5 ? ranked[Math.floor(Math.random() * Math.min(3, ranked.length))] : pool[Math.floor(Math.random() * pool.length)];
                             if (attrs2[pick] < 96) {
@@ -1933,7 +1961,7 @@ function GolfCareerSim() {
                         }
                         if (levelUps.length) {
                             st.pro = { ...st.pro, attrs: attrs2, overall: calcOverall(attrs2) };
-                            st.xpLevelUps = levelUps; // shown on results screen
+                            st.xpLevelUps = levelUps;
                         }
                         else {
                             st.xpLevelUps = null;
@@ -2878,18 +2906,31 @@ function GolfCareerSim() {
                 React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
                     g.caddie.perks ? Object.entries(g.caddie.perks).map(([k, v]) => `+${v} ${PERK_LABEL[k]}`).join(" · ") : "",
                     g.caddie.wxPerks ? (g.caddie.perks ? " · " : "") + "weather" : ""))),
-            g.xpLevelUps && g.xpLevelUps.length > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\uD83D\uDCC8 ATTRIBUTES IMPROVED"),
-                Object.entries(g.xpLevelUps.reduce((acc, k) => { acc[k] = (acc[k] || 0) + 1; return acc; }, {})).map(([k, n]) => {
+            (g.xpLevelUps && g.xpLevelUps.length > 0) || (g.xpBreakdown && g.xpBreakdown.length > 0) ? (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } },
+                        "\uD83D\uDCC8 EXPERIENCE \u00B7 +",
+                        g.xpGainLast || 0,
+                        " XP"),
+                    React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
+                        g.xp || 0,
+                        "/100 to next point")),
+                g.xpBreakdown && g.xpBreakdown.map((p, i) => (React.createElement("div", { key: i, className: "flex justify-between text-xs", style: { color: C.chalk } },
+                    React.createElement("span", null, p.label),
+                    React.createElement("span", { style: { color: C.green } },
+                        "+",
+                        p.amt)))),
+                React.createElement("div", { className: "h-1.5 rounded-full mt-1.5 mb-1 overflow-hidden", style: { background: "rgba(244,247,242,0.12)" } },
+                    React.createElement("div", { style: { width: `${g.xp || 0}%`, height: "100%", background: C.gold } })),
+                g.xpLevelUps && g.xpLevelUps.length > 0 && (React.createElement("div", { className: "mt-1 pt-1", style: { borderTop: "1px solid rgba(232,195,90,0.3)" } }, Object.entries(g.xpLevelUps.reduce((acc, k) => { acc[k] = (acc[k] || 0) + 1; return acc; }, {})).map(([k, n]) => {
                     var _a;
-                    return (React.createElement("p", { key: k, className: "text-sm mb-0.5", style: { color: C.green } },
-                        "\u25B2 ",
+                    return (React.createElement("p", { key: k, className: "text-sm", style: { color: C.gold } },
+                        "\u25B2 ATTRIBUTE UP \u2014 ",
                         ((_a = SLOTS.find((s) => s.key === k)) === null || _a === void 0 ? void 0 : _a.label) || k,
                         " +",
                         n));
-                }),
-                React.createElement("p", { className: "text-[11px]", style: { color: C.muted } }, "Earned through experience on tour. Keep playing well to keep climbing."),
-                React.createElement("button", { onClick: async () => { const st = { ...g, xpLevelUps: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))),
+                }))),
+                React.createElement("button", { onClick: async () => { const st = { ...g, xpLevelUps: null, xpBreakdown: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))) : null,
             (g.badgeNews || []).length > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(232,195,90,0.08)", border: `1.5px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\uD83C\uDF96\uFE0F MILESTONE UNLOCKED"),
                 g.badgeNews.map((b, i2) => (React.createElement("p", { key: i2, className: "text-xs mb-0.5", style: { color: C.chalk } },
