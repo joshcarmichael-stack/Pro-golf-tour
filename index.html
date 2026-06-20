@@ -991,6 +991,22 @@ function GolfCareerSim() {
                 if (res === null || res === void 0 ? void 0 : res.value) {
                     let s = JSON.parse(res.value);
                     if (s === null || s === void 0 ? void 0 : s.pro) {
+                        // REPAIR: fix any missing/NaN attributes on the saved pro (e.g. from the composure-creation bug)
+                        if (s.pro && s.pro.attrs) {
+                            const BASE8 = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
+                            let fixed = false;
+                            BASE8.forEach((k) => { if (typeof s.pro.attrs[k] !== "number" || isNaN(s.pro.attrs[k])) {
+                                s.pro.attrs[k] = 72;
+                                fixed = true;
+                            } });
+                            if (s.pro.attrs.composure == null) {
+                                s.pro.attrs.composure = 75;
+                                fixed = true;
+                            }
+                            const ov = calcOverall(s.pro.attrs);
+                            if (fixed || typeof s.pro.overall !== "number" || isNaN(s.pro.overall))
+                                s.pro.overall = ov;
+                        }
                         // REPAIR: a season finished but never rolled over (evIdx past schedule end, not retired)
                         if (!s.retired && s.evIdx >= SCHEDULE.length) {
                             try {
