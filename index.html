@@ -54,6 +54,36 @@ const buildTeams = (proName, proOverall) => {
     return teams;
 };
 const teamOverall = (team, ovrOf) => Math.round(team.members.reduce((a, n) => a + ovrOf(n), 0) / team.members.length);
+const EXTRA_TEAM_NAMES = ["Valencia Storm", "Perth Heat", "Kyoto Blossom", "Munich Eagles"];
+const ALL_TEAM_NAMES = [...TEAM_NAMES, ...EXTRA_TEAM_NAMES];
+const playerValue = (p) => {
+    const ovr = p.overall || 75;
+    const age = p.age || 28;
+    const pot = p.pot || ovr;
+    let v = Math.pow(Math.max(0, ovr - 60), 2.2) * 0.0055;
+    const headroom = Math.max(0, pot - ovr);
+    if (age <= 24)
+        v *= 1 + 0.05 * headroom + (24 - age) * 0.04;
+    else if (age >= 33)
+        v *= Math.max(0.45, 1 - (age - 32) * 0.08);
+    return Math.max(0.2, Math.round(v * 10) / 10);
+};
+const buildLeagues = (proName) => {
+    const ai = PLAYERS.slice().sort((a, b) => b.overall - a.overall).map((p) => p.name);
+    const N = 40, SIZE = 4;
+    const teams = Array.from({ length: N }, (_, i) => ({
+        id: i, name: ALL_TEAM_NAMES[i] || `Team ${i + 1}`, members: [], division: Math.floor(i / 10), budget: 0,
+    }));
+    let pos = 0;
+    for (let r = 0; r < SIZE; r++) {
+        const order = r % 2 === 0 ? [...Array(N).keys()] : [...Array(N).keys()].reverse();
+        for (const t of order) {
+            if (pos < ai.length)
+                teams[t].members.push(ai[pos++]);
+        }
+    }
+    return teams;
+};
 const ALLTIME_FIELD = [
     // name, country, [drvAcc, drvDist, longApp, shortApp, chip, putt, recovery, bunker]
     ["Tiger Woods (2000)", "USA", [90, 95, 97, 96, 95, 95, 97, 92]],
@@ -225,11 +255,11 @@ const holeWeights = (par, yds) => {
 };
 const holeFitOf = (a, w) => a.drivingAccuracy * w.acc + a.drivingDistance * w.dist + a.longApproach * w.lng + a.shortApproach * w.sht +
     a.chipping * w.chp + a.putting * w.put + a.recovery * w.rec + a.bunker * w.bnk;
-const playHole = (attrs, hole, wxAdj, safe) => {
+const playHole = (attrs, hole, wxAdj, safe, presAdj) => {
     const [par, yds, hz, mu0] = hole;
     const w = holeWeights(par, yds);
     const fit = holeFitOf(attrs, w);
-    const x = mu0 + wxAdj - (fit - 85) * 0.011;
+    const x = mu0 + wxAdj + (presAdj || 0) - (fit - 85) * 0.011;
     const reach = attrs.drivingDistance * .6 + attrs.longApproach * .4;
     let pE = par === 5 ? clampN(.03 + (reach - 85) * .0045 - x * .05, .001, .20) : (par === 4 && yds < 350 ? .004 : .0005);
     let pD = clampN(.012 + x * .08 + hz * .009, .003, .25);
@@ -412,10 +442,22 @@ const shotStory = (hole, score, attrs) => {
 };
 // ============ MODEL CONSTANTS ============
 const W = { driving: 0.20, longApproach: 0.15, shortApproach: 0.20, chipping: 0.13, putting: 0.20, recovery: 0.05, bunker: 0.07 };
+const compFromName = (n) => { let h = 71; for (let i = 0; i < (n || "").length; i++)
+    h = (h * 31 + n.charCodeAt(i)) % 9973; return 68 + (h % 22); };
+const compOf = (a) => (a && a.composure != null) ? a.composure : 78;
 const calcOverall = (a) => {
     const driving = Math.round(0.45 * a.drivingAccuracy + 0.55 * a.drivingDistance);
     return Math.round(driving * W.driving + a.longApproach * W.longApproach + a.shortApproach * W.shortApproach +
         a.chipping * W.chipping + a.putting * W.putting + a.recovery * W.recovery + a.bunker * W.bunker);
+};
+// pressure: composure shifts scoring when the moment is big (Sunday back-9 in contention, majors, cup).
+// returns a small per-hole stroke adjustment (negative = better). intensity 0..1.
+const pressureAdj = (a, intensity) => {
+    if (!intensity)
+        return 0;
+    const c = compOf(a);
+    // a 90-composure player gains, a 65 loses; scaled by how big the moment is
+    return -((c - 78) * 0.010) * intensity;
 };
 const courseFit = (a, course) => {
     let s = 0;
@@ -832,6 +874,7 @@ const SLOTS = [
     { key: "longApproach", label: "LONG APPROACH" }, { key: "shortApproach", label: "SHORT APPROACH" },
     { key: "chipping", label: "CHIPPING" }, { key: "putting", label: "PUTTING" },
     { key: "recovery", label: "RECOVERY" }, { key: "bunker", label: "BUNKER PLAY" },
+    { key: "composure", label: "COMPOSURE" },
 ];
 const NATIONS = Object.keys(NATION_CODE);
 function Btn({ children, onClick, disabled, kind = "gold", small }) {
@@ -1028,7 +1071,7 @@ function GolfCareerSim() {
             return null;
         if (!e)
             return base;
-        return { ...base, ...e.attrs, name: e.displayName || base.name, country: e.country || base.country, overall: e.overall, age: e.age, rookie: e.rookie, tier: e.tier };
+        return { ...base, ...e.attrs, composure: (e.attrs && e.attrs.composure != null) ? e.attrs.composure : compFromName(base.name), name: e.displayName || base.name, country: e.country || base.country, overall: e.overall, age: e.age, rookie: e.rookie, tier: e.tier };
     };
     const clean2 = (nm) => (nm || "").replace(" (YOU)", "");
     const valOf = (name, st = g) => {
@@ -1481,8 +1524,16 @@ function GolfCareerSim() {
         while (alive.length > 1 && n < 8) {
             const hole = t.course.holes[order[n % order.length]];
             const scs = alive.map((s) => {
-                if (!t.team)
-                    return playHole(s.attrs, hole, wxAdjFor(wx, s.wx));
+                if (!t.team) {
+                    let pAdj = 0;
+                    if (s.isYou && t.round === 3 && i >= 9) {
+                        // bigger pressure deeper into the back nine and in majors/cups
+                        const base = (i - 8) / 10; // .1 .. 1.0
+                        const evMult = (t.ev && (t.ev.type === "major" || t.ev.type === "tc")) ? 1.4 : 1;
+                        pAdj = pressureAdj(s.attrs, base * evMult);
+                    }
+                    return playHole(s.attrs, hole, wxAdjFor(wx, s.wx), false, pAdj);
+                }
                 const a = playHole(s.members[0].attrs, hole, wxAdjFor(wx, s.members[0].wx));
                 const b = playHole(s.members[1].attrs, hole, wxAdjFor(wx, s.members[1].wx));
                 return Math.min(a, b);
@@ -4096,18 +4147,19 @@ function GolfCareerSim() {
             const oppNames = m.youSideA ? m.b : m.a;
             let myAdj = (ry.homeSide === mySideId ? -0.011 : 0) + (mode === "s" ? -(ry.youSinglesMod || 0) * 0.011 : 0);
             const oppAdj = (ry.homeSide === oppSideId ? -0.011 : 0);
-            const sideScore = (names, adj) => {
+            const sideScore = (names, adj, isMe) => {
                 const hole = course.holes[am.hole];
+                const pAdj = isMe ? pressureAdj(pl(names[0]), 0.5 + (am.hole / 18) * 0.6) : 0;
                 if (mode === "fb")
-                    return Math.min(playHole(pl(names[0]), hole, adj), playHole(pl(names[1]), hole, adj));
+                    return Math.min(playHole(pl(names[0]), hole, adj, false, pAdj), playHole(pl(names[1]), hole, adj, false, isMe ? pressureAdj(pl(names[1]), 0.5 + (am.hole / 18) * 0.6) : 0));
                 if (mode === "fs")
-                    return playHole(blendAttrs(pl(names[0]), pl(names[1])), hole, adj);
-                return playHole(pl(names[0]), hole, adj);
+                    return playHole(blendAttrs(pl(names[0]), pl(names[1])), hole, adj, false, pAdj);
+                return playHole(pl(names[0]), hole, adj, false, pAdj);
             };
             do {
                 const hole = course.holes[am.hole];
-                const my = sideScore(myNames, myAdj);
-                const opp = sideScore(oppNames, oppAdj);
+                const my = sideScore(myNames, myAdj, true);
+                const opp = sideScore(oppNames, oppAdj, false);
                 am.log.push({ h: am.hole + 1, par: hole[0], my, opp });
                 am.diff += my < opp ? 1 : my > opp ? -1 : 0;
                 am.hole += 1;
