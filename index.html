@@ -3737,7 +3737,9 @@ function GolfCareerSim() {
                 })(),
                 React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u2B50 = squad's top scorer \u00B7 season points decide lineup ties"))),
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "TABLE \u00B7 THIS SEASON"),
+                React.createElement("div", { className: "flex justify-between mb-1" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold } }, "TABLE \u00B7 THIS SEASON"),
+                    React.createElement("span", { className: "text-[10px]", style: { color: C.muted } }, "ovr \u00B7 pts")),
                 table.map((t, i) => {
                     const mine = t.id === (mt === null || mt === void 0 ? void 0 : mt.id);
                     const promo = i < 2 && myDiv > 0, releg = i >= table.length - 2 && myDiv < 3;
@@ -3749,7 +3751,10 @@ function GolfCareerSim() {
                             mine ? " (YOURS)" : "",
                             " ",
                             promo ? React.createElement("span", { style: { color: C.green } }, "\u25B2") : releg ? React.createElement("span", { style: { color: C.red } }, "\u25BC") : ""),
-                        React.createElement("span", null, t.pts)));
+                        React.createElement("span", { className: "whitespace-nowrap" },
+                            React.createElement("span", { style: { color: tint(t.ovr), fontSize: 10 } }, t.ovr),
+                            " \u00B7 ",
+                            t.pts)));
                 }),
                 React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u25B2 promotion \u00B7 \u25BC relegation (applied at season end \u2014 coming in the next update)")),
             React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "4 divisions \u00B7 10 teams each, five players per squad. Your best four finishers score for the club weekly. Off-season, clubs trade by player value within their budgets \u2014 and you may get an offer to move up.")));
