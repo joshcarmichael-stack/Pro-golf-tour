@@ -1739,7 +1739,13 @@ function GolfCareerSim() {
             tour.results.finishers.forEach((r) => {
                 var _a, _b;
                 if (tour.team) {
-                    r.members.forEach((m) => { var _a, _b; st.standings[m.name] = { pts: (((_a = st.standings[m.name]) === null || _a === void 0 ? void 0 : _a.pts) || 0) + r.pts, money: (((_b = st.standings[m.name]) === null || _b === void 0 ? void 0 : _b.money) || 0) + r.money }; });
+                    r.members.forEach((m) => {
+                        var _a, _b;
+                        const nm = (m.name || "").replace(" (YOU)", "");
+                        st.standings[nm] = { pts: (((_a = st.standings[nm]) === null || _a === void 0 ? void 0 : _a.pts) || 0) + r.pts, money: (((_b = st.standings[nm]) === null || _b === void 0 ? void 0 : _b.money) || 0) + r.money };
+                        if (m.isYou || nm === g.pro.name)
+                            myLine = { ...r, name: g.pro.name, isYou: true };
+                    });
                 }
                 else {
                     st.standings[r.name] = { pts: (((_a = st.standings[r.name]) === null || _a === void 0 ? void 0 : _a.pts) || 0) + r.pts, money: (((_b = st.standings[r.name]) === null || _b === void 0 ? void 0 : _b.money) || 0) + r.money };
@@ -1799,6 +1805,14 @@ function GolfCareerSim() {
                     st.myStats.cutsMade++;
                     st.bank = ((_a = g.bank) !== null && _a !== void 0 ? _a : g.myStats.careerMoney) + myLine.money;
                     st.myStats.careerMoney += myLine.money;
+                    // DUAL POT: in team/league modes your winnings also build your club's prize pot
+                    if ((g.mode === "team" && st.teams) || (g.mode === "league" && st.leagues)) {
+                        const pool = g.mode === "league" ? st.leagues : st.teams;
+                        const myTm = pool.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
+                        if (myTm) {
+                            myTm.teamPot = Math.round(((myTm.teamPot || 0) + myLine.money / 1e6) * 10) / 10;
+                        }
+                    }
                     if (myLine.pos <= 10) {
                         st.myStats.top10s++;
                         st.myStats.careerTop10s = (st.myStats.careerTop10s || 0) + 1;
@@ -2141,6 +2155,58 @@ function GolfCareerSim() {
             const valA = (n) => { var _a; const c = n.replace(" (YOU)", ""); if (c === g.pro.name)
                 return playerValue({ overall: calcOverall(g.pro.attrs), age: (g.pro.age || 25) + 1, pot: 99 }); const ai = (g.ai && g.ai[c]) || {}; const ov = ai.overall || (((_a = PLAYERS.find((p) => p.name === c)) === null || _a === void 0 ? void 0 : _a.overall) || 75); return playerValue({ overall: ov, age: ai.age || 28, pot: ai.pot || ov }); };
             let leagues = g.leagues.map((t) => ({ ...t, members: t.members.slice() }));
+            // ---- RETIREMENTS → FREE-AGENT DRAFT ----
+            // any roster name that retired this rollover (evo.news out->in) leaves a vacant seat.
+            const retiredMap = {};
+            (evo.news || []).forEach((n) => { retiredMap[n.out] = n.in; });
+            const freeAgents = []; // regens whose retiree was on a league team
+            leagues.forEach((t) => {
+                t.members = t.members.map((mn) => {
+                    const clean = mn.replace(" (YOU)", "");
+                    if (retiredMap[clean] && !mn.includes("(YOU)")) {
+                        // seat vacated; the regen enters the free-agent pool, NOT this seat
+                        freeAgents.push(retiredMap[clean]);
+                        return null; // mark vacancy
+                    }
+                    return mn;
+                });
+            });
+            // also fold in any unsigned regens already floating (none normally) — keep simple
+            // DRAFT: weakest division & lowest team first get first pick of the best free agents
+            if (freeAgents.length) {
+                const faOvr = (n) => { const e = (evo.ai && evo.ai[Object.keys(evo.ai).find((k) => (evo.ai[k].displayName || k) === n)]); return e ? e.overall : 75; };
+                const pool = freeAgents.slice().sort((a, b) => faOvr(b) - faOvr(a)); // best first
+                // build draft order: lowest division first (div 3 -> 0), and within division worst-finishers first
+                const draftTeams = [];
+                for (let d = 3; d >= 0; d--) {
+                    const divT = leagues.filter((t) => t.division === d)
+                        .sort((a, b) => ((g.teamSeasonPts || {})[a.id] || 0) - ((g.teamSeasonPts || {})[b.id] || 0)); // worst first
+                    divT.forEach((t) => draftTeams.push(t));
+                }
+                // assign: each vacant seat drafts the next-best free agent, weakest teams pick first
+                let pick = 0;
+                draftTeams.forEach((t) => {
+                    for (let i = 0; i < t.members.length; i++) {
+                        if (t.members[i] === null && pick < pool.length) {
+                            t.members[i] = pool[pick++];
+                        }
+                    }
+                });
+                // any leftover vacancies (shouldn't happen) get a fresh fallback name
+                leagues.forEach((t) => { t.members = t.members.map((m) => m === null ? (pool[pick++] || "Tour Rookie") : m); });
+            }
+            else {
+                // no retirements affecting teams — clear any stray nulls defensively
+                leagues.forEach((t) => { t.members = t.members.filter((m) => m !== null); while (t.members.length < 4)
+                    t.members.push("Tour Rookie"); });
+            }
+            // snapshot each team's finishing position IN ITS DIVISION before any promotion/relegation
+            const finishSnapshot = {};
+            const preDivision = {};
+            for (let d = 0; d < 4; d++) {
+                const divField = leagues.filter((t) => t.division === d).sort((a, b) => ((g.teamSeasonPts || {})[b.id] || 0) - ((g.teamSeasonPts || {})[a.id] || 0));
+                divField.forEach((t, i) => { finishSnapshot[t.id] = i + 1; preDivision[t.id] = d; });
+            }
             // promotion/relegation by final standings per division
             for (let d = 0; d < 4; d++) {
                 const divTeams = leagues.filter((t) => t.division === d).sort((a, b) => ((g.teamSeasonPts || {})[b.id] || 0) - ((g.teamSeasonPts || {})[a.id] || 0));
@@ -2149,13 +2215,29 @@ function GolfCareerSim() {
                 if (d < 3)
                     divTeams.slice(-2).forEach((t) => { t.division = d + 1; }); // bottom 2 down
             }
-            // award prize money to budgets (higher finishes earn more); then a simple AI transfer pass
-            leagues.forEach((t) => { t.budget = Math.round(((4 - t.division) * 5 + 3 + ((g.teamSeasonPts || {})[t.id] || 0) / 400) * 10) / 10; });
+            // budgets = base (new division) + end-of-season prize (scaled by division) + accumulated team pot
+            leagues.forEach((t) => {
+                const finishPos = finishSnapshot[t.id] || 10;
+                const ranAtDiv = preDivision[t.id] != null ? preDivision[t.id] : t.division;
+                const divBase = (4 - t.division) * 5 + 3;
+                // end-of-season prize scales steeply by division: top flight pays far more than the bottom
+                const divMult = [4, 2.4, 1.4, 0.8][ranAtDiv] || 1;
+                const prize = Math.max(0, (11 - finishPos)) * divMult * 1.1; // div0 winner ~ $44m, div3 winner ~ $9m
+                const pot = t.teamPot || 0; // tournament winnings collected through the season
+                t.budget = Math.round((divBase + prize + pot) * 10) / 10;
+                t.lastPrize = Math.round(prize * 10) / 10;
+                t.lastPot = Math.round(pot * 10) / 10;
+                t.teamPot = 0; // reset for next season
+            });
             // AI transfer pass: each higher-div team may buy the best affordable player from a lower-div team
             const transfers = [];
+            const movedThisWindow = new Set(); // a player can only move ONCE per window
+            const teamActed = new Set(); // a team trades at most once per window
             leagues.filter((t) => !t.members.some((m) => m.includes("(YOU)"))).forEach((buyer) => {
                 if (Math.random() > 0.5)
                     return; // not every team acts
+                if (teamActed.has(buyer.id))
+                    return;
                 // weakest slot to upgrade
                 let wIdx = 0, wOvr = 999;
                 buyer.members.forEach((m, i) => { const o = ovrA(m); if (o < wOvr) {
@@ -2167,11 +2249,15 @@ function GolfCareerSim() {
                 leagues.forEach((seller) => {
                     if (seller.id === buyer.id)
                         return;
+                    if (teamActed.has(seller.id))
+                        return;
                     if (seller.division < buyer.division)
                         return; // only buy from same/lower divisions
                     seller.members.forEach((m, si) => {
                         if (m.includes("(YOU)"))
                             return;
+                        if (movedThisWindow.has(m))
+                            return; // already transferred this window
                         const gain = ovrA(m) - wOvr;
                         const cost = valA(m);
                         if (gain > bestGain && cost <= buyer.budget) {
@@ -2186,6 +2272,10 @@ function GolfCareerSim() {
                     best.seller.members[best.si] = out; // swap the displaced player down
                     buyer.budget = Math.round((buyer.budget - best.cost) * 10) / 10;
                     best.seller.budget = Math.round((best.seller.budget + best.cost) * 10) / 10;
+                    movedThisWindow.add(best.name); // lock the bought player
+                    movedThisWindow.add(out); // and the displaced player — neither moves again
+                    teamActed.add(buyer.id);
+                    teamActed.add(best.seller.id); // both clubs done for the window
                     transfers.push({ to: buyer.name, player: best.name.replace(" (YOU)", ""), from: best.seller.name, fee: best.cost });
                 }
             });
@@ -2253,6 +2343,16 @@ function GolfCareerSim() {
         if (g.mode === "team" && g.teams) {
             st.teamSeasonPts = {};
             st.teamMemberPts = {};
+            // remap any retired player on a team to their regen's new name (keeps rosters correct)
+            const retiredMapT = {};
+            (evo.news || []).forEach((n) => { retiredMapT[n.out] = n.in; });
+            st.teams = g.teams.map((t) => ({ ...t, members: t.members.map((mn) => {
+                    const isYou = mn.includes("(YOU)");
+                    const clean = mn.replace(" (YOU)", "");
+                    if (!isYou && retiredMapT[clean])
+                        return retiredMapT[clean];
+                    return mn;
+                }) }));
             const myOvr = calcOverall(g.pro.attrs);
             const mt = (g.teams || []).find((t) => t.members.some((mn) => mn.includes("(YOU)")));
             const tOvr = (t) => Math.round(t.members.reduce((a, n) => {
@@ -2966,7 +3066,17 @@ function GolfCareerSim() {
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: C.gold } }, mt.name),
                 React.createElement("div", { className: "text-sm", style: { color: movedUp ? C.green : C.chalk } },
                     divName(mt.division),
-                    movedUp ? " · PROMOTED! ▲" : ""))),
+                    movedUp ? " · PROMOTED! ▲" : ""),
+                React.createElement("div", { className: "text-xs mt-1", style: { color: C.muted } },
+                    "\uD83C\uDFC6 Season prize $",
+                    (mt.lastPrize || 0).toFixed(1),
+                    "m \u00B7 \uD83D\uDCB0 tournament pot $",
+                    (mt.lastPot || 0).toFixed(1),
+                    "m"),
+                React.createElement("div", { className: "text-sm mt-0.5", style: { color: C.gold, fontFamily: FONT } },
+                    "TRANSFER BUDGET $",
+                    (mt.budget || 0).toFixed(1),
+                    "m"))),
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "AROUND THE MARKET"),
                 g.leagueTransfers.length === 0 && React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "A quiet window \u2014 no major moves this off-season."),
