@@ -1891,82 +1891,6 @@ function GolfCareerSim() {
                     st.myStats.cutsMade++;
                     st.bank = ((_a = g.bank) !== null && _a !== void 0 ? _a : g.myStats.careerMoney) + myLine.money;
                     st.myStats.careerMoney += myLine.money;
-                    // ===== XP FROM PERFORMANCE → auto-raises attributes at thresholds (slow climb) =====
-                    {
-                        const pos = myLine.pos;
-                        const me2 = tour.scores.find((s) => s.isYou);
-                        // tally birdies/eagles and clean/sub-par rounds across YOUR rounds from the scorecard
-                        let birdies = 0, eagles = 0, bogeyFree = 0, subPar = 0, beatField = 0;
-                        if (me2 && me2.rounds && !tour.team) {
-                            me2.rounds.forEach((rsc, ri) => {
-                                // we only have round totals here, not per-hole; use round vs par and vs field
-                                const parTot = tour.course.par;
-                                if (rsc < parTot)
-                                    subPar++;
-                                if (tour.fieldRoundAvgs[ri] != null && rsc < tour.fieldRoundAvgs[ri] - 1.5)
-                                    beatField++;
-                            });
-                        }
-                        // birdies/eagles already counted into st.myStats this event via applyStatDeltas
-                        const xpParts = [];
-                        let xpGain = 0;
-                        const add = (label, amt) => { if (amt > 0) {
-                            xpParts.push({ label, amt });
-                            xpGain += amt;
-                        } };
-                        add("Played the weekend", 4);
-                        if (pos === 1)
-                            add("WON the tournament", 30);
-                        else if (pos <= 3)
-                            add("Top-3 finish", 18);
-                        else if (pos <= 5)
-                            add("Top-5 finish", 12);
-                        else if (pos <= 10)
-                            add("Top-10 finish", 8);
-                        else if (pos <= 25)
-                            add("Top-25 finish", 4);
-                        add(`${subPar} sub-par round${subPar !== 1 ? "s" : ""}`, subPar * 3);
-                        add(`Outplayed the field ×${beatField}`, beatField * 4);
-                        if (ev.type === "major" || ev.type === "tc") {
-                            const bonus = Math.round(xpGain * 0.5);
-                            add("Big-event bonus", bonus);
-                        }
-                        // youth learns faster; veterans plateau
-                        const ageNow = (_b = g.pro.age) !== null && _b !== void 0 ? _b : 22;
-                        if (ageNow <= 23) {
-                            const yb = Math.round(xpGain * 0.3);
-                            add("Young talent", yb);
-                        }
-                        else if (ageNow >= 33) {
-                            xpGain = Math.round(xpGain * 0.7);
-                        }
-                        st.xp = (st.xp || 0) + xpGain;
-                        st.xpGainLast = xpGain;
-                        st.xpBreakdown = xpParts;
-                        // auto-convert: every 100 XP banks one attribute point, placed on a weighted-random skill
-                        const THRESH = 100;
-                        let levelUps = [];
-                        let attrs2 = { ...st.pro.attrs };
-                        const HEAVY = ["drivingDistance", "drivingAccuracy", "longApproach", "shortApproach", "putting", "chipping"];
-                        const ALL8 = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
-                        while ((st.xp || 0) >= THRESH) {
-                            st.xp -= THRESH;
-                            const pool = Math.random() < 0.6 ? HEAVY : ALL8;
-                            const ranked = pool.slice().sort((a, b) => (attrs2[b] || 0) - (attrs2[a] || 0));
-                            const pick = Math.random() < 0.5 ? ranked[Math.floor(Math.random() * Math.min(3, ranked.length))] : pool[Math.floor(Math.random() * pool.length)];
-                            if (attrs2[pick] < 96) {
-                                attrs2[pick] = attrs2[pick] + 1;
-                                levelUps.push(pick);
-                            }
-                        }
-                        if (levelUps.length) {
-                            st.pro = { ...st.pro, attrs: attrs2, overall: calcOverall(attrs2) };
-                            st.xpLevelUps = levelUps;
-                        }
-                        else {
-                            st.xpLevelUps = null;
-                        }
-                    }
                     // DUAL POT: in team/league modes your winnings also build your club's prize pot
                     if ((g.mode === "team" && st.teams) || (g.mode === "league" && st.leagues)) {
                         const pool = g.mode === "league" ? st.leagues : st.teams;
@@ -1989,6 +1913,85 @@ function GolfCareerSim() {
                     }
                     if (!st.myStats.bestFinish || myLine.pos < st.myStats.bestFinish)
                         st.myStats.bestFinish = myLine.pos;
+                }
+                // ===== XP FROM PERFORMANCE → earned whether you make the cut or not (so you always progress) =====
+                if (!tour.team) {
+                    const me2 = tour.scores.find((s) => s.isYou);
+                    const madeCut = !!myLine;
+                    const pos = myLine ? myLine.pos : null;
+                    // count sub-par rounds and rounds you beat the field — works for missed cuts too (you still play 2 rounds)
+                    let subPar = 0, beatField = 0, nearPar = 0;
+                    if (me2 && me2.rounds) {
+                        me2.rounds.forEach((rsc, ri) => {
+                            const parTot = tour.course.par;
+                            if (rsc < parTot)
+                                subPar++;
+                            else if (rsc <= parTot + 1)
+                                nearPar++;
+                            if (tour.fieldRoundAvgs[ri] != null && rsc < tour.fieldRoundAvgs[ri] - 1.5)
+                                beatField++;
+                        });
+                    }
+                    const xpParts = [];
+                    let xpGain = 0;
+                    const add = (label, amt) => { if (amt > 0) {
+                        xpParts.push({ label, amt });
+                        xpGain += amt;
+                    } };
+                    // baseline for competing at all — the developing player still learns from every start
+                    add("Tournament experience", madeCut ? 5 : 3);
+                    if (madeCut)
+                        add("Made the cut", 4);
+                    if (pos === 1)
+                        add("WON the tournament", 30);
+                    else if (pos != null && pos <= 3)
+                        add("Top-3 finish", 18);
+                    else if (pos != null && pos <= 5)
+                        add("Top-5 finish", 12);
+                    else if (pos != null && pos <= 10)
+                        add("Top-10 finish", 8);
+                    else if (pos != null && pos <= 25)
+                        add("Top-25 finish", 4);
+                    add(`${subPar} sub-par round${subPar !== 1 ? "s" : ""}`, subPar * 3);
+                    add(`${nearPar} solid round${nearPar !== 1 ? "s" : ""}`, nearPar * 1);
+                    add(`Outplayed the field ×${beatField}`, beatField * 4);
+                    if (ev.type === "major" || ev.type === "tc") {
+                        const bonus = Math.round(xpGain * 0.5);
+                        add("Big-event bonus", bonus);
+                    }
+                    const ageNow = (_b = g.pro.age) !== null && _b !== void 0 ? _b : 22;
+                    if (ageNow <= 23) {
+                        const yb = Math.round(xpGain * 0.3);
+                        add("Young talent", yb);
+                    }
+                    else if (ageNow >= 33) {
+                        xpGain = Math.round(xpGain * 0.7);
+                    }
+                    st.xp = (st.xp || 0) + xpGain;
+                    st.xpGainLast = xpGain;
+                    st.xpBreakdown = xpParts;
+                    const THRESH = 100;
+                    let levelUps = [];
+                    let attrs2 = { ...st.pro.attrs };
+                    const HEAVY = ["drivingDistance", "drivingAccuracy", "longApproach", "shortApproach", "putting", "chipping"];
+                    const ALL8 = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
+                    while ((st.xp || 0) >= THRESH) {
+                        st.xp -= THRESH;
+                        const pool = Math.random() < 0.6 ? HEAVY : ALL8;
+                        const ranked = pool.slice().sort((a, b) => (attrs2[b] || 0) - (attrs2[a] || 0));
+                        const pick = Math.random() < 0.5 ? ranked[Math.floor(Math.random() * Math.min(3, ranked.length))] : pool[Math.floor(Math.random() * pool.length)];
+                        if (attrs2[pick] < 96) {
+                            attrs2[pick] = attrs2[pick] + 1;
+                            levelUps.push(pick);
+                        }
+                    }
+                    if (levelUps.length) {
+                        st.pro = { ...st.pro, attrs: attrs2, overall: calcOverall(attrs2) };
+                        st.xpLevelUps = levelUps;
+                    }
+                    else {
+                        st.xpLevelUps = null;
+                    }
                 }
             }
             if (g.mode === "league" && st.leagues) {
@@ -2181,12 +2184,35 @@ function GolfCareerSim() {
         const wList = Object.keys(st.standings).map((n) => { var _a; return ({ n, pts: ((st.owgrBase || OWGR_SEED)[n] || 0) + (((_a = st.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0) }); }).sort((a, b) => b.pts - a.pts);
         if (wList.length && wList[0].n === st.pro.name)
             st.myStats.reachedNo1 = true;
+        // ===== MID-SEASON TRANSFER WINDOW (around the halfway point) =====
+        if (st.mode === "league" && st.leagues && st.evIdx === 16 && !st.midWindowDone) {
+            st.midWindowDone = true;
+            const myOvr = calcOverall(st.pro.attrs);
+            const mt = st.leagues.find((t) => t.members.some((m) => m.includes("(YOU)")));
+            const myDiv = mt ? mt.division : 3;
+            const myVal = playerValue({ overall: myOvr, age: st.pro.age || 22, pot: 99 });
+            const sf = (st.seasonForm || {})[st.pro.name] || { w: 0, r2: 0, t10: 0, maj: 0 };
+            const formScore = sf.w * 4 + sf.r2 * 2 + sf.t10 + sf.maj * 5;
+            const suitors = st.leagues.filter((t) => t.division < myDiv && !t.members.some((m) => m.includes("(YOU)")))
+                .map((t) => ({ t, weakest: Math.min(...t.members.map((m) => ovrOf(m, st))), budget: t.budget || 0 }))
+                .filter((s) => myOvr > s.weakest - 2 && s.budget >= myVal * 0.8)
+                .sort((a, b) => a.t.division - b.t.division).slice(0, 2);
+            if ((formScore >= 4 || myOvr >= 84) && suitors.length) {
+                st.playerOffers = suitors.map((s) => ({
+                    teamId: s.t.id, teamName: s.t.name, division: s.t.division,
+                    fee: Math.round(myVal * (0.9 + Math.random() * 0.4) * 10) / 10,
+                    blurb: (myDiv - s.t.division) >= 2 ? "A mid-season swoop from a top club." : "A mid-season move up.",
+                }));
+                st.playerOffersWhen = "mid";
+            }
+        }
         const stB = applyBadges(st);
         const goTeam = (stB.mode === "team" || stB.mode === "league") && stB.lastTeamWeek;
+        const midOffers = stB.mode === "league" && stB.playerOffers && stB.playerOffers.length && stB.playerOffersWhen === "mid";
         setG(stB);
         await save(stB);
         setTour(null);
-        setScreen(goTeam ? "teamResults" : "hub");
+        setScreen(midOffers ? "playerOffers" : (goTeam ? "teamResults" : "hub"));
     };
     // ---------- Ryder ----------
     const proSide = (nat) => nat === "USA" ? "USA" : EUR_NATIONS.includes(nat) ? "EUR" : null;
@@ -2460,6 +2486,37 @@ function GolfCareerSim() {
                 st.teamTrophies = tro0;
             }
             st.myDivision = newDiv;
+            // ===== TRANSFER OFFERS FOR YOU from bigger clubs (off-season) =====
+            {
+                const myVal = playerValue({ overall: calcOverall(g.pro.attrs), age: (g.pro.age || 22) + 1, pot: 99 });
+                const myOvr = calcOverall(g.pro.attrs);
+                // form factor: your season points relative to a strong return
+                const myPts = (g.teamSeasonPts && mt) ? 0 : 0;
+                const sf = (g.seasonForm || {})[g.pro.name] || { w: 0, r2: 0, t10: 0, maj: 0 };
+                const formScore = sf.w * 4 + sf.r2 * 2 + sf.t10 + sf.maj * 5;
+                // clubs from a HIGHER division than yours, who can afford you and want an upgrade
+                const suitors = leagues.filter((t) => t.division < newDiv && !t.members.some((m) => m.includes("(YOU)")))
+                    .map((t) => {
+                    const weakest = Math.min(...t.members.map((m) => ovrOf(m, st)));
+                    const wantsYou = myOvr > weakest - 2; // you'd be an upgrade or close
+                    const canAfford = (t.budget || 0) >= myVal * 0.8;
+                    return { t, weakest, wantsYou, canAfford, gap: newDiv - t.division };
+                })
+                    .filter((s) => s.wantsYou && s.canAfford);
+                // interest scales with form; need at least some form to attract bids
+                const interested = (formScore >= 3 || myOvr >= 82) ? suitors.sort((a, b) => a.t.division - b.t.division).slice(0, 3) : [];
+                if (interested.length) {
+                    st.playerOffers = interested.map((s) => ({
+                        teamId: s.t.id, teamName: s.t.name, division: s.t.division,
+                        fee: Math.round(myVal * (0.9 + Math.random() * 0.4) * 10) / 10,
+                        blurb: s.gap >= 2 ? "A major step up — top-flight ambition." : "A move up the divisions.",
+                    }));
+                    st.playerOffersWhen = "off-season";
+                }
+                else {
+                    st.playerOffers = null;
+                }
+            }
         }
         // ===== SEASON AWARDS (all modes; team-specific ones only in team mode) =====
         {
@@ -2516,6 +2573,7 @@ function GolfCareerSim() {
         if (g.mode === "league" && g.leagues) {
             st.teamSeasonPts = {};
             st.teamMemberPts = {};
+            st.midWindowDone = false;
         }
         if (g.mode === "team" && g.teams) {
             st.teamSeasonPts = {};
@@ -2572,6 +2630,8 @@ function GolfCareerSim() {
         let nextScreen = st.retired ? "retired" : (st.teamOffers && st.teamOffers.length ? "teamOffers" : (st.teamNoOffer ? "teamNoOffer" : "hub"));
         if (g.mode === "league" && st.leagueTransfers)
             nextScreen = "transferWindow";
+        if (g.mode === "league" && st.playerOffers && st.playerOffers.length)
+            nextScreen = "playerOffers";
         st.awardsThenScreen = nextScreen;
         setG(st);
         await save(st);
@@ -2906,6 +2966,17 @@ function GolfCareerSim() {
                 React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
                     g.caddie.perks ? Object.entries(g.caddie.perks).map(([k, v]) => `+${v} ${PERK_LABEL[k]}`).join(" · ") : "",
                     g.caddie.wxPerks ? (g.caddie.perks ? " · " : "") + "weather" : ""))),
+            g.signingNews && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\u270D\uFE0F NEW CLUB"),
+                React.createElement("p", { className: "text-sm", style: { color: C.chalk } },
+                    "You've signed for ",
+                    React.createElement("b", { style: { color: C.gold } }, g.signingNews.team),
+                    " (",
+                    divName(g.signingNews.division),
+                    ") for $",
+                    g.signingNews.fee,
+                    "m. A fresh challenge \u2014 go prove you belong."),
+                React.createElement("button", { onClick: async () => { const st = { ...g, signingNews: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))),
             (g.xpLevelUps && g.xpLevelUps.length > 0) || (g.xpBreakdown && g.xpBreakdown.length > 0) ? (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
                 React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } },
@@ -3300,6 +3371,62 @@ function GolfCareerSim() {
             React.createElement(Btn, { onClick: () => setScreen("hub") }, "CONTINUE")));
     }
     // ---------- transfer window summary (league mode, off-season) ----------
+    if (screen === "playerOffers" && g.playerOffers && g.playerOffers.length) {
+        const accept = async (offer) => {
+            // move you to the new club: take their weakest non-you slot
+            const leagues = g.leagues.map((t) => ({ ...t, members: t.members.slice() }));
+            // remove you from your current club
+            const old = leagues.find((t) => t.members.some((m) => m.includes("(YOU)")));
+            const tgt = leagues.find((t) => t.id === offer.teamId);
+            if (old && tgt) {
+                const yi = old.members.findIndex((m) => m.includes("(YOU)"));
+                // weakest player at the new club is displaced down to your old club
+                let wIdx = 0, wOvr = 999;
+                tgt.members.forEach((m, i) => { if (m.includes("(YOU)"))
+                    return; const o = ovrOf(m); if (o < wOvr) {
+                    wOvr = o;
+                    wIdx = i;
+                } });
+                const displaced = tgt.members[wIdx];
+                tgt.members[wIdx] = g.pro.name + " (YOU)";
+                if (yi >= 0)
+                    old.members[yi] = displaced;
+            }
+            const st = { ...g, leagues, playerOffers: null, myDivision: tgt ? tgt.division : g.myDivision,
+                everPromoted: (tgt && old && tgt.division < old.division) ? true : g.everPromoted,
+                bestDivision: Math.min(g.bestDivision != null ? g.bestDivision : 3, tgt ? tgt.division : 3),
+                signingNews: { team: offer.teamName, division: offer.division, fee: offer.fee } };
+            setG(st);
+            await save(st);
+            setScreen(g.playerOffersWhen === "mid" ? "hub" : (st.leagueTransfers ? "transferWindow" : "hub"));
+        };
+        const decline = async () => {
+            const st = { ...g, playerOffers: null };
+            setG(st);
+            await save(st);
+            setScreen(g.playerOffersWhen === "mid" ? "hub" : (st.leagueTransfers ? "transferWindow" : "hub"));
+        };
+        const mtNow = myLeagueTeam();
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, g.playerOffersWhen === "mid" ? "MID-SEASON WINDOW" : "OFF-SEASON"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83D\uDCDE CLUBS WANT YOU"),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } },
+                    "Your form has caught the eye of bigger clubs. Move up to chase the top flight \u2014 or stay and lead ",
+                    mtNow ? mtNow.name : "your club",
+                    ".")),
+            g.playerOffers.map((offer) => (React.createElement("div", { key: offer.teamId, className: "w-full mb-2 p-3 rounded-xl", style: { background: C.card, border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { className: "flex justify-between items-baseline" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: C.gold } }, offer.teamName),
+                    React.createElement("span", { className: "text-xs", style: { color: C.muted } }, divName(offer.division))),
+                React.createElement("div", { className: "text-xs mb-2", style: { color: C.green } },
+                    offer.blurb,
+                    " \u00B7 bid $",
+                    offer.fee,
+                    "m"),
+                React.createElement("button", { onClick: () => accept(offer), className: "w-full py-2 rounded-md active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 14, letterSpacing: 1 } }, "ACCEPT & SIGN \u25B8")))),
+            React.createElement(Btn, { kind: "panel", onClick: decline }, "DECLINE ALL \u00B7 STAY PUT")));
+    }
     if (screen === "transferWindow" && g.leagueTransfers) {
         const mt = myLeagueTeam();
         const movedUp = g.myDivision != null && mt && mt.division < g.myDivision;
