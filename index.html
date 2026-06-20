@@ -1031,6 +1031,16 @@ function GolfCareerSim() {
         return { ...base, ...e.attrs, name: e.displayName || base.name, country: e.country || base.country, overall: e.overall, age: e.age, rookie: e.rookie, tier: e.tier };
     };
     const clean2 = (nm) => (nm || "").replace(" (YOU)", "");
+    const valOf = (name, st = g) => {
+        const clean = clean2(name);
+        if (clean === st.pro.name)
+            return playerValue({ overall: calcOverall(effAttrs(st)), age: st.pro.age, pot: 99 });
+        const ai = aiP(clean, st);
+        const e = (st.ai && st.ai[clean]) || {};
+        return ai ? playerValue({ overall: ai.overall, age: ai.age, pot: e.pot || ai.overall }) : 1;
+    };
+    const myLeagueTeam = (st = g) => (st.leagues || []).find((t) => t.members.some((mn) => mn.includes("(YOU)")));
+    const divName = (d) => ["Premier Division", "Championship", "Division One", "Division Two"][d] || `Division ${d + 1}`;
     const ROSTER = (st = g) => PLAYERS.map((p) => aiP(p.name, st)).filter(Boolean);
     const ovrOf = (name, st = g) => {
         const clean = name.replace(" (YOU)", "");
@@ -1164,15 +1174,26 @@ function GolfCareerSim() {
                 });
             }
             const teams0 = mode === "team" ? buildTeams(pro.name, pro.overall) : null;
+            let leagues0 = null, freeAgentOffers0 = null;
+            if (mode === "league") {
+                leagues0 = buildLeagues(pro.name, null, null, null);
+                // assign budgets: higher divisions richer; some randomness
+                leagues0.forEach((t) => { t.budget = Math.round(((4 - t.division) * 6 + 4 + Math.random() * 6) * 10) / 10; });
+                // three lowest-division teams approach you as a free agent
+                const d3 = leagues0.filter((t) => t.division === 3);
+                const shuffled = d3.sort(() => Math.random() - 0.5).slice(0, 3).map((t) => t.id);
+                freeAgentOffers0 = shuffled;
+            }
             const st = { pro, season: 1, evIdx: 0, mode,
                 ...(aiSeed ? { ai: aiSeed } : {}),
                 ...(teams0 ? { teams: teams0, teamSeasonPts: {} } : {}),
+                ...(leagues0 ? { leagues: leagues0, teamSeasonPts: {}, teamMemberPts: {}, freeAgentOffers: freeAgentOffers0, isFreeAgent: true } : {}),
                 standings: Object.fromEntries([...PLAYERS.map((p) => [p.name, { pts: 0, money: 0 }]), [pro.name, { pts: 0, money: 0 }]]),
                 myStats: freshStats(), history: [], seasonLog: [], tally: {}, ryderHolder: "USA", lastRyder: null,
                 eventHistory: {}, courseXP: {}, rcRace: {}, pastWinners: {}, owgrBase: { ...OWGR_SEED }, xp: 0, bank: 0, wxXP: [0, 0, 0], earned: {}, ownedGear: ["ball_std", "drv_std", "irn_std", "wdg_std", "put_std"], coach: null, badges: [], badgeNews: [], caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: false };
             setG(st);
             save(st);
-            setTimeout(() => setScreen("hub"), 700);
+            setTimeout(() => setScreen(st.mode === "league" && st.isFreeAgent ? "freeAgency" : "hub"), 700);
         }
     };
     const resetAll = async () => {
@@ -1683,6 +1704,34 @@ function GolfCareerSim() {
                         st.myStats.bestFinish = myLine.pos;
                 }
             }
+            if (g.mode === "league" && st.leagues) {
+                const teamOf = {};
+                st.leagues.forEach((t) => t.members.forEach((mn) => { teamOf[mn.replace(" (YOU)", "")] = t.id; }));
+                const clean = (nm) => nm.replace(" (YOU)", "");
+                const myTeamObj = st.leagues.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
+                const myTeamId = myTeamObj ? myTeamObj.id : null;
+                const perTeam = {};
+                tour.results.finishers.forEach((r) => {
+                    const cn = clean(r.name);
+                    let tid = r.isYou ? myTeamId : teamOf[cn];
+                    if (tid == null)
+                        tid = teamOf[cn];
+                    if (tid == null)
+                        return;
+                    (perTeam[tid] = perTeam[tid] || []).push({ name: r.isYou ? g.pro.name : cn, pos: r.pos, pts: r.pts || 0, isYou: r.isYou });
+                });
+                const tsp = { ...(st.teamSeasonPts || {}) };
+                Object.entries(perTeam).forEach(([tid, arr]) => {
+                    const best2 = arr.slice().sort((a, b) => b.pts - a.pts).slice(0, 2);
+                    tsp[tid] = (tsp[tid] || 0) + best2.reduce((s, x) => s + x.pts, 0);
+                });
+                st.teamSeasonPts = tsp;
+                if (myTeamObj) {
+                    const mp = { ...(st.teamMemberPts || {}) };
+                    (perTeam[myTeamObj.id] || []).forEach((x) => { mp[x.name] = (mp[x.name] || 0) + x.pts; });
+                    st.teamMemberPts = mp;
+                }
+            }
             if (g.mode === "team" && st.teams) {
                 const teamOf = {};
                 st.teams.forEach((t) => t.members.forEach((mn) => { teamOf[mn.replace(" (YOU)", "")] = t.id; }));
@@ -1955,6 +2004,66 @@ function GolfCareerSim() {
         if (newAge >= 45)
             st.retired = true;
         // TEAM MODE: reset season pts; generate transfer offers if you've outgrown your team
+        // ===== LEAGUE MODE: promotion/relegation + AI transfer window =====
+        if (g.mode === "league" && g.leagues) {
+            const ovrA = (n) => { var _a; const c = n.replace(" (YOU)", ""); if (c === g.pro.name)
+                return calcOverall(g.pro.attrs); const e = (g.ai && g.ai[c]); return e ? e.overall : (((_a = PLAYERS.find((p) => p.name === c)) === null || _a === void 0 ? void 0 : _a.overall) || 75); };
+            const valA = (n) => { var _a; const c = n.replace(" (YOU)", ""); if (c === g.pro.name)
+                return playerValue({ overall: calcOverall(g.pro.attrs), age: (g.pro.age || 25) + 1, pot: 99 }); const ai = (g.ai && g.ai[c]) || {}; const ov = ai.overall || (((_a = PLAYERS.find((p) => p.name === c)) === null || _a === void 0 ? void 0 : _a.overall) || 75); return playerValue({ overall: ov, age: ai.age || 28, pot: ai.pot || ov }); };
+            let leagues = g.leagues.map((t) => ({ ...t, members: t.members.slice() }));
+            // promotion/relegation by final standings per division
+            for (let d = 0; d < 4; d++) {
+                const divTeams = leagues.filter((t) => t.division === d).sort((a, b) => ((g.teamSeasonPts || {})[b.id] || 0) - ((g.teamSeasonPts || {})[a.id] || 0));
+                if (d > 0)
+                    divTeams.slice(0, 2).forEach((t) => { t.division = d - 1; }); // top 2 up
+                if (d < 3)
+                    divTeams.slice(-2).forEach((t) => { t.division = d + 1; }); // bottom 2 down
+            }
+            // award prize money to budgets (higher finishes earn more); then a simple AI transfer pass
+            leagues.forEach((t) => { t.budget = Math.round(((4 - t.division) * 5 + 3 + ((g.teamSeasonPts || {})[t.id] || 0) / 400) * 10) / 10; });
+            // AI transfer pass: each higher-div team may buy the best affordable player from a lower-div team
+            const transfers = [];
+            leagues.filter((t) => !t.members.some((m) => m.includes("(YOU)"))).forEach((buyer) => {
+                if (Math.random() > 0.5)
+                    return; // not every team acts
+                // weakest slot to upgrade
+                let wIdx = 0, wOvr = 999;
+                buyer.members.forEach((m, i) => { const o = ovrA(m); if (o < wOvr) {
+                    wOvr = o;
+                    wIdx = i;
+                } });
+                // find a target: a player on a lower-or-equal team, better than buyer's weakest, affordable
+                let best = null, bestGain = 0;
+                leagues.forEach((seller) => {
+                    if (seller.id === buyer.id)
+                        return;
+                    if (seller.division < buyer.division)
+                        return; // only buy from same/lower divisions
+                    seller.members.forEach((m, si) => {
+                        if (m.includes("(YOU)"))
+                            return;
+                        const gain = ovrA(m) - wOvr;
+                        const cost = valA(m);
+                        if (gain > bestGain && cost <= buyer.budget) {
+                            bestGain = gain;
+                            best = { seller, si, name: m, cost };
+                        }
+                    });
+                });
+                if (best && bestGain >= 2) {
+                    const out = buyer.members[wIdx];
+                    buyer.members[wIdx] = best.name;
+                    best.seller.members[best.si] = out; // swap the displaced player down
+                    buyer.budget = Math.round((buyer.budget - best.cost) * 10) / 10;
+                    best.seller.budget = Math.round((best.seller.budget + best.cost) * 10) / 10;
+                    transfers.push({ to: buyer.name, player: best.name.replace(" (YOU)", ""), from: best.seller.name, fee: best.cost });
+                }
+            });
+            st.leagues = leagues;
+            st.leagueTransfers = transfers.slice(0, 8);
+            const mt = leagues.find((t) => t.members.some((m) => m.includes("(YOU)")));
+            st.myDivision = mt ? mt.division : 3;
+        }
         // ===== SEASON AWARDS (all modes; team-specific ones only in team mode) =====
         {
             const sf = g.seasonForm || {};
@@ -1972,10 +2081,12 @@ function GolfCareerSim() {
             const myPoy = poyScore(g.pro.name);
             const awards = { season: g.season, poy, poyIsYou: poy === g.pro.name, myPoyScore: Math.round(myPoy),
                 myLine: sf[g.pro.name] || { w: 0, r2: 0, t10: 0, maj: 0, pts: 0 } };
-            if (g.mode === "team" && g.teams) {
-                const mt = g.teams.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
+            if ((g.mode === "team" && g.teams) || (g.mode === "league" && g.leagues)) {
+                const pool = g.mode === "league" ? g.leagues : g.teams;
+                const mt = pool.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
                 // team title
-                const table = (g.teams || []).map((t) => ({ id: t.id, name: t.name, pts: (g.teamSeasonPts || {})[t.id] || 0 })).sort((a, b) => b.pts - a.pts);
+                const scopeTeams = g.mode === "league" ? (pool || []).filter((t) => t.division === (mt ? mt.division : 3)) : (pool || []);
+                const table = scopeTeams.map((t) => ({ id: t.id, name: t.name, pts: (g.teamSeasonPts || {})[t.id] || 0 })).sort((a, b) => b.pts - a.pts);
                 awards.teamChampion = table[0];
                 awards.myTeamRank = mt ? table.findIndex((t) => t.id === mt.id) + 1 : null;
                 awards.wonTitle = mt && table[0] && table[0].id === mt.id;
@@ -2004,6 +2115,10 @@ function GolfCareerSim() {
             if (awards.poyIsYou)
                 tro.poys = (tro.poys || 0) + 1;
             st.teamTrophies = tro;
+        }
+        if (g.mode === "league" && g.leagues) {
+            st.teamSeasonPts = {};
+            st.teamMemberPts = {};
         }
         if (g.mode === "team" && g.teams) {
             st.teamSeasonPts = {};
@@ -2047,7 +2162,9 @@ function GolfCareerSim() {
     };
     const newSeason = async () => {
         const st = buildNextSeason(g);
-        const nextScreen = st.retired ? "retired" : (st.teamOffers && st.teamOffers.length ? "teamOffers" : (st.teamNoOffer ? "teamNoOffer" : "hub"));
+        let nextScreen = st.retired ? "retired" : (st.teamOffers && st.teamOffers.length ? "teamOffers" : (st.teamNoOffer ? "teamNoOffer" : "hub"));
+        if (g.mode === "league" && st.leagueTransfers)
+            nextScreen = "transferWindow";
         st.awardsThenScreen = nextScreen;
         setG(st);
         await save(st);
@@ -2292,6 +2409,7 @@ function GolfCareerSim() {
             React.createElement("div", { className: "text-xs mb-2", style: { color: C.muted } },
                 g.mode === "alltime" ? "👑 ALL-TIME · " : "",
                 g.mode === "team" && myTeam() ? `🤝 ${myTeam().name} · ` : "",
+                g.mode === "league" && myLeagueTeam() ? `🏟️ ${myLeagueTeam().name} · ` : "",
                 g.pro.nation,
                 " \u00B7 Age ", (_c = g.pro.age) !== null && _c !== void 0 ? _c : 22,
                 " \u00B7 Season ",
@@ -2400,6 +2518,7 @@ function GolfCareerSim() {
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setSelSched(null); setScreen("schedule"); } }, "\uD83D\uDCC5 SCHEDULE"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("world") }, "\uD83C\uDF10 WORLD RANKINGS"),
                 g.mode === "team" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("team") }, "\uD83E\uDD1D MY TEAM"),
+                g.mode === "league" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("league") }, "\uD83C\uDFDF\uFE0F MY LEAGUE"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("coaches") }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHES"),
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("equipment") }, "\uD83C\uDFCC\uFE0F EQUIPMENT")),
             (() => {
@@ -2682,6 +2801,129 @@ function GolfCareerSim() {
             g.lastFullBoard && React.createElement("div", { className: "mb-2" },
                 React.createElement(Btn, { kind: "panel", onClick: () => { setG({ ...g, boardReturn: "teamResults" }); setScreen("fullBoard"); } }, "\uD83D\uDCCB VIEW FULL LEADERBOARD")),
             React.createElement(Btn, { onClick: () => setScreen("hub") }, "CONTINUE")));
+    }
+    // ---------- transfer window summary (league mode, off-season) ----------
+    if (screen === "transferWindow" && g.leagueTransfers) {
+        const mt = myLeagueTeam();
+        const movedUp = g.myDivision != null && mt && mt.division < g.myDivision;
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.muted } }, "OFF-SEASON"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83D\uDCCB TRANSFER WINDOW")),
+            mt && (React.createElement("div", { className: "p-3 rounded-xl mb-3 text-center", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: C.gold } }, mt.name),
+                React.createElement("div", { className: "text-sm", style: { color: movedUp ? C.green : C.chalk } },
+                    divName(mt.division),
+                    movedUp ? " · PROMOTED! ▲" : ""))),
+            React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "AROUND THE MARKET"),
+                g.leagueTransfers.length === 0 && React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "A quiet window \u2014 no major moves this off-season."),
+                g.leagueTransfers.map((tr, i) => (React.createElement("div", { key: i, className: "text-xs mb-1", style: { color: C.chalk } },
+                    React.createElement("span", { style: { color: C.gold } }, tr.player),
+                    " \u2192 ",
+                    tr.to,
+                    " ",
+                    React.createElement("span", { style: { color: C.muted } },
+                        "(from ",
+                        tr.from,
+                        ", $",
+                        tr.fee.toFixed(1),
+                        "m)"))))),
+            React.createElement(Btn, { onClick: async () => { const nx = "hub"; const st = { ...g, leagueTransfers: null }; setG(st); await save(st); setScreen(nx); } }, "START THE SEASON \u25B8")));
+    }
+    // ---------- free agency (league mode start) ----------
+    if (screen === "freeAgency" && g.freeAgentOffers) {
+        const sign = async (tid) => {
+            const leagues = g.leagues.map((t) => ({ ...t, members: t.members.slice() }));
+            const tgt = leagues.find((t) => t.id === tid);
+            // bump weakest member into free agency pool (they leave the league for simplicity)
+            let wIdx = 0, wOvr = 999;
+            tgt.members.forEach((mn, i) => { const o = ovrOf(mn); if (o < wOvr) {
+                wOvr = o;
+                wIdx = i;
+            } });
+            tgt.members[wIdx] = g.pro.name + " (YOU)";
+            const st = { ...g, leagues, isFreeAgent: false, freeAgentOffers: null };
+            setG(st);
+            await save(st);
+            setScreen("hub");
+        };
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.muted } }, "FREE AGENT"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "THREE CLUBS WANT YOU"),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "You're unsigned \u2014 and three Division Two sides have made an approach. Pick where to start your climb. Win, and bigger clubs in higher divisions will come for your signature.")),
+            g.freeAgentOffers.map((tid) => {
+                const t = g.leagues.find((x) => x.id === tid);
+                return (React.createElement("button", { key: tid, onClick: () => sign(tid), className: "w-full mb-2 p-3 rounded-xl text-left active:scale-[0.99]", style: { background: C.card, border: `1.5px solid ${C.gold}` } },
+                    React.createElement("div", { className: "flex justify-between items-baseline" },
+                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: C.gold } }, t.name),
+                        React.createElement("span", { className: "text-xs", style: { color: C.muted } }, divName(t.division))),
+                    React.createElement("div", { className: "text-xs", style: { color: C.muted } },
+                        "Squad: ",
+                        t.members.join(" · ")),
+                    React.createElement("div", { className: "text-xs mt-1", style: { color: C.green } }, "Sign here \u25B8")));
+            })));
+    }
+    // ---------- league hub (standings across divisions) ----------
+    if (screen === "league") {
+        const mt = myLeagueTeam();
+        const myDiv = mt ? mt.division : 3;
+        const table = (g.leagues || []).filter((t) => t.division === myDiv)
+            .map((t) => ({ ...t, pts: (g.teamSeasonPts || {})[t.id] || 0, ovr: teamOverall(t, (n) => ovrOf(n)) }))
+            .sort((a, b) => b.pts - a.pts || b.ovr - a.ovr);
+        const myRank = mt ? table.findIndex((t) => t.id === mt.id) + 1 : 0;
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.chalk } },
+                "\uD83C\uDFDF\uFE0F ",
+                divName(myDiv)),
+            mt && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { className: "flex justify-between items-baseline" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: C.gold } }, mt.name),
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.chalk } },
+                        ordinal(myRank),
+                        " of ",
+                        table.length)),
+                React.createElement("div", { className: "text-xs mb-2", style: { color: C.muted } },
+                    "Squad value $",
+                    mt.members.reduce((a, n) => a + valOf(n), 0).toFixed(1),
+                    "m \u00B7 budget $",
+                    (mt.budget || 0).toFixed(1),
+                    "m"),
+                mt.members.map((mn) => {
+                    const you = mn.includes("(YOU)");
+                    return (React.createElement("div", { key: mn, className: "flex justify-between text-xs mb-0.5", style: { color: you ? C.gold : C.chalk } },
+                        React.createElement("span", null,
+                            mn.replace(" (YOU)", ""),
+                            you ? " (YOU)" : "",
+                            " ",
+                            React.createElement("span", { style: { color: C.muted, fontSize: 10 } },
+                                "\u00B7 ",
+                                ovrOf(mn),
+                                " ovr")),
+                        React.createElement("span", { style: { color: C.muted } },
+                            "$",
+                            valOf(mn).toFixed(1),
+                            "m")));
+                }))),
+            React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "TABLE \u00B7 THIS SEASON"),
+                table.map((t, i) => {
+                    const mine = t.id === (mt === null || mt === void 0 ? void 0 : mt.id);
+                    const promo = i < 2 && myDiv > 0, releg = i >= table.length - 2 && myDiv < 3;
+                    return (React.createElement("div", { key: t.id, className: "flex justify-between text-xs mb-0.5", style: { color: mine ? C.gold : C.chalk, fontWeight: mine ? 700 : 400 } },
+                        React.createElement("span", { className: "truncate pr-2" },
+                            i + 1,
+                            ". ",
+                            t.name,
+                            mine ? " (YOURS)" : "",
+                            " ",
+                            promo ? React.createElement("span", { style: { color: C.green } }, "\u25B2") : releg ? React.createElement("span", { style: { color: C.red } }, "\u25BC") : ""),
+                        React.createElement("span", null, t.pts)));
+                }),
+                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u25B2 promotion \u00B7 \u25BC relegation (applied at season end \u2014 coming in the next update)")),
+            React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "4 divisions \u00B7 10 teams each. Your best two finishers score for the club weekly. Off-season, clubs trade by player value within their budgets \u2014 and you may get an offer to move up.")));
     }
     // ---------- team tour ----------
     if (screen === "team") {
