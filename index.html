@@ -1199,7 +1199,8 @@ function GolfCareerSim() {
             setFlashName(PLAYERS[Math.floor(Math.random() * PLAYERS.length)].name);
             if (++t > 14) {
                 clearInterval(spinIv.current);
-                const pk = PLAYERS[Math.floor(Math.random() * PLAYERS.length)];
+                const pkRaw = PLAYERS[Math.floor(Math.random() * PLAYERS.length)];
+                const pk = { ...pkRaw, composure: pkRaw.composure != null ? pkRaw.composure : compFromName(pkRaw.name) };
                 const pool = SLOTS.map((s) => s.key).filter((k) => !attrs[k]);
                 const avail = [...pool].sort(() => Math.random() - .5).slice(0, 3);
                 setPair([{ ...pk, _avail: avail }]);
