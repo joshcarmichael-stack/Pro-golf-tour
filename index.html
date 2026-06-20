@@ -877,6 +877,27 @@ const tint = (v) => v >= 90 ? C.gold : v >= 85 ? C.green : v >= 80 ? C.chalk : C
 const scoreColor = (sc, par) => { const d = sc - par; return d <= -2 ? C.gold : d === -1 ? C.green : d === 0 ? C.chalk : d === 1 ? C.bogey : C.red; };
 const scoreName = (sc, par) => { if (sc === 1)
     return "HOLE IN ONE!!"; const d = sc - par; return d <= -3 ? "ALBATROSS!!" : d === -2 ? "EAGLE!" : d === -1 ? "BIRDIE" : d === 0 ? "PAR" : d === 1 ? "BOGEY" : d === 2 ? "DOUBLE BOGEY" : "TRIPLE+"; };
+const ARCHETYPES = [
+    { id: "bomber", emoji: "💣", name: "THE BOMBER", blurb: "Prodigious length off the tee. Overpowers par 5s, but the short game needs work.",
+        strong: { drivingDistance: 88, drivingAccuracy: 78, longApproach: 80 }, weak: 66 },
+    { id: "surgeon", emoji: "🎯", name: "THE SURGEON", blurb: "Pinpoint iron play and accuracy. Hits fairways and greens all day; lacks raw power.",
+        strong: { drivingAccuracy: 86, longApproach: 86, shortApproach: 84 }, weak: 66 },
+    { id: "wedge", emoji: "🪄", name: "WEDGE WIZARD", blurb: "Deadly from 120 yards and in. Wedges and scrambling carry you; off the tee you're ordinary.",
+        strong: { shortApproach: 88, chipping: 86, bunker: 84 }, weak: 66 },
+    { id: "putter", emoji: "🟢", name: "PUTTING MAESTRO", blurb: "The best putter in the game. You hole everything — if you can get it on the green.",
+        strong: { putting: 90, chipping: 80 }, weak: 68 },
+    { id: "scrambler", emoji: "🧗", name: "THE SCRAMBLER", blurb: "A magician in trouble. Up-and-down from anywhere, but you're in trouble a lot.",
+        strong: { recovery: 88, bunker: 84, chipping: 82, putting: 80 }, weak: 66 },
+    { id: "allround", emoji: "⚖️", name: "THE ALL-ROUNDER", blurb: "No glaring weakness, no standout weapon. A solid, balanced base to develop any way you like.",
+        strong: {}, weak: 74 },
+];
+const buildArchetypeAttrs = (arch) => {
+    const BASE8 = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
+    const attrs = {};
+    BASE8.forEach((k) => { attrs[k] = arch.strong[k] != null ? arch.strong[k] : (arch.weak + Math.floor(Math.random() * 4)); });
+    attrs.composure = 70 + Math.floor(Math.random() * 12);
+    return attrs;
+};
 const SLOTS = [
     { key: "drivingAccuracy", label: "DRIVING ACCURACY" }, { key: "drivingDistance", label: "DRIVING DISTANCE" },
     { key: "longApproach", label: "LONG APPROACH" }, { key: "shortApproach", label: "SHORT APPROACH" },
@@ -1225,7 +1246,7 @@ function GolfCareerSim() {
             }
         }, 85);
     };
-    const take = (key, value, from) => {
+    const take = async (key, value, from) => {
         const nx = { ...attrs, [key]: value };
         setAttrs(nx);
         setLastTake({ key, value, from });
@@ -1237,42 +1258,47 @@ function GolfCareerSim() {
                 nx.composure = 70 + Math.floor(Math.random() * 16);
             const pro = { name: name.trim(), nation, age: 17, attrs: nx, overall: calcOverall(nx),
                 wx: [68 + Math.floor(Math.random() * 23), 68 + Math.floor(Math.random() * 23), 68 + Math.floor(Math.random() * 23)] };
-            const allTime = mode === "alltime";
-            let aiSeed = null;
-            if (allTime) {
-                const keys = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
-                aiSeed = {};
-                PLAYERS.forEach((p, idx) => {
-                    const leg = ALLTIME_FIELD[idx];
-                    if (leg) {
-                        const attrs = Object.fromEntries(keys.map((k, i) => [k, leg[2][i]]));
-                        attrs.composure = clampN(88 + Math.round(gauss() * 4), 84, 97);
-                        aiSeed[p.name] = { displayName: leg[0], country: leg[1], age: 28 + (idx % 8), attrs, overall: calcOverall(attrs), pot: 97, legend: true };
-                    }
-                });
-            }
-            const teams0 = mode === "team" ? buildTeams(pro.name, pro.overall) : null;
-            let leagues0 = null, freeAgentOffers0 = null;
-            if (mode === "league") {
-                leagues0 = buildLeagues(pro.name, null, null, null);
-                // assign budgets: higher divisions richer; some randomness
-                leagues0.forEach((t) => { t.budget = Math.round(((4 - t.division) * 6 + 4 + Math.random() * 6) * 10) / 10; });
-                // three lowest-division teams approach you as a free agent
-                const d3 = leagues0.filter((t) => t.division === 3);
-                const shuffled = d3.sort(() => Math.random() - 0.5).slice(0, 3).map((t) => t.id);
-                freeAgentOffers0 = shuffled;
-            }
-            const st = { pro, season: 1, evIdx: 0, mode,
-                ...(aiSeed ? { ai: aiSeed } : {}),
-                ...(teams0 ? { teams: teams0, teamSeasonPts: {} } : {}),
-                ...(leagues0 ? { leagues: leagues0, teamSeasonPts: {}, teamMemberPts: {}, freeAgentOffers: freeAgentOffers0, isFreeAgent: true } : {}),
-                standings: Object.fromEntries([...PLAYERS.map((p) => [p.name, { pts: 0, money: 0 }]), [pro.name, { pts: 0, money: 0 }]]),
-                myStats: freshStats(), history: [], seasonLog: [], tally: {}, ryderHolder: "USA", lastRyder: null,
-                eventHistory: {}, courseXP: {}, rcRace: {}, pastWinners: {}, owgrBase: { ...OWGR_SEED }, xp: 0, bank: 0, wxXP: [0, 0, 0], earned: {}, ownedGear: ["ball_std", "drv_std", "irn_std", "wdg_std", "put_std"], coach: null, badges: [], badgeNews: [], caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: false };
-            setG(st);
-            save(st);
-            setTimeout(() => setScreen(st.mode === "league" && st.isFreeAgent ? "freeAgency" : "hub"), 700);
+            await beginCareer(pro);
         }
+    };
+    const beginCareer = async (pro) => {
+        if (!pro.wx)
+            pro.wx = [68 + Math.floor(Math.random() * 23), 68 + Math.floor(Math.random() * 23), 68 + Math.floor(Math.random() * 23)];
+        const allTime = mode === "alltime";
+        let aiSeed = null;
+        if (allTime) {
+            const keys = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
+            aiSeed = {};
+            PLAYERS.forEach((p, idx) => {
+                const leg = ALLTIME_FIELD[idx];
+                if (leg) {
+                    const attrs = Object.fromEntries(keys.map((k, i) => [k, leg[2][i]]));
+                    attrs.composure = clampN(88 + Math.round(gauss() * 4), 84, 97);
+                    aiSeed[p.name] = { displayName: leg[0], country: leg[1], age: 28 + (idx % 8), attrs, overall: calcOverall(attrs), pot: 97, legend: true };
+                }
+            });
+        }
+        const teams0 = mode === "team" ? buildTeams(pro.name, pro.overall) : null;
+        let leagues0 = null, freeAgentOffers0 = null;
+        if (mode === "league") {
+            leagues0 = buildLeagues(pro.name, null, null, null);
+            // assign budgets: higher divisions richer; some randomness
+            leagues0.forEach((t) => { t.budget = Math.round(((4 - t.division) * 6 + 4 + Math.random() * 6) * 10) / 10; });
+            // three lowest-division teams approach you as a free agent
+            const d3 = leagues0.filter((t) => t.division === 3);
+            const shuffled = d3.sort(() => Math.random() - 0.5).slice(0, 3).map((t) => t.id);
+            freeAgentOffers0 = shuffled;
+        }
+        const st = { pro, season: 1, evIdx: 0, mode,
+            ...(aiSeed ? { ai: aiSeed } : {}),
+            ...(teams0 ? { teams: teams0, teamSeasonPts: {} } : {}),
+            ...(leagues0 ? { leagues: leagues0, teamSeasonPts: {}, teamMemberPts: {}, freeAgentOffers: freeAgentOffers0, isFreeAgent: true } : {}),
+            standings: Object.fromEntries([...PLAYERS.map((p) => [p.name, { pts: 0, money: 0 }]), [pro.name, { pts: 0, money: 0 }]]),
+            myStats: freshStats(), history: [], seasonLog: [], tally: {}, ryderHolder: "USA", lastRyder: null,
+            eventHistory: {}, courseXP: {}, rcRace: {}, pastWinners: {}, owgrBase: { ...OWGR_SEED }, xp: 0, bank: 0, wxXP: [0, 0, 0], earned: {}, ownedGear: ["ball_std", "drv_std", "irn_std", "wdg_std", "put_std"], coach: null, badges: [], badgeNews: [], caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: false };
+        setG(st);
+        save(st);
+        setTimeout(() => setScreen(st.mode === "league" && st.isFreeAgent ? "freeAgency" : "hub"), 700);
     };
     const [confirmNew, setConfirmNew] = useState(false);
     const goHome = () => setScreen("landing");
@@ -2509,7 +2535,41 @@ function GolfCareerSim() {
                     React.createElement("option", { value: "" }, "Select nationality..."),
                     NATIONS.map((n) => React.createElement("option", { key: n, value: n }, n))),
                 nation && React.createElement("p", { className: "text-xs mb-3", style: { color: C.muted } }, nation === "USA" ? "🇺🇸 Eligible for Team USA at the Ryder Cup" : EUR_NATIONS.includes(nation) ? "🇪🇺 Eligible for Team Europe at the Ryder Cup" : "🌏 Eligible for the International Team at the Presidents Cup"),
-                React.createElement(Btn, { onClick: () => name.trim() && nation && setScreen("spin"), disabled: !name.trim() || !nation }, "HEAD TO THE RANGE"))));
+                React.createElement("p", { className: "text-xs mb-2", style: { color: C.gold, fontFamily: FONT, letterSpacing: 2 } }, "CHOOSE HOW TO BUILD YOUR PRO"),
+                React.createElement(Btn, { onClick: () => name.trim() && nation && setScreen("archetype"), disabled: !name.trim() || !nation }, "\uD83C\uDFAD PICK A PLAYER TYPE"),
+                React.createElement("div", { className: "h-2" }),
+                React.createElement(Btn, { kind: "panel", onClick: () => name.trim() && nation && setScreen("spin"), disabled: !name.trim() || !nation }, "\uD83C\uDFB0 SPIN FOR ATTRIBUTES"),
+                React.createElement("p", { className: "text-[11px] mt-3", style: { color: C.muted } }, "Player type: pick a specialty (long hitter, wedge wizard\u2026) and start as a raw prospect \u2014 strong in your strength, low elsewhere, with everything to earn. Spin: take attributes from eight random pros."))));
+    }
+    // ---------- archetype selection ----------
+    if (screen === "archetype") {
+        const choose = async (arch) => {
+            const attrs = buildArchetypeAttrs(arch);
+            const pro = { name: name.trim(), nation, age: 17, attrs, overall: calcOverall(attrs), archetype: arch.id };
+            await beginCareer(pro);
+        };
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center mb-2" },
+                React.createElement("button", { onClick: () => setScreen("identity"), className: "mb-2 px-3 py-1 rounded-md", style: { background: C.panel, color: C.chalk, fontFamily: FONT, fontSize: 13, letterSpacing: 2, border: "1px solid rgba(244,247,242,0.25)" } }, "\u2039 BACK"),
+                React.createElement("h1", { style: { fontFamily: FONT, fontSize: 34, color: C.chalk } }, "PICK YOUR TYPE"),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "You'll start as a raw 17-year-old prospect \u2014 strong where you specialise, and plenty to develop everywhere else through wins, majors and achievements.")),
+            ARCHETYPES.map((a) => {
+                const preview = calcOverall(buildArchetypeAttrs(a));
+                return (React.createElement("button", { key: a.id, onClick: () => choose(a), className: "w-full mb-2 p-3 rounded-xl text-left active:scale-[0.99]", style: { background: C.card, border: `1.5px solid ${C.gold}` } },
+                    React.createElement("div", { className: "flex justify-between items-baseline" },
+                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: C.gold } },
+                            a.emoji,
+                            " ",
+                            a.name),
+                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: tint(preview) } },
+                            "~",
+                            preview,
+                            " OVR")),
+                    React.createElement("p", { className: "text-xs mt-0.5", style: { color: C.muted } }, a.blurb),
+                    Object.keys(a.strong).length > 0 && React.createElement("p", { className: "text-[11px] mt-1", style: { color: C.green } },
+                        "Strengths: ",
+                        Object.keys(a.strong).map((k) => { var _a; return ((_a = SLOTS.find((s) => s.key === k)) === null || _a === void 0 ? void 0 : _a.label) || k; }).join(" · "))));
+            })));
     }
     if (screen === "spin") {
         const filled = Object.keys(attrs);
