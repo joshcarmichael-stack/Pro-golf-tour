@@ -1095,6 +1095,7 @@ function GolfCareerSim() {
     const [rrAttr, setRrAttr] = useState(null);
     const [selSched, setSelSched] = useState(null);
     const [prep, setPrep] = useState(null);
+    const [reserveChoice, setReserveChoice] = useState(null);
     const [worldTab, setWorldTab] = useState("pts");
     const [rrPair, setRrPair] = useState(null);
     useEffect(() => {
@@ -1583,33 +1584,23 @@ function GolfCareerSim() {
     };
     const startEvent = () => {
         const ev = SCHEDULE[g.evIdx];
-        // ===== BENCH CHECK (league mode): 5-man squad, best 4 play — only the weakest may sit =====
+        // ===== TEAM SELECTION (league): manager plays the best 4 of 5; the weakest is reserve this week =====
         if (g.mode === "league" && g.leagues && ev.type !== "team") {
             const mt = g.leagues.find((t) => t.members.some((m) => m.includes("(YOU)")));
-            if (mt) {
-                const mates = mt.members.filter((m) => !m.includes("(YOU)"));
-                const myOvr = calcOverall(g.pro.attrs);
+            if (mt && mt.members.length >= 5) {
                 const mp = g.teamMemberPts || {};
-                const myPts = mp[g.pro.name] || 0;
-                // rank everyone in the squad by overall; with best-4-play, only the 5th-ranked risks the bench
-                const ratings = mates.map((m) => ovrOf(m)).sort((a, b) => b - a);
-                // teammates clearly better than you. When overall is even (within 1), the one with MORE season points is picked ahead
-                const betterThanMe = mates.filter((m) => {
-                    const o = ovrOf(m);
-                    if (o > myOvr + 1)
-                        return true;
-                    if (Math.abs(o - myOvr) <= 1)
-                        return (mp[m.replace(" (YOU)", "")] || 0) > myPts; // even on rating → points decide
-                    return false;
-                }).length;
-                // you only risk benching if 4+ teammates are ahead of you (i.e. you're the clear 5th man)
-                let benchChance = 0;
-                if (betterThanMe >= 4) {
-                    const gapToFourth = (ratings[3] || 0) - myOvr; // how far below the 4th-best you are
-                    benchChance = gapToFourth >= 6 ? 0.5 : gapToFourth >= 3 ? 0.32 : gapToFourth >= 1 ? 0.15 : 0.05;
-                }
-                if (benchChance > 0 && Math.random() < benchChance) {
-                    benchThisWeek(ev);
+                const myOvr = calcOverall(g.pro.attrs);
+                // rank ALL FIVE squad members; selection by overall, season points break ties
+                const ranked = mt.members.map((m) => {
+                    const isYou = m.includes("(YOU)");
+                    return { name: isYou ? g.pro.name : m.replace(" (YOU)", ""), isYou, ovr: isYou ? myOvr : ovrOf(m), pts: mp[isYou ? g.pro.name : m.replace(" (YOU)", "")] || 0 };
+                }).sort((a, b) => b.ovr - a.ovr || b.pts - a.pts);
+                // the 5th-ranked (last) is the reserve this week
+                const reserve = ranked[ranked.length - 1];
+                if (reserve.isYou) {
+                    // you're left out of the main team — choose to train or play the alternate
+                    setReserveChoice({ ev });
+                    setScreen("reserveWeek");
                     return;
                 }
             }
@@ -1621,8 +1612,10 @@ function GolfCareerSim() {
         let realEv = ev, cname = resolveCourseName(ev, g.season), filterNames = null, parallel = null;
         if (ev.type === "major" || ev.type === "signature") {
             const ok = qualifiedCheck(ev);
+            // a free agent is non-exempt — never in the signature/major field, always sent to the alternate
+            const youQualify = !g.isFreeAgent && ok(g.pro.name);
             const qNames = ROSTER().map((p) => p.name).filter(ok);
-            if (!ok(g.pro.name)) {
+            if (!youQualify) {
                 const alt = ALT_EVENTS[g.evIdx % ALT_EVENTS.length];
                 realEv = { ...alt, opposite: ev.e };
                 cname = alt.c;
@@ -1637,17 +1630,29 @@ function GolfCareerSim() {
         setPrep({ ev: realEv, cname, course, filterNames, parallel, vitals: courseVitals(course) });
         setScreen("prep");
     };
-    const benchThisWeek = async (ev) => {
-        // left out of the lineup: no points/money, small practice XP, advance the event
-        const practiceXP = 6 + Math.floor(Math.random() * 5);
+    const reserveTrain = async () => {
+        const ev = reserveChoice.ev;
+        const trainXP = 10 + Math.floor(Math.random() * 6);
         const benchCount = (g.benchCount || 0) + 1;
-        const st = { ...g, evIdx: g.evIdx + 1, xp: (g.xp || 0) + practiceXP,
-            xpGainLast: practiceXP, xpBreakdown: [{ label: "Practice while benched", amt: practiceXP }],
-            benchCount, benchedNote: { event: ev.e, xp: practiceXP } };
-        // simulate the event for everyone else so standings/AI keep moving
+        const st = { ...g, evIdx: g.evIdx + 1, xp: (g.xp || 0) + trainXP, faPracticedThisGap: false,
+            xpGainLast: trainXP, xpBreakdown: [{ label: "Reserve-week training", amt: trainXP }],
+            benchCount, benchedNote: { event: ev.e, xp: trainXP, trained: true } };
+        setReserveChoice(null);
         setG(st);
         await save(st);
         setScreen("benched");
+    };
+    const reservePlayAlternate = () => {
+        // the reserve plays the opposite-field event for less XP (weaker field)
+        const ev = reserveChoice.ev;
+        const alt = ALT_EVENTS[g.evIdx % ALT_EVENTS.length];
+        const realEv = { ...alt, opposite: ev.e, reserveAlt: true };
+        const cname = alt.c;
+        const course = COURSES.find((c) => c.name === cname);
+        const filterNames = ROSTER().map((p) => p.name).filter((n) => ovrOf(n) < 78); // weaker field plays alternates
+        setReserveChoice(null);
+        setPrep({ ev: realEv, cname, course, filterNames, parallel: null, vitals: courseVitals(course), reserveAlt: true });
+        setScreen("prep");
     };
     const launchTour = (pr, trainKey) => {
         const course = pr.course;
@@ -1672,6 +1677,7 @@ function GolfCareerSim() {
         const famExtra = -Math.min(plays, 5) * 0.0035;
         setTour({
             ev: pr.ev, course, weather, inField: myIdx >= 0, fitPct, team: false, plays, parallel: pr.parallel, trained,
+            reserveAlt: !!pr.reserveAlt,
             scores: field.map((f) => ({ ...f, rounds: [], total: 0, cut: false, extra: f.isYou ? famExtra : 0 })),
             round: 0, live: null, results: null, fieldRoundAvgs: [],
         });
@@ -1948,7 +1954,7 @@ function GolfCareerSim() {
         setTour(t);
     };
     const closeEvent = async () => {
-        var _a, _b;
+        var _a, _b, _c;
         const ev = tour.ev;
         const st = { ...g, standings: { ...g.standings }, myStats: { ...g.myStats }, history: [...g.history],
             seasonLog: [...(g.seasonLog || [])], tally: { ...(g.tally || {}) }, eventHistory: { ...(g.eventHistory || {}) }, courseXP: { ...(g.courseXP || {}) }, pastWinners: { ...(g.pastWinners || {}) } };
@@ -2108,6 +2114,12 @@ function GolfCareerSim() {
                     else if (ageNow >= 33) {
                         xpGain = Math.round(xpGain * 0.7);
                     }
+                    // weaker field = less to prove: alternate / opposite-field events pay reduced XP
+                    const isAlt = tour.reserveAlt || ev.type === "alt" || ev.opposite;
+                    if (isAlt) {
+                        xpGain = Math.round(xpGain * 0.6);
+                        xpParts.push({ label: "Weaker field (alternate)", amt: 0, note: "×0.6" });
+                    }
                     st.xp = (st.xp || 0) + xpGain;
                     st.xpGainLast = xpGain;
                     st.xpBreakdown = xpParts;
@@ -2144,7 +2156,7 @@ function GolfCareerSim() {
                     }
                 }
             }
-            if (g.mode === "league" && st.leagues) {
+            if (g.mode === "league" && st.leagues && !tour.reserveAlt) {
                 const teamOf = {};
                 st.leagues.forEach((t) => t.members.forEach((mn) => { teamOf[mn.replace(" (YOU)", "")] = t.id; }));
                 const clean = (nm) => nm.replace(" (YOU)", "");
@@ -2201,7 +2213,15 @@ function GolfCareerSim() {
                         tour.results.finishers.forEach((r) => { finByName[clean(r.name)] = r; });
                         (tour.scores || []).forEach((s) => { fieldByName[clean(s.name)] = s; });
                     }
-                    const counted = (perTeam[myTeamObj.id] || []).slice().sort((a, b) => b.pts - a.pts).slice(0, 4).map((x) => x.name);
+                    // counted = best 4 of ALL FIVE squad members by points (a missed cut still occupies a slot at 0 pts)
+                    const memberPtsThisWeek = myTeamObj.members.map((mn) => {
+                        const cn = clean(mn);
+                        const isYouM = mn.includes("(YOU)");
+                        const key = isYouM ? g.pro.name : cn;
+                        const entry = (perTeam[myTeamObj.id] || []).find((x) => x.name === key || x.name === cn);
+                        return { key, cn, pts: entry ? entry.pts : 0 };
+                    });
+                    const counted = memberPtsThisWeek.slice().sort((a, b) => b.pts - a.pts).slice(0, 4).map((x) => x.key);
                     const allFour = myTeamObj.members.map((mn) => {
                         const cn = clean(mn);
                         const isYouM = mn.includes("(YOU)");
@@ -2215,6 +2235,40 @@ function GolfCareerSim() {
                     });
                     const weekPts = allFour.filter((x) => x.counted).reduce((s, x) => s + x.pts, 0);
                     st.lastTeamWeek = { teamName: myTeamObj.name, teamId: myTeamObj.id, event: ev.e, members: allFour, weekPts, par: tour.course.par, isLeague: true, division: myTeamObj.division };
+                }
+            }
+            // RESERVE WEEK: you played the alternate, so the league points come from your 4 TEAMMATES in the main event (simulated)
+            if (g.mode === "league" && st.leagues && tour.reserveAlt) {
+                const clean = (nm) => nm.replace(" (YOU)", "");
+                const myTeamObj = st.leagues.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
+                if (myTeamObj) {
+                    // rank squad, the 4 non-you starters; give each a points haul based on overall vs a typical field
+                    const starters = myTeamObj.members.filter((mn) => !mn.includes("(YOU)"));
+                    const mp = { ...(st.teamMemberPts || {}) };
+                    const tsp = { ...(st.teamSeasonPts || {}) };
+                    const memberRows = starters.map((mn) => {
+                        const o = ovrOf(mn);
+                        // simple finish model: better players finish higher → more points (0–60 pts typical week)
+                        const luck = (Math.random() - 0.4);
+                        const proj = Math.max(0, Math.round((o - 70) * 4 + luck * 30));
+                        mp[clean(mn)] = (mp[clean(mn)] || 0) + proj;
+                        return { name: clean(mn), isYou: false, inField: true, madeCut: proj > 0, pos: null, pts: proj, total: null, cut: proj === 0, counted: true };
+                    });
+                    const best4 = memberRows.slice().sort((a, b) => b.pts - a.pts).slice(0, 4);
+                    const weekPts = best4.reduce((s, x) => s + x.pts, 0);
+                    tsp[myTeamObj.id] = (tsp[myTeamObj.id] || 0) + weekPts;
+                    st.teamMemberPts = mp;
+                    st.teamSeasonPts = tsp;
+                    // also score the OTHER league teams this week so the table keeps moving
+                    st.leagues.forEach((t) => {
+                        if (t.id === myTeamObj.id)
+                            return;
+                        const rows = t.members.map((mn) => Math.max(0, Math.round((ovrOf(mn) - 70) * 4 + (Math.random() - 0.4) * 30)));
+                        rows.sort((a, b) => b - a);
+                        tsp[t.id] = (tsp[t.id] || 0) + rows.slice(0, 4).reduce((s, x) => s + x, 0);
+                    });
+                    st.teamSeasonPts = tsp;
+                    st.reserveWeekNote = { event: (_c = SCHEDULE[g.evIdx]) === null || _c === void 0 ? void 0 : _c.e, teamPts: weekPts, teamName: myTeamObj.name };
                 }
             }
             if (g.mode === "team" && st.teams) {
@@ -2341,6 +2395,7 @@ function GolfCareerSim() {
             st.eventHistory[pv.ev.e] = [...(st.eventHistory[pv.ev.e] || []), { s: g.season, r: "DNQ" }];
         }
         st.evIdx = g.evIdx + 1;
+        st.faPracticedThisGap = false; // practice is available again before the next event
         if (st.evIdx >= SCHEDULE.length) {
             if (st.champion === st.pro.name) {
                 st.myStats.fedexTitles++;
@@ -3294,12 +3349,12 @@ function GolfCareerSim() {
                     "Reputation ",
                     Math.min(100, Math.round(((g.faProvenScore || 0) / 12) * 100)),
                     "% \u2014 prove yourself to attract contract offers."),
-                React.createElement("button", { onClick: async () => {
+                g.faPracticedThisGap ? (React.createElement("div", { className: "w-full py-2 rounded-md text-center", style: { background: "rgba(244,247,242,0.08)", color: C.muted, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, "\u2713 PRACTICED \u2014 rest up for the next event")) : (React.createElement("button", { onClick: async () => {
                         const xp = 9 + Math.floor(Math.random() * 6);
                         const st = { ...g, xp: (g.xp || 0) + xp, xpGainLast: xp, xpBreakdown: [{ label: "Full-time practice (free agent)", amt: xp }], faPracticedThisGap: true };
                         setG(st);
                         await save(st);
-                    }, className: "w-full py-2 rounded-md active:scale-95", style: { background: C.green, color: C.bg, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, "\uD83C\uDFCC\uFE0F PRACTICE FOR XP (+9\u201314)"),
+                    }, className: "w-full py-2 rounded-md active:scale-95", style: { background: C.green, color: C.bg, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, "\uD83C\uDFCC\uFE0F PRACTICE FOR XP (+9\u201314)")),
                 g.freeAgentOffers && g.freeAgentOffers.length > 0 && (React.createElement("button", { onClick: () => setScreen("freeAgency"), className: "w-full mt-2 py-2 rounded-md active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, "\uD83D\uDCDE VIEW CONTRACT OFFERS \u25B8")))),
             g.signingNews && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\u270D\uFE0F NEW CLUB"),
@@ -3701,25 +3756,45 @@ function GolfCareerSim() {
             React.createElement(Btn, { onClick: () => setScreen("hub") }, "CONTINUE")));
     }
     // ---------- transfer window summary (league mode, off-season) ----------
+    if (screen === "reserveWeek" && reserveChoice) {
+        const mt = myLeagueTeam();
+        const alt = ALT_EVENTS[g.evIdx % ALT_EVENTS.length];
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center pt-6" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, "RESERVE THIS WEEK"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.chalk, lineHeight: 1.05 } }, "NOT IN THE FOUR"),
+                React.createElement("p", { className: "text-sm mt-3 mb-4 px-2", style: { color: C.muted } },
+                    mt ? mt.name : "The manager",
+                    " named their strongest four for the ",
+                    reserveChoice.ev.e,
+                    ", and you're the odd one out this week. Your call:")),
+            React.createElement("button", { onClick: reservePlayAlternate, className: "w-full mb-3 p-3 rounded-xl text-left active:scale-[0.99]", style: { background: C.card, border: `1.5px solid ${C.blue}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 18, color: C.blue } }, "\u26F3 PLAY THE ALTERNATE"),
+                React.createElement("div", { className: "text-xs mt-0.5", style: { color: C.chalk } }, alt.e),
+                React.createElement("div", { className: "text-[11px] mt-1", style: { color: C.muted } }, "Tee it up in the opposite-field event for prize money and XP. Weaker field, so reduced XP (\u00D70.6) \u2014 but real competitive reps.")),
+            React.createElement("button", { onClick: reserveTrain, className: "w-full mb-3 p-3 rounded-xl text-left active:scale-[0.99]", style: { background: C.card, border: `1.5px solid ${C.green}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 18, color: C.green } }, "\uD83C\uDFCB\uFE0F TRAIN FOR THE WEEK"),
+                React.createElement("div", { className: "text-[11px] mt-1", style: { color: C.muted } }, "Put in the practice hours for a solid XP boost (+10\u201315) and no travel. Bank it toward an attribute in Develop."))));
+    }
     if (screen === "benched" && g.benchedNote) {
         const mt = myLeagueTeam();
         return (React.createElement(Shell, null,
             React.createElement("div", { className: "text-center pt-8" },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.red } }, "LEFT OUT"),
-                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1.05 } }, "NOT IN THE LINEUP"),
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.green } }, "TRAINING WEEK"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1.05 } }, "HARD AT WORK"),
                 React.createElement("p", { className: "text-sm mt-3 mb-2", style: { color: C.muted } },
-                    "The manager left you out for the ",
+                    "With ",
+                    mt ? mt.name : "the club",
+                    " playing their strongest four at the ",
                     g.benchedNote.event,
-                    ". ",
-                    mt ? mt.name : "The club",
-                    " went with more experienced names this week. You put in the practice hours instead."),
+                    ", you spent the week on the range sharpening your game."),
                 React.createElement("div", { className: "p-3 rounded-xl my-3 inline-block", style: { background: C.panel } },
                     React.createElement("span", { style: { color: C.green, fontFamily: FONT, fontSize: 16 } },
                         "+",
                         g.benchedNote.xp,
                         " XP"),
-                    React.createElement("span", { className: "text-xs ml-2", style: { color: C.muted } }, "from practice")),
-                React.createElement("p", { className: "text-xs mb-4", style: { color: C.muted } }, "Keep developing \u2014 close the gap to your squad and you'll force your way into the team. Or a smaller club may offer you regular golf."),
+                    React.createElement("span", { className: "text-xs ml-2", style: { color: C.muted } }, "from training")),
+                React.createElement("p", { className: "text-xs mb-4", style: { color: C.muted } }, "Keep developing \u2014 close the gap to your squad and you'll force your way into the four. Or a smaller club may offer you regular golf."),
                 React.createElement(Btn, { onClick: async () => { const st = { ...g, benchedNote: null }; setG(st); await save(st); setScreen("hub"); } }, "CONTINUE \u25B8"))));
     }
     if (screen === "playerOffers" && g.playerOffers && g.playerOffers.length) {
