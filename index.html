@@ -69,17 +69,36 @@ const playerValue = (p) => {
     return Math.max(0.2, Math.round(v * 10) / 10);
 };
 const buildLeagues = (proName) => {
-    const ai = PLAYERS.slice().sort((a, b) => b.overall - a.overall).map((p) => p.name);
-    const N = 40, SIZE = 5;
+    // talent pyramid: best players fill the top division, next-best the second, etc.
+    // each of 40 teams (4 divisions x 10) has 4 STARTERS + 1 weaker RESERVE
+    const sorted = PLAYERS.slice().sort((a, b) => b.overall - a.overall).map((p) => p.name);
+    const N = 40, DIVS = 4, PER_DIV = 10, STARTERS = 4;
     const teams = Array.from({ length: N }, (_, i) => ({
-        id: i, name: ALL_TEAM_NAMES[i] || `Team ${i + 1}`, members: [], division: Math.floor(i / 10), budget: 0,
+        id: i, name: ALL_TEAM_NAMES[i] || `Team ${i + 1}`, members: [], division: Math.floor(i / PER_DIV), budget: 0,
     }));
-    let pos = 0;
-    for (let r = 0; r < SIZE; r++) {
-        const order = r % 2 === 0 ? [...Array(N).keys()] : [...Array(N).keys()].reverse();
-        for (const t of order) {
-            if (pos < ai.length)
-                teams[t].members.push(ai[pos++]);
+    // top 160 are starters, stratified by division; bottom 40 are reserves
+    const starters = sorted.slice(0, N * STARTERS); // 160
+    const reserves = sorted.slice(N * STARTERS); // 40 weakest
+    // assign starters: division 0 (Premier) gets the strongest 40, then snake WITHIN each division for balance
+    let sIdx = 0;
+    for (let d = 0; d < DIVS; d++) {
+        const divTeams = teams.filter((t) => t.division === d).map((t) => t.id);
+        for (let r = 0; r < STARTERS; r++) {
+            const order = r % 2 === 0 ? divTeams : [...divTeams].reverse();
+            for (const tid of order) {
+                if (sIdx < starters.length)
+                    teams[tid].members.push(starters[sIdx++]);
+            }
+        }
+    }
+    // assign one reserve per team — weakest reserves to the lowest divisions (so Premier reserve is still decent)
+    // reserves are sorted strong→weak; give the better reserves to higher divisions
+    let rIdx = 0;
+    for (let d = 0; d < DIVS; d++) {
+        const divTeams = teams.filter((t) => t.division === d).map((t) => t.id);
+        for (const tid of divTeams) {
+            if (rIdx < reserves.length)
+                teams[tid].members.push(reserves[rIdx++]);
         }
     }
     return teams;
@@ -1252,6 +1271,7 @@ function GolfCareerSim() {
     const [reserveChoice, setReserveChoice] = useState(null);
     const [worldCup, setWorldCup] = useState(null);
     const [puttoff, setPuttoff] = useState(null);
+    const [wcStage, setWcStage] = useState(0);
     const [worldTab, setWorldTab] = useState("pts");
     const [rrPair, setRrPair] = useState(null);
     useEffect(() => {
@@ -2697,8 +2717,10 @@ function GolfCareerSim() {
             setPuttoff({ ...sim.pendingPuttoff, putts: [], turn: 0 });
             setScreen("puttoff");
         }
-        else
+        else {
+            setWcStage(0);
             setScreen("worldCup");
+        }
     };
     // resume the knockout after a player putt-off is decided
     const resumeWorldCupAfterPuttoff = (winner) => {
@@ -2716,8 +2738,10 @@ function GolfCareerSim() {
             setPuttoff({ ...ko.pendingPuttoff, putts: [], turn: 0 });
             setScreen("puttoff");
         }
-        else
+        else {
+            setWcStage(0);
             setScreen("worldCup");
+        }
     };
     const startEuroIntl = (st) => {
         const side = eiSide(st.pro.nation);
@@ -4759,9 +4783,109 @@ function GolfCareerSim() {
         const wc = worldCup;
         const champ = wc.champion;
         const nameOf = (n) => n === g.pro.name ? "YOU" : n.split(" ").slice(-1)[0];
-        // find your group and your knockout path
         const myGroup = wc.groups.find((grp) => grp.players.some((p) => p.isYou));
         const myGroupIdx = wc.groups.indexOf(myGroup);
+        const advancedSet = new Set([...wc.groups.flatMap((grp) => grp.advance.map((p) => p.name)), ...(wc.bestThirds || []).map((p) => p.name)]);
+        // knockout rounds in display order (sim builds them small→big already)
+        const koRounds = wc.rounds;
+        // STAGES: 0 = opening, 1 = groups, 2..(2+koRounds.length-1) = each KO round, last = champion+summary
+        const TOTAL = 2 + koRounds.length + 1; // opening, groups, each KO round, finale
+        const stage = Math.min(wcStage, TOTAL - 1);
+        const next = () => setWcStage((s) => Math.min(s + 1, TOTAL - 1));
+        // ---- STAGE 0: big opening ----
+        if (stage === 0) {
+            return (React.createElement(Shell, null,
+                React.createElement("div", { className: "text-center pt-12" },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 5, color: C.gold } }, "\uD83C\uDF0D EVERY FOUR YEARS"),
+                    React.createElement("h1", { style: { fontFamily: FONT, fontSize: 46, color: C.chalk, lineHeight: 0.95 }, className: "mt-2" },
+                        "THE",
+                        React.createElement("br", null),
+                        "WORLD CUP",
+                        React.createElement("br", null),
+                        "OF GOLF"),
+                    React.createElement("p", { className: "text-sm mt-4 px-4", style: { color: C.muted } }, wc.venue),
+                    React.createElement("p", { className: "text-xs mt-1 px-6", style: { color: C.muted } }, "48 players. 24 nations. Two from every country, decided by a season of points. Match play, all the way to one champion."),
+                    wc.youIn ? (React.createElement("div", { className: "mt-5 p-3 rounded-xl mx-4", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+                        React.createElement("p", { className: "text-sm", style: { color: C.gold } },
+                            "You QUALIFIED. You're representing ",
+                            g.pro.nation,
+                            " on the world stage."))) : (React.createElement("div", { className: "mt-5 p-3 rounded-xl mx-4", style: { background: C.panel } },
+                        React.createElement("p", { className: "text-sm", style: { color: C.muted } }, "You didn't make your nation's top two this time \u2014 watch the world's best battle it out."))),
+                    React.createElement("div", { className: "mt-6 px-4" },
+                        React.createElement(Btn, { onClick: next }, "ENTER THE GROUPS \u25B8")))));
+        }
+        // ---- STAGE 1: group stage ----
+        if (stage === 1) {
+            return (React.createElement(Shell, null,
+                React.createElement("div", { className: "text-center mb-2" },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } }, "GROUP STAGE"),
+                    React.createElement("h2", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk } }, "12 GROUPS OF 4"),
+                    React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "Top 2 from each group advance, plus the 8 best third-placed. \u2713 = through.")),
+                myGroup && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+                    React.createElement("div", { className: "text-xs mb-1", style: { color: C.gold, fontFamily: FONT, letterSpacing: 1 } },
+                        "YOUR GROUP \u2014 ",
+                        String.fromCharCode(65 + myGroupIdx)),
+                    myGroup.players.map((p, i) => {
+                        const adv = advancedSet.has(p.name);
+                        return (React.createElement("div", { key: p.name, className: "flex justify-between text-xs mb-0.5", style: { color: p.isYou ? C.gold : adv ? C.chalk : C.muted, fontWeight: p.isYou ? 700 : 400 } },
+                            React.createElement("span", null,
+                                i + 1,
+                                ". ",
+                                p.isYou ? "YOU" : p.name,
+                                " ",
+                                adv ? React.createElement("span", { style: { color: C.green } },
+                                    "\u2713",
+                                    i === 2 ? " (3rd)" : "") : ""),
+                            React.createElement("span", { style: { color: C.muted } },
+                                p.gpts,
+                                "pts \u00B7 ",
+                                p.gdiff > 0 ? "+" : "",
+                                p.gdiff)));
+                    }))),
+                React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3" }, wc.groups.map((grp, gi) => {
+                    if (gi === myGroupIdx)
+                        return null;
+                    return (React.createElement("div", { key: gi, className: "p-2 rounded-lg", style: { background: C.panel } },
+                        React.createElement("div", { className: "text-[10px] mb-0.5", style: { color: C.gold, letterSpacing: 1 } },
+                            "GROUP ",
+                            String.fromCharCode(65 + gi)),
+                        grp.players.map((p, i) => (React.createElement("div", { key: p.name, className: "flex justify-between", style: { color: advancedSet.has(p.name) ? C.chalk : C.muted, fontSize: 10 } },
+                            React.createElement("span", { className: "truncate pr-1" },
+                                nameOf(p.name),
+                                " ",
+                                advancedSet.has(p.name) ? "✓" : ""),
+                            React.createElement("span", null, p.gpts))))));
+                })),
+                React.createElement(Btn, { onClick: next }, koRounds.length ? "INTO THE KNOCKOUTS ▸" : "RESULTS ▸")));
+        }
+        // ---- STAGES 2..: each knockout round ----
+        const koIdx = stage - 2;
+        if (koIdx >= 0 && koIdx < koRounds.length) {
+            const rd = koRounds[koIdx];
+            const isFinal = rd.name === "Final";
+            return (React.createElement(Shell, null,
+                React.createElement("div", { className: "text-center mb-2" },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } }, isFinal ? "🏆 THE FINAL" : "KNOCKOUT"),
+                    React.createElement("h2", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk } }, rd.name.toUpperCase()),
+                    React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } },
+                        wc.venue,
+                        " \u00B7 single match play",
+                        rd.matches.length > 1 ? ` · ${rd.matches.length} ties` : "")),
+                React.createElement("div", { className: "grid gap-1.5 mb-3" }, rd.matches.map((m, i) => {
+                    const aWon = m.winner === m.a;
+                    const tie = m.decided === "playoff" || m.decided === "puttoff";
+                    return (React.createElement("div", { key: i, className: "p-2 rounded-lg flex items-center justify-between", style: { background: m.involvesYou ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.panel, border: m.involvesYou ? `1px solid ${C.gold}` : "none" } },
+                        React.createElement("div", { className: "flex-1 text-xs", style: { color: aWon ? C.chalk : C.muted, fontWeight: aWon ? 700 : 400 } },
+                            nameOf(m.a),
+                            aWon ? " ✓" : ""),
+                        React.createElement("div", { className: "px-1 text-[9px]", style: { color: C.muted } }, tie ? (m.decided === "puttoff" ? "putt-off" : "playoff") : m.margin),
+                        React.createElement("div", { className: "flex-1 text-xs text-right", style: { color: !aWon ? C.chalk : C.muted, fontWeight: !aWon ? 700 : 400 } },
+                            !aWon ? "✓ " : "",
+                            nameOf(m.b))));
+                })),
+                React.createElement(Btn, { onClick: next }, isFinal ? "CROWN THE CHAMPION ▸" : "NEXT ROUND ▸")));
+        }
+        // ---- FINAL STAGE: champion + your summary ----
         const myKO = [];
         wc.rounds.forEach((rd) => rd.matches.forEach((m) => { if (m.involvesYou)
             myKO.push({ round: rd.name, ...m }); }));
@@ -4770,72 +4894,33 @@ function GolfCareerSim() {
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } },
                     "\uD83C\uDF0D THE GLOBAL CUP \u00B7 SEASON ",
                     wc.season),
-                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.chalk, lineHeight: 1 } }, "WORLD CUP OF GOLF"),
-                React.createElement("div", { className: "text-xs mt-1", style: { color: C.muted } },
-                    wc.venue,
-                    " \u00B7 48 players \u00B7 24 nations")),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk } }, "WORLD CUP CHAMPION")),
             React.createElement("div", { className: "p-4 rounded-xl mb-3 text-center", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `2px solid ${C.gold}` } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "WORLD CHAMPION"),
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 26, color: champ && champ.isYou ? C.gold : C.chalk, lineHeight: 1.1 }, className: "mt-1" }, champ ? (champ.isYou ? "🏆 YOU! 🏆" : champ.name) : "—"),
-                champ && React.createElement("div", { className: "text-xs mt-0.5", style: { color: C.muted } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 30, color: champ && champ.isYou ? C.gold : C.chalk, lineHeight: 1.1 } }, champ ? (champ.isYou ? "🏆 YOU! 🏆" : champ.name) : "—"),
+                champ && React.createElement("div", { className: "text-xs mt-1", style: { color: C.muted } },
                     FLAG[champ.country] || "🌐",
                     " ",
                     champ.nationName),
-                champ && champ.isYou && React.createElement("div", { className: "text-sm mt-1", style: { color: C.gold } }, "You've conquered the world. The Global Cup is yours.")),
-            wc.youIn ? (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
+                champ && champ.isYou && React.createElement("div", { className: "text-sm mt-2", style: { color: C.gold } }, "You've conquered the world. The Global Cup is yours.")),
+            wc.youIn && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 1, color: C.gold }, className: "mb-1" }, "YOUR TOURNAMENT"),
-                myGroup && (React.createElement(React.Fragment, null,
-                    React.createElement("div", { className: "text-xs mb-1", style: { color: C.chalk } },
-                        "Group ",
-                        String.fromCharCode(65 + myGroupIdx),
-                        ":"),
-                    myGroup.players.map((p, i) => {
-                        const advanced = i < 2 || (wc.bestThirds && wc.bestThirds.some((t) => t.name === p.name));
-                        return (React.createElement("div", { key: p.name, className: "flex justify-between text-xs mb-0.5", style: { color: p.isYou ? C.gold : advanced ? C.chalk : C.muted, fontWeight: p.isYou ? 700 : 400 } },
-                            React.createElement("span", null,
-                                i + 1,
-                                ". ",
-                                p.isYou ? "YOU" : p.name,
-                                " ",
-                                advanced ? React.createElement("span", { style: { color: C.green } },
-                                    "\u2713",
-                                    i === 2 ? " (3rd)" : "") : ""),
-                            React.createElement("span", { style: { color: C.muted } },
-                                p.gpts,
-                                "pts \u00B7 ",
-                                p.gdiff > 0 ? "+" : "",
-                                p.gdiff,
-                                " GD")));
-                    }))),
-                myKO.length > 0 && (React.createElement("div", { className: "mt-2" },
-                    React.createElement("div", { className: "text-xs mb-1", style: { color: C.chalk } }, "Knockout run:"),
-                    myKO.map((m, i) => {
-                        const won = m.winner === g.pro.name;
-                        const tie = m.decided === "playoff" || m.decided === "puttoff";
-                        return (React.createElement("div", { key: i, className: "text-xs mb-0.5", style: { color: won ? C.green : C.red } },
-                            m.round,
-                            ": ",
-                            won ? "beat" : "lost to",
-                            " ",
-                            nameOf(m.a === g.pro.name ? m.b : m.a),
-                            " ",
-                            React.createElement("span", { style: { color: C.muted } }, tie ? m.margin : won ? `(${m.margin})` : "")));
-                    }))),
-                myGroup && !myGroup.advance.some((p) => p.isYou) && !(wc.bestThirds && wc.bestThirds.some((t) => t.isYou)) && React.createElement("div", { className: "text-xs mt-1", style: { color: C.red } }, "Group stage exit \u2014 finished outside the top 2 and missed the best-third places. Not your year."),
-                myGroup && wc.bestThirds && wc.bestThirds.some((t) => t.isYou) && React.createElement("div", { className: "text-xs mt-1", style: { color: C.green } }, "Squeaked through as one of the best third-placed players! \uD83C\uDF89"))) : (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
-                React.createElement("p", { className: "text-sm", style: { color: C.muted } }, "You didn't qualify for this World Cup \u2014 you weren't in your nation's top two on points. Watch it unfold and target the next one in 4 seasons."))),
-            React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 1, color: C.gold }, className: "mb-1" }, "KNOCKOUT BRACKET"),
-                wc.rounds.filter((rd) => rd.name === "Quarter-finals" || rd.name === "Semi-finals" || rd.name === "Final").map((rd) => (React.createElement("div", { key: rd.name, className: "mb-2" },
-                    React.createElement("div", { className: "text-[11px]", style: { color: C.muted, letterSpacing: 1 } }, rd.name.toUpperCase()),
-                    rd.matches.map((m, i) => (React.createElement("div", { key: i, className: "text-xs", style: { color: m.involvesYou ? C.gold : C.chalk } },
-                        nameOf(m.a),
+                myGroup && React.createElement("div", { className: "text-xs mb-1", style: { color: myGroup.advance.some((p) => p.isYou) ? C.green : advancedSet.has(g.pro.name) ? C.green : C.red } },
+                    "Group ",
+                    String.fromCharCode(65 + myGroupIdx),
+                    ": ",
+                    myGroup.advance.some((p) => p.isYou) ? `qualified ${myGroup.advance[0].isYou ? "1st" : "2nd"}` : advancedSet.has(g.pro.name) ? "through as a best third" : "group stage exit"),
+                myKO.map((m, i) => {
+                    const won = m.winner === g.pro.name;
+                    const tie = m.decided === "playoff" || m.decided === "puttoff";
+                    return (React.createElement("div", { key: i, className: "text-xs mb-0.5", style: { color: won ? C.green : C.red } },
+                        m.round,
+                        ": ",
+                        won ? "beat" : "lost to",
                         " ",
-                        m.winner === m.a ? "def." : "lost to",
+                        nameOf(m.a === g.pro.name ? m.b : m.a),
                         " ",
-                        nameOf(m.b),
-                        " ",
-                        React.createElement("span", { style: { color: C.muted } }, m.margin)))))))),
+                        React.createElement("span", { style: { color: C.muted } }, tie ? (m.decided === "puttoff" ? "(putt-off)" : "(playoff)") : won ? `(${m.margin})` : "")));
+                }))),
             React.createElement(Btn, { onClick: finishWorldCup }, "CONTINUE TO THE CUP \u25B8")));
     }
     if (screen === "worldCupQual") {
