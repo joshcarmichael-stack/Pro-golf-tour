@@ -4265,10 +4265,14 @@ function GolfCareerSim() {
             const movedUp = tgt && old && tgt.division < old.division;
             // a pending promotion spin only stands if this move is itself upward; signing sideways/down cancels it
             const keepReroll = g.rerollAvailable && movedUp;
+            // reset YOUR personal team-MVP tally on the move — points earned at your old club don't count toward the new club's MVP race
+            const tmp = { ...(g.teamMemberPts || {}) };
+            delete tmp[g.pro.name];
             const st = { ...g, leagues, playerOffers: null, myDivision: tgt ? tgt.division : g.myDivision,
                 everPromoted: movedUp ? true : g.everPromoted,
                 bestDivision: Math.min(g.bestDivision != null ? g.bestDivision : 3, tgt ? tgt.division : 3),
                 rerollAvailable: keepReroll, promotedNote: keepReroll ? g.promotedNote : null,
+                teamMemberPts: tmp,
                 signingNews: { team: offer.teamName, division: offer.division, fee: offer.fee } };
             setG(st);
             await save(st);
@@ -4491,8 +4495,11 @@ function GolfCareerSim() {
                 wIdx = i;
             } });
             tgt.members[wIdx] = g.pro.name + " (YOU)";
+            const tmpFA = { ...(g.teamMemberPts || {}) };
+            delete tmpFA[g.pro.name];
             const st = { ...g, leagues, isFreeAgent: false, freeAgentOffers: null, myDivision: tgt.division,
                 bestDivision: Math.min(g.bestDivision != null ? g.bestDivision : 3, tgt.division),
+                teamMemberPts: tmpFA,
                 signingNews: { team: tgt.name, division: tgt.division, fee: 0 } };
             setG(st);
             await save(st);
