@@ -1645,7 +1645,7 @@ function GolfCareerSim() {
                 bonusPerk = { [best[0]]: 1 };
         }
         const caddie = { ...c, chem: keepingChem, bonusPerk };
-        const st = { ...g, caddie, caddieOffers: null, prevCaddie: null };
+        const st = { ...g, caddie, caddieOffers: null, prevCaddie: null, caddieLeftNote: null };
         setG(st);
         await save(st);
     };
@@ -3472,6 +3472,13 @@ function GolfCareerSim() {
                     " \u00B7 PRE-SEASON"),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 36, color: C.chalk, lineHeight: 1 } }, "CHOOSE YOUR CADDIE"),
                 React.createElement("p", { className: "text-sm mt-2 mb-4", style: { color: C.muted } }, "Three loopers want your bag this season. Each sharpens a different part of your game \u2014 and some are said to be magicians in bad weather. Choose wisely; they're yours for the year.")),
+            g.caddieLeftNote && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(217,108,79,0.1)", border: `1.5px solid ${C.red}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.red }, className: "mb-1" }, "\uD83C\uDF92 CADDIE DEPARTURE"),
+                React.createElement("p", { className: "text-sm", style: { color: C.chalk } },
+                    React.createElement("b", null, g.caddieLeftNote.name),
+                    " has walked away",
+                    g.caddieLeftNote.special ? " — a legend doesn't carry a bag that isn't contending" : ", looking for a player who delivers",
+                    ". Any chemistry you'd built together is gone \u2014 time for a fresh face on the bag."))),
             g.caddieOffers.map((c) => (React.createElement("button", { key: c.name, onClick: () => hireCaddie(c), className: "w-full mb-3 p-3 rounded-xl text-left active:scale-[0.99]", style: { background: c.special ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card, border: c.special ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.2)" } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: c.special ? C.gold : C.chalk } }, c.name),
                 React.createElement("p", { className: "text-xs mb-1", style: { color: C.muted } }, c.desc),
@@ -3601,7 +3608,7 @@ function GolfCareerSim() {
                     "START SEASON ",
                     g.season + 1,
                     " \u25B8"))),
-            g.caddieLeftNote && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(217,108,79,0.1)", border: `1.5px solid ${C.red}` } },
+            false && g.caddieLeftNote && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(217,108,79,0.1)", border: `1.5px solid ${C.red}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.red }, className: "mb-1" }, "\uD83C\uDF92 CADDIE DEPARTURE"),
                 React.createElement("p", { className: "text-sm", style: { color: C.chalk } },
                     React.createElement("b", null, g.caddieLeftNote.name),
@@ -4547,6 +4554,18 @@ function GolfCareerSim() {
                 const past = (g.pastWinners || {})[ev.e] || [];
                 const open = selSched === ev.e;
                 const isMajor = ev.type === "major";
+                // best career result at this event from eventHistory
+                const hist = (g.eventHistory || {})[ev.e] || [];
+                const finPos = (r) => {
+                    if (!r || r === "MC" || r === "DNQ" || r === "DNP")
+                        return 9999;
+                    const n = parseInt(String(r).replace(/[^0-9]/g, ""), 10);
+                    return isNaN(n) ? 9999 : n;
+                };
+                let best = null;
+                hist.forEach((h) => { if (best === null || finPos(h.r) < finPos(best.r))
+                    best = h; });
+                const bestPlayable = best && finPos(best.r) < 9999;
                 return (React.createElement("div", { key: ev.e },
                     React.createElement("button", { onClick: () => setSelSched(open ? null : ev.e), className: "w-full mb-1.5 p-2.5 rounded-md flex items-center gap-2 text-left active:scale-[0.99]", style: { background: i < g.evIdx ? "rgba(20,61,41,0.5)" : C.panel, border: isMajor ? `1px solid ${C.gold}` : i === g.evIdx ? "1px solid rgba(159,217,139,0.6)" : "1px solid transparent" } },
                         React.createElement("div", { className: "flex-1 min-w-0" },
@@ -4559,7 +4578,13 @@ function GolfCareerSim() {
                                 MAJOR_ROTATION[ev.e] ? " (rotates)" : "",
                                 " \u00B7 $",
                                 ev.purse,
-                                "M")),
+                                "M"),
+                            bestPlayable && React.createElement("div", { className: "text-[10px]", style: { color: finPos(best.r) === 1 ? C.gold : C.green } },
+                                "\uD83C\uDFC5 Best: ",
+                                best.r,
+                                " (S",
+                                best.s,
+                                ")")),
                         React.createElement("span", { className: "text-xs", style: { color: C.muted } }, past.length ? `${past.length} ▾` : "—")),
                     open && (React.createElement("div", { className: "mb-2 p-2.5 rounded-md", style: { background: "rgba(27,77,52,0.6)" } },
                         past.length === 0 && React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "No champions yet in your era."),
