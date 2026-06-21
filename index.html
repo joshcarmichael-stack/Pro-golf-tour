@@ -1316,6 +1316,7 @@ function GolfCareerSim() {
     const [worldCup, setWorldCup] = useState(null);
     const [puttoff, setPuttoff] = useState(null);
     const [wcStage, setWcStage] = useState(0);
+    const [pendingSign, setPendingSign] = useState(null);
     const [worldTab, setWorldTab] = useState("pts");
     const [rrPair, setRrPair] = useState(null);
     useEffect(() => {
@@ -1477,6 +1478,103 @@ function GolfCareerSim() {
         return ai ? playerValue({ overall: ai.overall, age: ai.age, pot: e.pot || ai.overall }) : 1;
     };
     const myLeagueTeam = (st = g) => (st.leagues || []).find((t) => t.members.some((mn) => mn.includes("(YOU)")));
+    // players you can realistically sign: same/lower division, OR an unhappy reserve (5th man) at a higher-div club
+    const signablePlayers = (st = g) => {
+        const mt = myLeagueTeam(st);
+        if (!mt)
+            return [];
+        const myDiv = mt.division;
+        const out = [];
+        (st.leagues || []).forEach((t) => {
+            if (t.id === mt.id)
+                return;
+            // rank squad to identify the reserve (weakest = 5th man)
+            const ranked = t.members.map((mn) => ({ mn, ovr: ovrOf(mn, st) })).sort((a, b) => b.ovr - a.ovr);
+            t.members.forEach((mn) => {
+                if (mn.includes("(YOU)"))
+                    return;
+                const ovr = ovrOf(mn, st);
+                const isReserve = ranked[ranked.length - 1].mn === mn; // the 5th man
+                let available = false, reason = "";
+                if (t.division > myDiv) {
+                    available = true;
+                    reason = "wants to drop down";
+                } // lower-div players keen to join
+                else if (t.division === myDiv) {
+                    available = true;
+                    reason = "open to a move";
+                } // same division, persuadable
+                else if (t.division < myDiv && isReserve) {
+                    available = true;
+                    reason = "unhappy reserve";
+                } // bench player at a bigger club, for game time
+                if (available)
+                    out.push({ name: mn.replace(" (YOU)", ""), fromTeamId: t.id, fromTeam: t.name, fromDiv: t.division, ovr, fee: valOf(mn, st), reason, isReserve });
+            });
+        });
+        // sort by overall desc so best targets surface, but the realistic ones (your level) cluster naturally
+        return out.sort((a, b) => b.ovr - a.ovr);
+    };
+    // execute a signing: you buy `target`, drop `dropName` to free agents; the selling club then reacts (domino, capped)
+    const executeSigning = async (target, dropName) => {
+        const leagues = (g.leagues || []).map((t) => ({ ...t, members: t.members.slice() }));
+        const faPool = [...(g.freeAgentPool || [])];
+        const mt = leagues.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
+        const seller = leagues.find((t) => t.id === target.fromTeamId);
+        if (!mt || !seller)
+            return;
+        // 1. you drop a player → they become a free agent
+        const dropIdx = mt.members.findIndex((mn) => mn.replace(" (YOU)", "") === dropName);
+        if (dropIdx >= 0 && !mt.members[dropIdx].includes("(YOU)")) {
+            faPool.push(dropName);
+            mt.members.splice(dropIdx, 1);
+        }
+        // 2. remove target from seller, add to your squad
+        const tIdx = seller.members.findIndex((mn) => mn.replace(" (YOU)", "") === target.name);
+        if (tIdx >= 0)
+            seller.members.splice(tIdx, 1);
+        mt.members.push(target.name);
+        // 3. pay the fee
+        mt.teamPot = Math.max(0, Math.round(((mt.teamPot || mt.budget || 0) - target.fee) * 10) / 10);
+        mt.budget = Math.max(0, Math.round(((mt.budget || 0) - target.fee) * 10) / 10);
+        // 4. DOMINO: the seller now has a hole. They replace — from free agents, or by buying down (capped at depth 2)
+        const fillHole = (team, depth) => {
+            while (team.members.length < 5) {
+                // prefer a free agent close to the gap; else dip lower or take any FA
+                if (faPool.length) {
+                    // pick best affordable-ish FA by overall
+                    faPool.sort((a, b) => ovrOf(b) - ovrOf(a));
+                    const sign = faPool.shift();
+                    team.members.push(sign);
+                }
+                else if (depth < 2) {
+                    // buy a reserve from a lower division, pushing the domino one more step
+                    const lower = leagues.filter((t) => t.division > team.division && t.members.length >= 5);
+                    if (!lower.length) {
+                        team.members.push("Tour Rookie");
+                        continue;
+                    }
+                    const src = lower[Math.floor(Math.random() * lower.length)];
+                    const ranked = src.members.map((mn) => ({ mn, ovr: ovrOf(mn) })).sort((a, b) => a.ovr - b.ovr);
+                    const taken = ranked[0].mn; // their weakest
+                    const ti = src.members.indexOf(taken);
+                    if (ti >= 0)
+                        src.members.splice(ti, 1);
+                    team.members.push(taken);
+                    fillHole(src, depth + 1); // the source now needs filling → domino continues
+                }
+                else {
+                    team.members.push("Tour Rookie"); // domino bottoms out
+                }
+            }
+        };
+        fillHole(seller, 0);
+        const st = { ...g, leagues, freeAgentPool: faPool,
+            signingNews: { signed: target.name, dropped: dropName, fee: target.fee, club: mt.name } };
+        setG(st);
+        await save(st);
+        setScreen("transferMarket");
+    };
     const divName = (d) => ["Premier Division", "Championship", "Division One", "Division Two"][d] || `Division ${d + 1}`;
     const ROSTER = (st = g) => PLAYERS.map((p) => aiP(p.name, st)).filter(Boolean);
     const ovrOf = (name, st = g) => {
@@ -3815,7 +3913,8 @@ function GolfCareerSim() {
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("develop") },
                     "\uD83D\uDCAA DEVELOP",
                     (g.xp || 0) > 0 ? ` · ${g.xp} XP` : ""),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("worldCupQual") }, "\uD83C\uDF0D WORLD CUP")),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("worldCupQual") }, "\uD83C\uDF0D WORLD CUP"),
+                g.mode === "league" && !g.isFreeAgent && myLeagueTeam() && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("transferMarket") }, "\uD83D\uDCB0 TRANSFERS")),
             (() => {
                 const m = g.myStats;
                 const wIdx = owgrList().findIndex((x) => x.name === g.pro.name) + 1;
@@ -4220,6 +4319,89 @@ function GolfCareerSim() {
                     React.createElement("button", { onClick: () => accept(offer), className: "w-full py-2 rounded-md active:scale-95", style: { background: offer.rescue ? C.blue : benchRisk ? "rgba(217,108,79,0.85)" : C.gold, color: C.bg, fontFamily: FONT, fontSize: 14, letterSpacing: 1 } }, offer.rescue ? "DROP DOWN & PLAY ▸" : benchRisk ? "SIGN ANYWAY ▸" : "ACCEPT & SIGN ▸")));
             }),
             React.createElement(Btn, { kind: "panel", onClick: decline }, "DECLINE ALL \u00B7 STAY PUT")));
+    }
+    if (screen === "transferMarket") {
+        const mt = myLeagueTeam();
+        if (!mt) {
+            return React.createElement(Shell, null,
+                React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+                React.createElement("p", { style: { color: C.muted }, className: "text-sm" }, "Sign for a club first to access the transfer market."));
+        }
+        const budget = Math.round((mt.teamPot || mt.budget || 0) * 10) / 10;
+        const targets = signablePlayers().slice(0, 24);
+        // drop-selection step
+        if (pendingSign) {
+            return (React.createElement(Shell, null,
+                React.createElement(BackTop, { onClick: () => setPendingSign(null) }),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk } }, "WHO MAKES WAY?"),
+                React.createElement("p", { className: "text-xs mb-3", style: { color: C.muted } },
+                    "Signing ",
+                    React.createElement("b", { style: { color: C.gold } }, pendingSign.name),
+                    " (",
+                    pendingSign.ovr,
+                    ") for $",
+                    pendingSign.fee,
+                    "m. Your squad is full \u2014 choose who to release to the free-agent pool."),
+                React.createElement("div", { className: "grid gap-2" }, mt.members.filter((mn) => !mn.includes("(YOU)")).map((mn) => {
+                    const nm = mn.replace(" (YOU)", "");
+                    const o = ovrOf(mn);
+                    return (React.createElement("button", { key: mn, onClick: async () => { setPendingSign(null); await executeSigning(pendingSign, nm); }, className: "w-full p-3 rounded-xl flex justify-between items-center active:scale-[0.99]", style: { background: C.panel, border: "1px solid rgba(244,247,242,0.12)" } },
+                        React.createElement("span", { style: { color: C.chalk } }, nm),
+                        React.createElement("span", { style: { color: tint(o) } },
+                            o,
+                            " ovr \u00B7 release \u25B8")));
+                }))));
+        }
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement("div", { className: "mb-2" },
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 26, color: C.chalk } }, "\uD83D\uDCB0 TRANSFER MARKET"),
+                React.createElement("div", { className: "flex justify-between items-baseline" },
+                    React.createElement("p", { className: "text-xs", style: { color: C.muted } },
+                        mt.name,
+                        " \u00B7 ",
+                        divName(mt.division),
+                        " \u00B7 squad ",
+                        mt.members.length,
+                        "/5"),
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 18, color: C.gold } },
+                        "$",
+                        budget,
+                        "m"))),
+            g.signingNews && g.signingNews.signed && (React.createElement("div", { className: "p-2 rounded-lg mb-3", style: { background: "rgba(159,217,139,0.1)", border: `1px solid ${C.green}` } },
+                React.createElement("p", { className: "text-xs", style: { color: C.green } },
+                    "\u2713 Signed ",
+                    g.signingNews.signed,
+                    " for $",
+                    g.signingNews.fee,
+                    "m \u00B7 released ",
+                    g.signingNews.dropped,
+                    " to free agents."))),
+            React.createElement("p", { className: "text-[11px] mb-2", style: { color: C.muted } }, "Targets from your division or below, plus unhappy reserves at bigger clubs. Sign one and you'll release a squad player \u2014 who then enters the free-agent pool, and the selling club must replace them."),
+            React.createElement("div", { className: "grid gap-2" },
+                targets.map((t) => {
+                    const afford = budget >= t.fee;
+                    const reserveTag = t.reason === "unhappy reserve" ? "🪑 reserve, wants game time" : t.reason === "wants to drop down" ? "↓ open to dropping down" : "open to a move";
+                    return (React.createElement("div", { key: t.name, className: "p-3 rounded-xl", style: { background: C.card, border: `1px solid ${afford ? "rgba(232,195,90,0.4)" : "rgba(244,247,242,0.1)"}`, opacity: afford ? 1 : 0.55 } },
+                        React.createElement("div", { className: "flex justify-between items-baseline" },
+                            React.createElement("span", { style: { fontFamily: FONT, fontSize: 17, color: C.chalk } }, t.name),
+                            React.createElement("span", { style: { color: tint(t.ovr) } },
+                                t.ovr,
+                                " ovr")),
+                        React.createElement("div", { className: "text-[11px] mb-2", style: { color: C.muted } },
+                            FLAG[NATION_CODE[(ROSTER().find((p) => p.name === t.name) || {}).country]] || "",
+                            " ",
+                            t.fromTeam,
+                            " (",
+                            divName(t.fromDiv),
+                            ") \u00B7 ",
+                            reserveTag),
+                        React.createElement("button", { disabled: !afford, onClick: () => { if (mt.members.length >= 5)
+                                setPendingSign(t);
+                            else
+                                executeSigning(t, null); }, className: `w-full py-2 rounded-md ${afford ? "active:scale-95" : ""}`, style: { background: afford ? C.gold : "rgba(244,247,242,0.1)", color: afford ? C.bg : C.muted, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, afford ? `SIGN · $${t.fee}m ▸` : `NEED $${t.fee}m`)));
+                }),
+                targets.length === 0 && React.createElement("p", { className: "text-sm text-center", style: { color: C.muted } }, "No realistic targets available right now. Check back next window."))));
     }
     if (screen === "transferWindow" && g.leagueTransfers) {
         const mt = myLeagueTeam();
