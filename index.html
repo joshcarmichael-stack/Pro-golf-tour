@@ -747,6 +747,160 @@ const worldCupTable = (combined, pro, plist = PLAYERS) => {
         .sort((a, b) => b.strength - a.strength);
     return nations.slice(0, 24); // top 24 nations → 48 players
 };
+const WC_VENUES = ["Royal Melbourne, Australia", "St Andrews (Old Course)", "Whistling Straits, USA", "Marco Simone, Italy"];
+// numeric match margin: +ve = side A wins by that many holes, -ve = side B, 0 = all square
+const MARGIN_NUM = () => { const r = Math.random(); return r < 0.3 ? 1 : r < 0.55 ? 2 : r < 0.75 ? 3 : r < 0.9 ? 4 : 5; };
+const marginText = (n) => n === 0 ? "halved" : Math.abs(n) >= 4 ? `${Math.abs(n)}&${Math.abs(n) - 1}` : `${Math.abs(n)} up`;
+// a single knockout match: resolve, and on a tie go to a 3-hole playoff, then a sudden-death putt-off
+const koMatch = (a, b, rating, interactive = false) => {
+    const out = matchOutcome(rating(a), rating(b));
+    if (out !== "H") {
+        const w = out === "A" ? a : b, mg = MARGIN_NUM();
+        return { winner: w, margin: marginText(mg), decided: "match" };
+    }
+    // tied after 18 → 3-hole AGGREGATE STROKE-PLAY playoff (lower total wins)
+    const strokeRound = (p) => { let s = 0; for (let h = 0; h < 3; h++) {
+        s += 4 - (p.overall - 75) * 0.04 + gauss() * 0.7;
+    } return s; };
+    const sa = strokeRound(a), sb = strokeRound(b);
+    if (Math.abs(sa - sb) > 0.25) {
+        const w = sa < sb ? a : b;
+        return { winner: w, margin: "after a playoff", decided: "playoff" };
+    }
+    // still level → sudden-death putt-off; if you're involved and interactive, pause for the shootout screen
+    if (interactive && (a.isYou || b.isYou))
+        return { needsPuttoff: true, a, b };
+    return resolvePuttoff(a, b);
+};
+const resolvePuttoff = (a, b) => {
+    const makeP = (p) => 0.55 + ((p.putting != null ? p.putting : p.overall) - 75) * 0.012;
+    let depth = 0;
+    while (depth < 15) {
+        depth++;
+        const am = Math.random() < makeP(a), bm = Math.random() < makeP(b);
+        if (am && !bm)
+            return { winner: a, margin: `on putt ${depth} of the shootout`, decided: "puttoff" };
+        if (bm && !am)
+            return { winner: b, margin: `on putt ${depth} of the shootout`, decided: "puttoff" };
+    }
+    return { winner: (a.putting || a.overall) >= (b.putting || b.overall) ? a : b, margin: "in a marathon putt-off", decided: "puttoff" };
+};
+// Simulate the whole World Cup: 48 players → 12 groups of 4 → top2 + best 8 thirds = 32 → knockout
+const simWorldCup = (qualifiers, proName) => {
+    const field = qualifiers.slice(0, 48);
+    const seeded = field.slice().sort((a, b) => b.pts - a.pts);
+    const groups = Array.from({ length: 12 }, () => []);
+    let gi = 0, dir = 1;
+    seeded.forEach((p) => { groups[gi].push(p); gi += dir; if (gi === 12) {
+        gi = 11;
+        dir = -1;
+    }
+    else if (gi < 0) {
+        gi = 0;
+        dir = 1;
+    } });
+    const rating = (p) => p.overall + gauss() * 1.7;
+    const pairs = [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]];
+    const groupResults = groups.map((grp, grpIdx) => {
+        const table = grp.map((p) => ({ ...p, gp: 0, gw: 0, gd: 0, gl: 0, gpts: 0, gdiff: 0, h2h: {} }));
+        const matches = [];
+        pairs.forEach((round, rIdx) => {
+            round.forEach(([i, j]) => {
+                if (!grp[i] || !grp[j])
+                    return;
+                const involvesYou = grp[i].isYou || grp[j].isYou;
+                const out = matchOutcome(rating(grp[i]), rating(grp[j]));
+                let mg = 0;
+                if (out === "A") {
+                    mg = MARGIN_NUM();
+                    table[i].gw++;
+                    table[i].gpts += 3;
+                    table[j].gl++;
+                    table[i].gdiff += mg;
+                    table[j].gdiff -= mg;
+                    table[i].h2h[grp[j].name] = 1;
+                    table[j].h2h[grp[i].name] = -1;
+                }
+                else if (out === "B") {
+                    mg = MARGIN_NUM();
+                    table[j].gw++;
+                    table[j].gpts += 3;
+                    table[i].gl++;
+                    table[j].gdiff += mg;
+                    table[i].gdiff -= mg;
+                    table[j].h2h[grp[i].name] = 1;
+                    table[i].h2h[grp[j].name] = -1;
+                }
+                else {
+                    table[i].gd++;
+                    table[j].gd++;
+                    table[i].gpts += 1;
+                    table[j].gpts += 1;
+                    table[i].h2h[grp[j].name] = 0;
+                    table[j].h2h[grp[i].name] = 0;
+                }
+                table[i].gp++;
+                table[j].gp++;
+                matches.push({ round: rIdx, a: grp[i].name, b: grp[j].name, out, involvesYou, marginNum: out === "A" ? mg : out === "B" ? -mg : 0, margin: marginText(out === "H" ? 0 : mg) });
+            });
+        });
+        // sort: points → goal difference → head-to-head → wins
+        table.sort((a, b) => {
+            if (b.gpts !== a.gpts)
+                return b.gpts - a.gpts;
+            if (b.gdiff !== a.gdiff)
+                return b.gdiff - a.gdiff;
+            const h = (a.h2h[b.name] != null ? a.h2h[b.name] : 0);
+            if (h !== 0)
+                return -h; // a beat b → a first
+            return b.gw - a.gw || b.overall - a.overall;
+        });
+        table.forEach((p, i) => { p.groupRank = i + 1; p.groupLetter = String.fromCharCode(65 + grpIdx); });
+        return { players: table, matches, advance: table.slice(0, 2), third: table[2] };
+    });
+    // qualifiers: top 2 from each group (24) + best 8 third-placed (by points, GD, wins)
+    const autoQ = groupResults.flatMap((g) => g.advance);
+    const thirds = groupResults.map((g) => g.third).filter(Boolean).sort((a, b) => b.gpts - a.gpts || b.gdiff - a.gdiff || b.gw - a.gw || b.overall - a.overall);
+    const bestThirds = thirds.slice(0, 8);
+    const knockoutQ = bestThirds.map((p) => ({ ...p, viaThird: true }));
+    const bracket = [...autoQ, ...knockoutQ].sort((a, b) => b.gpts - a.gpts || b.gdiff - a.gdiff || b.overall - a.overall);
+    // run the knockout (resumable: pauses on a player putt-off)
+    const ko = runKnockout({ bracket, rounds: [], rating });
+    return { groups: groupResults, bestThirds, ...ko };
+};
+const WC_ROUND_NAMES = { 32: "Round of 32", 16: "Round of 16", 8: "Quarter-finals", 4: "Semi-finals", 2: "Final" };
+// plays knockout rounds; if a player putt-off is hit, returns { pendingPuttoff, resume } to hand to the UI
+const runKnockout = (state) => {
+    let { bracket, rounds, rating } = state;
+    rating = rating || ((p) => p.overall + gauss() * 1.7);
+    while (bracket.length > 1) {
+        // resume a round in progress if needed
+        let ms = state.partialMatches || [];
+        let next = state.partialNext || [];
+        let startM = ms.length;
+        state.partialMatches = null;
+        state.partialNext = null;
+        for (let m = startM; m < bracket.length / 2; m++) {
+            const a = bracket[m], b = bracket[bracket.length - 1 - m];
+            if (!a || !b) {
+                if (a)
+                    next.push(a);
+                continue;
+            }
+            const res = koMatch(a, b, rating, true);
+            if (res.needsPuttoff) {
+                // pause: hand the putt-off to the UI, remember where we are
+                return { pendingPuttoff: { a: res.a, b: res.b, roundName: WC_ROUND_NAMES[bracket.length] || `Last ${bracket.length}` },
+                    resume: { bracket, rounds, rating, roundName: WC_ROUND_NAMES[bracket.length] || `Last ${bracket.length}`, partialMatches: ms, partialNext: next } };
+            }
+            ms.push({ a: a.name, b: b.name, winner: res.winner.name, involvesYou: a.isYou || b.isYou, margin: res.margin, decided: res.decided });
+            next.push(res.winner);
+        }
+        rounds.push({ name: WC_ROUND_NAMES[bracket.length] || `Last ${bracket.length}`, matches: ms });
+        bracket = next;
+    }
+    return { rounds, champion: bracket[0] };
+};
 const sessionPlayersN = (team, sIdx, youTier, n) => {
     const you = team.find((t) => t.isYou);
     let pool = team.filter((t) => !t.isYou);
@@ -1071,7 +1225,7 @@ const SAVE_KEY = "golf-career-sim-v4";
 const freshStats = () => ({ events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 0, bestFinish: null,
     birdies: 0, eagles: 0, albatrosses: 0, aces: 0,
     careerMoney: 0, careerWins: 0, careerMajors: 0, careerBirdies: 0, careerEagles: 0, careerAlbatrosses: 0, careerAces: 0,
-    fedexTitles: 0, careerTop10s: 0, reachedNo1: false, rc: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, pc: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, ei: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] } });
+    fedexTitles: 0, careerTop10s: 0, reachedNo1: false, rc: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, pc: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, ei: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, wc: { apps: 0, titles: 0, bestFinish: null } });
 function GolfCareerSim() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4;
     const [g, setG] = useState(null);
@@ -1096,6 +1250,8 @@ function GolfCareerSim() {
     const [selSched, setSelSched] = useState(null);
     const [prep, setPrep] = useState(null);
     const [reserveChoice, setReserveChoice] = useState(null);
+    const [worldCup, setWorldCup] = useState(null);
+    const [puttoff, setPuttoff] = useState(null);
     const [worldTab, setWorldTab] = useState("pts");
     const [rrPair, setRrPair] = useState(null);
     useEffect(() => {
@@ -2404,9 +2560,8 @@ function GolfCareerSim() {
             setG(stB);
             await save(stB);
             setTour(null);
-            // three marquee team events rotate so each lands regularly: Ryder → Presidents → Europe v International
             const cupCycle = stB.season % 3;
-            if (cupCycle === 0) {
+            const normalCup = () => { if (cupCycle === 0) {
                 startRyder(stB);
             }
             else if (cupCycle === 1) {
@@ -2414,6 +2569,14 @@ function GolfCareerSim() {
             }
             else {
                 startEuroIntl(stB);
+            } };
+            // World Cup of Golf lands in season 1, then every 4th season (5, 9, 13...), ON TOP of the normal cup
+            const isWCyear = stB.season === 1 || (stB.season - 1) % 4 === 0;
+            if (isWCyear) {
+                startWorldCup(stB);
+            }
+            else {
+                normalCup();
             }
             return;
         }
@@ -2458,6 +2621,104 @@ function GolfCareerSim() {
     const pcSide = (nat) => nat === "USA" ? "USA" : EUR_NATIONS.includes(nat) ? null : "INTL";
     // Europe vs International: which side is the player on (USA players don't feature)
     const eiSide = (nat) => nat === "USA" ? null : EUR_NATIONS.includes(nat) ? "EUR" : "INTL";
+    const finishWorldCup = async () => {
+        const st = { ...g };
+        st.wcNo = (g.wcNo || 0) + 1;
+        const champ = worldCup.champion;
+        const youWon = champ && champ.isYou;
+        // how far did YOU get? find your last appearance in the rounds
+        let xp = 0;
+        const parts = [];
+        if (worldCup.youIn) {
+            // group stage XP for appearing
+            xp += 20;
+            parts.push({ label: "World Cup appearance", amt: 20 });
+            // did you advance from your group?
+            const advanced = worldCup.groups.some((grp) => grp.advance.some((p) => p.isYou));
+            if (advanced) {
+                xp += 15;
+                parts.push({ label: "Reached the knockouts", amt: 15 });
+            }
+            // count knockout wins involving you
+            let koWins = 0, lastRound = "";
+            worldCup.rounds.forEach((rd) => rd.matches.forEach((m) => {
+                if (m.involvesYou) {
+                    lastRound = rd.name;
+                    if (m.winner === g.pro.name)
+                        koWins++;
+                }
+            }));
+            if (koWins > 0) {
+                const a = koWins * 10;
+                xp += a;
+                parts.push({ label: `${koWins} knockout win${koWins > 1 ? "s" : ""}`, amt: a });
+            }
+            if (youWon) {
+                xp += 50;
+                parts.push({ label: "🏆 WORLD CUP CHAMPION", amt: 50 });
+            }
+        }
+        const wcRec = { ...(g.myStats.wc || { apps: 0, titles: 0, bestFinish: null }) };
+        if (worldCup.youIn)
+            wcRec.apps++;
+        if (youWon)
+            wcRec.titles++;
+        st.myStats = { ...g.myStats, wc: wcRec };
+        st.lastWorldCup = { season: worldCup.season, champion: champ ? champ.name : "—", championNation: champ ? champ.nationName : "", youWon, venue: worldCup.venue };
+        if (xp > 0) {
+            st.xp = (st.xp || 0) + xp;
+            st.xpGainLast = xp;
+            st.xpBreakdown = parts;
+        }
+        setG(st);
+        await save(st);
+        setWorldCup(null);
+        // chain into the normal cup for this season
+        const cupCycle = st.season % 3;
+        if (cupCycle === 0) {
+            startRyder(st);
+        }
+        else if (cupCycle === 1) {
+            startPres(st);
+        }
+        else {
+            startEuroIntl(st);
+        }
+    };
+    const startWorldCup = (st) => {
+        const table = worldCupTable(rcCombined(st), st.pro, ROSTER(st));
+        const qualifiers = table.flatMap((n) => n.qualifiers.map((q) => ({ ...q, country: n.code, nationName: n.name })));
+        const youInWC = qualifiers.some((q) => q.isYou);
+        const venue = WC_VENUES[(st.wcNo || 0) % WC_VENUES.length];
+        const sim = simWorldCup(qualifiers, st.pro.name);
+        const wcState = { ...sim, qualifiers, youIn: youInWC, venue, season: st.season };
+        setWorldCup(wcState);
+        if (sim.pendingPuttoff) {
+            setPuttoff({ ...sim.pendingPuttoff, putts: [], turn: 0 });
+            setScreen("puttoff");
+        }
+        else
+            setScreen("worldCup");
+    };
+    // resume the knockout after a player putt-off is decided
+    const resumeWorldCupAfterPuttoff = (winner) => {
+        const wc = worldCup;
+        const res = wc.resume;
+        // record the just-finished putt-off match into the partial round
+        const a = puttoff.a, b = puttoff.b;
+        res.partialMatches.push({ a: a.name, b: b.name, winner: winner.name, involvesYou: a.isYou || b.isYou, margin: "in a putt-off shootout", decided: "puttoff" });
+        res.partialNext.push(winner);
+        const ko = runKnockout(res);
+        const merged = { ...wc, ...ko, pendingPuttoff: ko.pendingPuttoff || null, resume: ko.resume || null };
+        setWorldCup(merged);
+        setPuttoff(null);
+        if (ko.pendingPuttoff) {
+            setPuttoff({ ...ko.pendingPuttoff, putts: [], turn: 0 });
+            setScreen("puttoff");
+        }
+        else
+            setScreen("worldCup");
+    };
     const startEuroIntl = (st) => {
         const side = eiSide(st.pro.nation);
         const cupNo = st.eiCupNo || 0;
@@ -4417,6 +4678,166 @@ function GolfCareerSim() {
             React.createElement(Btn, { onClick: () => setScreen("hub"), kind: "panel" }, "BACK")));
     }
     // ---------- trophy cabinet ----------
+    if (screen === "puttoff" && puttoff) {
+        const me = puttoff.a.isYou ? puttoff.a : puttoff.b;
+        const opp = puttoff.a.isYou ? puttoff.b : puttoff.a;
+        const myPutting = effAttrs(g).putting || g.pro.attrs.putting || 75;
+        const oppPutting = opp.putting != null ? opp.putting : opp.overall;
+        const PUTTS = [
+            { d: "8 feet, dead straight", base: 0.7 }, { d: "12 feet, left-to-right break", base: 0.55 },
+            { d: "15 feet, downhill and quick", base: 0.42 }, { d: "20 feet, big breaker", base: 0.3 },
+            { d: "6 feet, but for the match", base: 0.62 }, { d: "10 feet, into the grain", base: 0.5 },
+            { d: "25 feet, last roll of the dice", base: 0.22 },
+        ];
+        const rounds = puttoff.putts;
+        const roundIdx = rounds.length;
+        const cur = PUTTS[roundIdx % PUTTS.length];
+        const myMakeP = Math.max(0.15, Math.min(0.92, cur.base + (myPutting - 75) * 0.015));
+        const oppMakeP = Math.max(0.15, Math.min(0.92, cur.base + (oppPutting - 75) * 0.015));
+        const attempt = () => {
+            const myMake = Math.random() < myMakeP;
+            const oppMake = Math.random() < oppMakeP;
+            const newPutts = [...rounds, { desc: cur.d, myMake, oppMake }];
+            // decided if exactly one made
+            if (myMake && !oppMake) {
+                setPuttoff({ ...puttoff, putts: newPutts, decided: "you" });
+            }
+            else if (oppMake && !myMake) {
+                setPuttoff({ ...puttoff, putts: newPutts, decided: "opp" });
+            }
+            else {
+                setPuttoff({ ...puttoff, putts: newPutts });
+            } // both made or both missed → continue
+        };
+        const decided = puttoff.decided;
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } }, "SUDDEN-DEATH PUTT-OFF"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk, lineHeight: 1.1 } }, puttoff.roundName),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } },
+                    "YOU vs ",
+                    opp.name,
+                    " \u00B7 all square after the playoff. First to hole one the other misses.")),
+            React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
+                React.createElement("div", { className: "flex justify-between text-xs mb-2", style: { color: C.muted } },
+                    React.createElement("span", null, "PUTT"),
+                    React.createElement("span", null,
+                        "YOU (",
+                        myPutting,
+                        ")"),
+                    React.createElement("span", null,
+                        opp.name.split(" ").slice(-1)[0],
+                        " (",
+                        oppPutting,
+                        ")")),
+                rounds.map((r, i) => (React.createElement("div", { key: i, className: "flex justify-between text-xs mb-1", style: { color: C.chalk } },
+                    React.createElement("span", { className: "truncate pr-2", style: { maxWidth: "55%" } },
+                        i + 1,
+                        ". ",
+                        r.desc),
+                    React.createElement("span", { style: { color: r.myMake ? C.green : C.red } }, r.myMake ? "✓ MAKE" : "✗ miss"),
+                    React.createElement("span", { style: { color: r.oppMake ? C.green : C.red } }, r.oppMake ? "✓ MAKE" : "✗ miss")))),
+                rounds.length === 0 && React.createElement("p", { className: "text-xs text-center", style: { color: C.muted } }, "Step up and hole your first putt.")),
+            !decided ? (React.createElement(React.Fragment, null,
+                React.createElement("div", { className: "p-4 rounded-xl mb-3 text-center", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+                    React.createElement("div", { className: "text-xs mb-1", style: { color: C.muted } },
+                        "PUTT ",
+                        roundIdx + 1),
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk, lineHeight: 1.15 } }, cur.d),
+                    React.createElement("div", { className: "text-[11px] mt-1", style: { color: C.muted } },
+                        "Your make chance: ",
+                        Math.round(myMakeP * 100),
+                        "% (putting ",
+                        myPutting,
+                        ")")),
+                React.createElement(Btn, { onClick: attempt }, "\uD83C\uDFCC\uFE0F HIT THE PUTT"))) : (React.createElement("div", { className: "p-4 rounded-xl text-center", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `2px solid ${decided === "you" ? C.gold : C.red}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: decided === "you" ? C.gold : C.red, lineHeight: 1.1 } }, decided === "you" ? "🎉 YOU WIN THE SHOOTOUT!" : `${opp.name} holds nerve`),
+                React.createElement("p", { className: "text-xs mt-1 mb-3", style: { color: C.muted } }, decided === "you" ? "Ice in the veins. You're through." : "Heartbreak at the last. Your World Cup ends here."),
+                React.createElement(Btn, { onClick: () => resumeWorldCupAfterPuttoff(decided === "you" ? me : opp) }, "CONTINUE \u25B8")))));
+    }
+    if (screen === "worldCup" && worldCup) {
+        const wc = worldCup;
+        const champ = wc.champion;
+        const nameOf = (n) => n === g.pro.name ? "YOU" : n.split(" ").slice(-1)[0];
+        // find your group and your knockout path
+        const myGroup = wc.groups.find((grp) => grp.players.some((p) => p.isYou));
+        const myGroupIdx = wc.groups.indexOf(myGroup);
+        const myKO = [];
+        wc.rounds.forEach((rd) => rd.matches.forEach((m) => { if (m.involvesYou)
+            myKO.push({ round: rd.name, ...m }); }));
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center mb-3" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } },
+                    "\uD83C\uDF0D THE GLOBAL CUP \u00B7 SEASON ",
+                    wc.season),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.chalk, lineHeight: 1 } }, "WORLD CUP OF GOLF"),
+                React.createElement("div", { className: "text-xs mt-1", style: { color: C.muted } },
+                    wc.venue,
+                    " \u00B7 48 players \u00B7 24 nations")),
+            React.createElement("div", { className: "p-4 rounded-xl mb-3 text-center", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `2px solid ${C.gold}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "WORLD CHAMPION"),
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 26, color: champ && champ.isYou ? C.gold : C.chalk, lineHeight: 1.1 }, className: "mt-1" }, champ ? (champ.isYou ? "🏆 YOU! 🏆" : champ.name) : "—"),
+                champ && React.createElement("div", { className: "text-xs mt-0.5", style: { color: C.muted } },
+                    FLAG[champ.country] || "🌐",
+                    " ",
+                    champ.nationName),
+                champ && champ.isYou && React.createElement("div", { className: "text-sm mt-1", style: { color: C.gold } }, "You've conquered the world. The Global Cup is yours.")),
+            wc.youIn ? (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 1, color: C.gold }, className: "mb-1" }, "YOUR TOURNAMENT"),
+                myGroup && (React.createElement(React.Fragment, null,
+                    React.createElement("div", { className: "text-xs mb-1", style: { color: C.chalk } },
+                        "Group ",
+                        String.fromCharCode(65 + myGroupIdx),
+                        ":"),
+                    myGroup.players.map((p, i) => {
+                        const advanced = i < 2 || (wc.bestThirds && wc.bestThirds.some((t) => t.name === p.name));
+                        return (React.createElement("div", { key: p.name, className: "flex justify-between text-xs mb-0.5", style: { color: p.isYou ? C.gold : advanced ? C.chalk : C.muted, fontWeight: p.isYou ? 700 : 400 } },
+                            React.createElement("span", null,
+                                i + 1,
+                                ". ",
+                                p.isYou ? "YOU" : p.name,
+                                " ",
+                                advanced ? React.createElement("span", { style: { color: C.green } },
+                                    "\u2713",
+                                    i === 2 ? " (3rd)" : "") : ""),
+                            React.createElement("span", { style: { color: C.muted } },
+                                p.gpts,
+                                "pts \u00B7 ",
+                                p.gdiff > 0 ? "+" : "",
+                                p.gdiff,
+                                " GD")));
+                    }))),
+                myKO.length > 0 && (React.createElement("div", { className: "mt-2" },
+                    React.createElement("div", { className: "text-xs mb-1", style: { color: C.chalk } }, "Knockout run:"),
+                    myKO.map((m, i) => {
+                        const won = m.winner === g.pro.name;
+                        const tie = m.decided === "playoff" || m.decided === "puttoff";
+                        return (React.createElement("div", { key: i, className: "text-xs mb-0.5", style: { color: won ? C.green : C.red } },
+                            m.round,
+                            ": ",
+                            won ? "beat" : "lost to",
+                            " ",
+                            nameOf(m.a === g.pro.name ? m.b : m.a),
+                            " ",
+                            React.createElement("span", { style: { color: C.muted } }, tie ? m.margin : won ? `(${m.margin})` : "")));
+                    }))),
+                myGroup && !myGroup.advance.some((p) => p.isYou) && !(wc.bestThirds && wc.bestThirds.some((t) => t.isYou)) && React.createElement("div", { className: "text-xs mt-1", style: { color: C.red } }, "Group stage exit \u2014 finished outside the top 2 and missed the best-third places. Not your year."),
+                myGroup && wc.bestThirds && wc.bestThirds.some((t) => t.isYou) && React.createElement("div", { className: "text-xs mt-1", style: { color: C.green } }, "Squeaked through as one of the best third-placed players! \uD83C\uDF89"))) : (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
+                React.createElement("p", { className: "text-sm", style: { color: C.muted } }, "You didn't qualify for this World Cup \u2014 you weren't in your nation's top two on points. Watch it unfold and target the next one in 4 seasons."))),
+            React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 1, color: C.gold }, className: "mb-1" }, "KNOCKOUT BRACKET"),
+                wc.rounds.filter((rd) => rd.name === "Quarter-finals" || rd.name === "Semi-finals" || rd.name === "Final").map((rd) => (React.createElement("div", { key: rd.name, className: "mb-2" },
+                    React.createElement("div", { className: "text-[11px]", style: { color: C.muted, letterSpacing: 1 } }, rd.name.toUpperCase()),
+                    rd.matches.map((m, i) => (React.createElement("div", { key: i, className: "text-xs", style: { color: m.involvesYou ? C.gold : C.chalk } },
+                        nameOf(m.a),
+                        " ",
+                        m.winner === m.a ? "def." : "lost to",
+                        " ",
+                        nameOf(m.b),
+                        " ",
+                        React.createElement("span", { style: { color: C.muted } }, m.margin)))))))),
+            React.createElement(Btn, { onClick: finishWorldCup }, "CONTINUE TO THE CUP \u25B8")));
+    }
     if (screen === "worldCupQual") {
         const nextWC = g.season === 1 ? 1 : (g.season <= 5 ? 5 : Math.ceil((g.season) / 4) * 4 + 1);
         const isWCyear = g.season === 1 || (g.season - 1) % 4 === 0;
