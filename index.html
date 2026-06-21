@@ -931,26 +931,44 @@ const sessionPlayersN = (team, sIdx, youTier, n) => {
     }
     return [...sel, ...pool.slice(0, n - sel.length)];
 };
-const simPresSessions = (usa, intl, strategy, homeSide) => {
+const simPresSessions = (usa, intl, strategy, homeSide, captainCtx) => {
     const hbU = homeSide === "USA" ? 1.0 : 0, hbI = homeSide === "INTL" ? 1.0 : 0;
     const youTeam = usa.some((t) => t.isYou) ? "USA" : intl.some((t) => t.isYou) ? "INTL" : null;
-    let youTier = youTeam ? (youTeam === "USA" ? usa : intl).findIndex((t) => t.isYou) : -1;
+    let baseTier = youTeam ? (youTeam === "USA" ? usa : intl).findIndex((t) => t.isYou) : -1;
+    // captain's base role from form + seniority (lower tier = picked more)
+    const ctx = captainCtx || {};
+    let roleTier = baseTier;
+    if (ctx.verdict === "lead")
+        roleTier = Math.max(0, baseTier - 4);
+    else if (ctx.verdict === "rookie")
+        roleTier = baseTier + 3;
+    // your preference nudges it
     let singlesMod = 0;
     if (youTeam && strategy === "allin") {
-        youTier = 0;
-        singlesMod = -1.5;
+        roleTier = Math.max(0, roleTier - 3);
     }
     if (youTeam && strategy === "fresh") {
-        youTier = 9;
-        singlesMod = 1.5;
+        roleTier = roleTier + 3;
+        singlesMod = 1.2;
     }
+    let youTier = roleTier;
+    let momentum = 0; // updated as sessions go: a poor projected session rotates you out next time
     const fmt = [["THURSDAY FOURSOMES", 5], ["FRIDAY FOUR-BALLS", 5], ["SATURDAY FOURSOMES", 4], ["SATURDAY FOUR-BALLS", 4], ["SUNDAY SINGLES", 12]];
     let usaPts = 0, eurPts = 0;
     const sessions = fmt.map(([label, nMatch], sIdx) => {
         const matches = [];
+        // momentum-adjusted tier for THIS session (a cold streak rotates you out)
+        const effTier = Math.max(0, Math.min(11, youTier + Math.round(momentum)));
         if (sIdx < 4) {
-            const uSel = sessionPlayersN(usa, sIdx, youTeam === "USA" ? youTier : 99, nMatch * 2);
-            const iSel = sessionPlayersN(intl, sIdx, youTeam === "INTL" ? youTier : 99, nMatch * 2);
+            const uSel = sessionPlayersN(usa, sIdx, youTeam === "USA" ? effTier : 99, nMatch * 2);
+            const iSel = sessionPlayersN(intl, sIdx, youTeam === "INTL" ? effTier : 99, nMatch * 2);
+            // project how you'd fare to feed momentum (you're more likely to keep your place playing well)
+            const me = youTeam === "USA" ? usa.find((t) => t.isYou) : youTeam === "INTL" ? intl.find((t) => t.isYou) : null;
+            const youPicked = [...uSel, ...iSel].some((x) => x && x.isYou);
+            if (youPicked && me) {
+                const proj = gauss() + (me.overall - 80) * 0.04;
+                momentum += proj < -0.7 ? 1.5 : proj > 0.7 ? -0.8 : 0;
+            }
             for (let m = 0; m < nMatch; m++) {
                 const a = [uSel[m * 2], uSel[m * 2 + 1]], b = [iSel[m * 2], iSel[m * 2 + 1]];
                 if (!a[0] || !a[1] || !b[0] || !b[1])
@@ -1060,26 +1078,40 @@ const sessionPlayers = (team, sIdx, youTier) => {
     sel = [...sel, ...pool.slice(0, 8 - sel.length)];
     return sel;
 };
-const simRyderSessions = (usa, eur, strategy, homeSide) => {
+const simRyderSessions = (usa, eur, strategy, homeSide, captainCtx) => {
     const hbU = homeSide === "USA" ? 1.0 : 0, hbE = homeSide === "EUR" ? 1.0 : 0;
     const youTeam = usa.some((t) => t.isYou) ? "USA" : eur.some((t) => t.isYou) ? "EUR" : null;
-    let youTier = youTeam ? (youTeam === "USA" ? usa : eur).findIndex((t) => t.isYou) : -1;
+    let baseTier = youTeam ? (youTeam === "USA" ? usa : eur).findIndex((t) => t.isYou) : -1;
+    const ctx = captainCtx || {};
+    let roleTier = baseTier;
+    if (ctx.verdict === "lead")
+        roleTier = Math.max(0, baseTier - 4);
+    else if (ctx.verdict === "rookie")
+        roleTier = baseTier + 3;
     let singlesMod = 0;
     if (youTeam && strategy === "allin") {
-        youTier = 0;
-        singlesMod = -1.5;
+        roleTier = Math.max(0, roleTier - 3);
     }
     if (youTeam && strategy === "fresh") {
-        youTier = 9;
-        singlesMod = 1.5;
+        roleTier = roleTier + 3;
+        singlesMod = 1.2;
     }
+    let youTier = roleTier;
+    let momentum = 0;
     const labels = ["FRIDAY FOURSOMES", "FRIDAY FOUR-BALLS", "SATURDAY FOURSOMES", "SATURDAY FOUR-BALLS", "SUNDAY SINGLES"];
     let usaPts = 0, eurPts = 0;
     const sessions = labels.map((label, sIdx) => {
         const matches = [];
+        const effTier = Math.max(0, Math.min(11, youTier + Math.round(momentum)));
         if (sIdx < 4) {
-            const uSel = sessionPlayers(usa, sIdx, youTeam === "USA" ? youTier : 99);
-            const eSel = sessionPlayers(eur, sIdx, youTeam === "EUR" ? youTier : 99);
+            const uSel = sessionPlayers(usa, sIdx, youTeam === "USA" ? effTier : 99);
+            const eSel = sessionPlayers(eur, sIdx, youTeam === "EUR" ? effTier : 99);
+            const me = youTeam === "USA" ? usa.find((t) => t.isYou) : youTeam === "EUR" ? eur.find((t) => t.isYou) : null;
+            const youPicked = [...uSel, ...eSel].some((x) => x && x.isYou);
+            if (youPicked && me) {
+                const proj = gauss() + (me.overall - 80) * 0.04;
+                momentum += proj < -0.7 ? 1.5 : proj > 0.7 ? -0.8 : 0;
+            }
             for (let m = 0; m < 4; m++) {
                 const a = [uSel[m * 2], uSel[m * 2 + 1]], b = [eSel[m * 2], eSel[m * 2 + 1]];
                 if (!a[0] || !a[1] || !b[0] || !b[1])
@@ -1246,7 +1278,7 @@ const freshStats = () => ({ events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 
     careerMoney: 0, careerWins: 0, careerMajors: 0, careerBirdies: 0, careerEagles: 0, careerAlbatrosses: 0, careerAces: 0,
     fedexTitles: 0, careerTop10s: 0, reachedNo1: false, rc: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, pc: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, ei: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, wc: { apps: 0, titles: 0, bestFinish: null } });
 function GolfCareerSim() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7;
     const [g, setG] = useState(null);
     const [screen, setScreen] = useState("loading");
     const [mode, setMode] = useState("standard");
@@ -2800,8 +2832,17 @@ function GolfCareerSim() {
         }
     };
     const answerCaptain = (strategy) => {
-        const sim = (ryder.kind === "pres" || ryder.kind === "ei") ? simPresSessions(ryder.usa, ryder.eur, strategy, ryder.homeSide) : simRyderSessions(ryder.usa, ryder.eur, strategy, ryder.homeSide);
-        setRyder({ ...ryder, pending: false, strategy, ...sim, revealed: 0 });
+        var _a, _b, _c;
+        // captain context: form (world rank) + seniority (cups played) → verdict
+        const list = Object.keys(g.standings).map((n) => { var _a; return ({ n, pts: ((g.owgrBase || OWGR_SEED)[n] || 0) + (((_a = g.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0) }); }).sort((a, b) => b.pts - a.pts);
+        const myRank = list.findIndex((x) => x.n === g.pro.name) + 1;
+        const caps = (((_a = g.myStats.rc) === null || _a === void 0 ? void 0 : _a.apps) || 0) + (((_b = g.myStats.pc) === null || _b === void 0 ? void 0 : _b.apps) || 0) + (((_c = g.myStats.ei) === null || _c === void 0 ? void 0 : _c.apps) || 0);
+        const inForm = myRank > 0 && myRank <= 15;
+        const senior = caps >= 3;
+        const verdict = (inForm || senior) ? "lead" : (caps === 0 ? "rookie" : "squad");
+        const captainCtx = { verdict, myRank, caps };
+        const sim = (ryder.kind === "pres" || ryder.kind === "ei") ? simPresSessions(ryder.usa, ryder.eur, strategy, ryder.homeSide, captainCtx) : simRyderSessions(ryder.usa, ryder.eur, strategy, ryder.homeSide, captainCtx);
+        setRyder({ ...ryder, pending: false, strategy, captainVerdict: verdict, ...sim, revealed: 0 });
         setScreen("ryder");
     };
     const finishRyder = async () => {
@@ -6026,20 +6067,45 @@ function GolfCareerSim() {
     }
     // ---------- captain's call ----------
     if (screen === "ryderCall" && ryder) {
+        // captain's assessment from form (your world ranking / season pts) + seniority (cups played)
+        const myRank = (() => {
+            const list = Object.keys(g.standings).map((n) => { var _a; return ({ n, pts: ((g.owgrBase || OWGR_SEED)[n] || 0) + (((_a = g.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0) }); }).sort((a, b) => b.pts - a.pts);
+            return list.findIndex((x) => x.n === g.pro.name) + 1;
+        })();
+        const caps = (((_x = g.myStats.rc) === null || _x === void 0 ? void 0 : _x.apps) || 0) + (((_y = g.myStats.pc) === null || _y === void 0 ? void 0 : _y.apps) || 0) + (((_z = g.myStats.ei) === null || _z === void 0 ? void 0 : _z.apps) || 0);
+        const inForm = myRank > 0 && myRank <= 15;
+        const senior = caps >= 3;
+        // captain's leaning: star (plays a lot), rotation (eased in), or balanced
+        const verdict = (inForm || senior) ? "lead" : (caps === 0 ? "rookie" : "squad");
+        const verdictText = verdict === "lead"
+            ? `You're one of my key men${senior ? " — a veteran of this team" : ""}${inForm ? " and in the form of your life" : ""}. I'm leaning on you this week.`
+            : verdict === "rookie"
+                ? "This is your first cup. I'll ease you in — pick my moments to send you out, and you'll be fresh for Sunday singles."
+                : "You're in my plans but I've got a deep team. I'll use you where the pairings fit best.";
         return (React.createElement(Shell, null,
             React.createElement("div", { className: "pt-8 text-center" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 4, color: C.gold } }, "\uD83D\uDCDE INCOMING CALL"),
-                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: C.chalk, lineHeight: 1.1 } }, "THE CAPTAIN IS ON THE PHONE"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk, lineHeight: 1.1 } }, "THE CAPTAIN'S PLAN"),
                 React.createElement("div", { className: "p-4 rounded-xl my-4 text-left", style: { background: C.card, border: `1.5px solid ${C.gold}` } },
                     React.createElement("p", { className: "text-sm mb-2", style: { color: C.chalk } },
                         "\"",
-                        ryder.youPick ? "You didn't qualify on points — but I've watched you all year and I want you in my room. You're my pick." : "Congratulations — you've made the team on merit. Now I need to know how to use you.",
+                        ryder.youPick ? "You didn't qualify on points, but I picked you — I rate you. " : "",
+                        verdictText,
                         "\""),
-                    React.createElement("p", { className: "text-sm", style: { color: C.chalk } }, "\"How much golf do you want this week?\"")),
+                    React.createElement("p", { className: "text-xs mb-1", style: { color: C.muted } },
+                        "Your standing: world #",
+                        myRank || "—",
+                        " \u00B7 ",
+                        caps,
+                        " cup",
+                        caps !== 1 ? "s" : "",
+                        " played"),
+                    React.createElement("p", { className: "text-sm mt-2", style: { color: C.chalk } }, "\"But tell me \u2014 how do you want to be used? I'll take it into account.\"")),
                 React.createElement("div", { className: "grid gap-2" },
-                    React.createElement(Btn, { small: true, onClick: () => answerCaptain("allin") }, "\"PLAY ME IN EVERYTHING\" \u2014 all 5 sessions, but you'll be running on fumes by Sunday"),
-                    React.createElement(Btn, { small: true, kind: "green", onClick: () => answerCaptain("balanced") }, "\"USE ME WHERE YOU NEED ME\" \u2014 captain decides by your ranking"),
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => answerCaptain("fresh") }, "\"EASE ME IN\" \u2014 fewer team sessions, fresh legs for Sunday singles")))));
+                    React.createElement(Btn, { small: true, onClick: () => answerCaptain("allin") }, "\"PLAY ME AS MUCH AS YOU CAN\" \u2014 push for every session (risk: a bad result and I'll rest you)"),
+                    React.createElement(Btn, { small: true, kind: "green", onClick: () => answerCaptain("balanced") }, "\"YOUR CALL, SKIPPER\" \u2014 trust the captain's judgement"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => answerCaptain("fresh") }, "\"SAVE ME FOR SINGLES\" \u2014 fewer sessions, fresh legs for Sunday")),
+                React.createElement("p", { className: "text-[11px] mt-3", style: { color: C.muted } }, "The captain weighs your preference against form and seniority \u2014 and a poor session can see you rotated out of the next one."))));
     }
     // ---------- Ryder Cup ----------
     if (screen === "ryder" && ryder && !ryder.pending) {
@@ -6222,7 +6288,7 @@ function GolfCareerSim() {
                             g.myStats.eagles),
                         React.createElement("span", null,
                             "Earnings: ",
-                            fmtMoney(((_x = g.standings[g.pro.name]) === null || _x === void 0 ? void 0 : _x.money) || 0)),
+                            fmtMoney(((_0 = g.standings[g.pro.name]) === null || _0 === void 0 ? void 0 : _0.money) || 0)),
                         React.createElement("span", null,
                             "Career: ",
                             fmtMoney(g.myStats.careerMoney)))),
@@ -6237,16 +6303,16 @@ function GolfCareerSim() {
                 React.createElement(Btn, { onClick: newSeason },
                     "START SEASON ",
                     g.season + 1,
-                    ((_y = g.pro.age) !== null && _y !== void 0 ? _y : 22) + 1 >= 32 ? ` · AGE ${((_z = g.pro.age) !== null && _z !== void 0 ? _z : 22) + 1}` : ""),
-                ((_0 = g.pro.age) !== null && _0 !== void 0 ? _0 : 22) + 1 >= 32 && React.createElement("p", { className: "text-xs mt-1", style: { color: C.bogey } }, "\u23F3 The body slows past 31 \u2014 distance and recovery fade a touch each year. Skill holds."),
-                ((_1 = g.pro.age) !== null && _1 !== void 0 ? _1 : 22) >= 38 && React.createElement("div", { className: "mt-2" },
+                    ((_1 = g.pro.age) !== null && _1 !== void 0 ? _1 : 22) + 1 >= 32 ? ` · AGE ${((_2 = g.pro.age) !== null && _2 !== void 0 ? _2 : 22) + 1}` : ""),
+                ((_3 = g.pro.age) !== null && _3 !== void 0 ? _3 : 22) + 1 >= 32 && React.createElement("p", { className: "text-xs mt-1", style: { color: C.bogey } }, "\u23F3 The body slows past 31 \u2014 distance and recovery fade a touch each year. Skill holds."),
+                ((_4 = g.pro.age) !== null && _4 !== void 0 ? _4 : 22) >= 38 && React.createElement("div", { className: "mt-2" },
                     React.createElement(Btn, { small: true, kind: "red", onClick: async () => { const st = { ...g, retired: true }; setG(st); await save(st); setScreen("retired"); } }, "\uD83C\uDFC1 RETIRE \u2014 END YOUR CAREER")),
                 React.createElement("button", { onClick: resetAll, className: "w-full text-xs mt-3", style: { color: C.muted } }, "Delete career & start over"))));
     }
     // ---------- retirement & hall of fame ----------
     if (screen === "retired") {
         const m = g.myStats;
-        const hofScore = m.careerWins * 2 + m.careerMajors * 8 + m.fedexTitles * 6 + (m.rc.teamWins + (((_2 = m.pc) === null || _2 === void 0 ? void 0 : _2.teamWins) || 0)) * 2 + Math.floor(m.careerMoney / 2e7);
+        const hofScore = m.careerWins * 2 + m.careerMajors * 8 + m.fedexTitles * 6 + (m.rc.teamWins + (((_5 = m.pc) === null || _5 === void 0 ? void 0 : _5.teamWins) || 0)) * 2 + Math.floor(m.careerMoney / 2e7);
         const hof = hofScore >= 30;
         return (React.createElement(Shell, null,
             React.createElement("div", { className: "pt-8 text-center" },
@@ -6255,7 +6321,7 @@ function GolfCareerSim() {
                     g.pro.name.toUpperCase(),
                     " RETIRES"),
                 React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } },
-                    "Age ", (_3 = g.pro.age) !== null && _3 !== void 0 ? _3 : 22,
+                    "Age ", (_6 = g.pro.age) !== null && _6 !== void 0 ? _6 : 22,
                     " \u00B7 ",
                     g.season,
                     " seasons on tour"),
@@ -6285,7 +6351,7 @@ function GolfCareerSim() {
                             m.rc.teamWins),
                         React.createElement("span", null,
                             "Presidents Cup wins: ",
-                            ((_4 = m.pc) === null || _4 === void 0 ? void 0 : _4.teamWins) || 0)),
+                            ((_7 = m.pc) === null || _7 === void 0 ? void 0 : _7.teamWins) || 0)),
                     React.createElement("p", { className: "text-xs mt-2", style: { color: C.muted } }, hof ? "Your locker goes to St Augustine. They'll talk about your era for decades." :
                         m.careerMajors > 0 ? "A major champion's career — the Hall wanted more, but the trophy doesn't care." :
                             m.careerWins > 0 ? "A winner on the biggest tour in the world. Most never manage one." :
