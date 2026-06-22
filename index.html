@@ -818,27 +818,37 @@ const resolvePuttoff = (a, b) => {
     return { winner: (a.putting || a.overall) >= (b.putting || b.overall) ? a : b, margin: "in a marathon putt-off", decided: "puttoff" };
 };
 // Simulate the whole World Cup: 48 players → 12 groups of 4 → top2 + best 8 thirds = 32 → knockout
-const computeGroupTable = (grp, grpIdx, playerResults) => {
-    // grp: 4 players. playerResults: map "a|b" round-key → { out, mg } for matches already played by the user
+const computeGroupTable = (grp, grpIdx, playerResults, throughRound, preRolled) => {
+    // grp: 4 players. playerResults: map round-key → { out, mg } for user-played matches.
+    // throughRound: only count matches in rounds 0..throughRound (default all). preRolled: fixed AI results (so partial tables are consistent).
+    const maxRound = throughRound == null ? 2 : throughRound;
     const table = grp.map((p) => ({ ...p, gp: 0, gw: 0, gd: 0, gl: 0, gpts: 0, gdiff: 0, h2h: {} }));
     const matches = [];
     const pairs = [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]];
     const rating = (p) => p.overall + gauss() * 1.7;
     pairs.forEach((round, rIdx) => {
-        round.forEach(([i, j]) => {
+        if (rIdx > maxRound)
+            return;
+        round.forEach(([i, j], pairIdx) => {
             if (!grp[i] || !grp[j])
                 return;
             const involvesYou = grp[i].isYou || grp[j].isYou;
             let out, mg;
             const pr = playerResults && playerResults[`${rIdx}`];
+            const rollKey = `${rIdx}-${pairIdx}`;
             if (involvesYou && pr) {
-                // user already played this one — use their real result (pr.out is from side A=grp[i] perspective)
                 out = pr.out;
                 mg = pr.mg;
+            }
+            else if (preRolled && preRolled[rollKey]) {
+                out = preRolled[rollKey].out;
+                mg = preRolled[rollKey].mg;
             }
             else {
                 out = matchOutcome(rating(grp[i]), rating(grp[j]));
                 mg = out === "H" ? 0 : MARGIN_NUM();
+                if (preRolled)
+                    preRolled[rollKey] = { out, mg }; // memoize so later partial calls are consistent
             }
             if (out === "A") {
                 table[i].gw++;
@@ -2980,7 +2990,7 @@ function GolfCareerSim() {
             return { round: rIdx, opp: myGroup[oppPos], oppPos, youAreA: pr[0] === myPos };
         });
         setWorldCup({ qualifiers, groups, myGroupIdx, venue, season: st.season, youIn: true,
-            phase: "groupIntro", fixtures, myResults: {}, groupGameIdx: 0 });
+            phase: "groupIntro", fixtures, myResults: {}, groupGameIdx: 0, groupRolls: groups.map(() => ({})) });
         setWcStage(-1); // -1 = group play phase
         setScreen("worldCup");
     };
@@ -2997,9 +3007,7 @@ function GolfCareerSim() {
     const wcFinishGroupMatch = (am) => {
         const wc = worldCup;
         const fx = wc.fixtures[wc.groupGameIdx];
-        // result from side-A perspective of the GROUP (grp[i] is lower pos). Our fixture knows youAreA.
         const youWon = am.diff > 0, halved = am.diff === 0;
-        // translate to group A/B: in computeGroupTable, A = lower-index player. Determine from oppPos.
         const myPos = wc.groups[wc.myGroupIdx].findIndex((p) => p.isYou);
         const youAreLower = myPos < fx.oppPos;
         let out, mg = halved ? 0 : Math.abs(am.diff);
@@ -3010,18 +3018,27 @@ function GolfCareerSim() {
         else
             out = youAreLower ? "B" : "A";
         const myResults = { ...wc.myResults, [fx.round]: { out, mg } };
+        // show standings AFTER this game (round index just played)
+        setWorldCup({ ...wc, myResults, phase: "groupStandings", standingsThrough: wc.groupGameIdx,
+            lastMatch: { opp: fx.opp.name, youWon, halved, am } });
+        setScreen("worldCup");
+    };
+    // advance from a standings view to the next group game, or finalize into the knockout
+    const wcAdvanceFromStandings = () => {
+        const wc = worldCup;
         const nextIdx = wc.groupGameIdx + 1;
         if (nextIdx < wc.fixtures.length) {
-            setWorldCup({ ...wc, myResults, groupGameIdx: nextIdx, phase: "groupNext", lastMatch: { opp: fx.opp.name, youWon, halved, am } });
+            setWorldCup({ ...wc, groupGameIdx: nextIdx, phase: "groupNext" });
             setScreen("worldCup");
         }
         else {
-            // all 3 group games played → finalize all groups, assemble knockout, run it
-            const groupResults = wc.groups.map((grp, gi) => computeGroupTable(grp, gi, gi === wc.myGroupIdx ? myResults : null));
+            // all 3 group games done → finalize all groups (using fixed rolls), assemble knockout, run it
+            const rolls = wc.groupRolls || wc.groups.map(() => ({}));
+            const groupResults = wc.groups.map((grp, gi) => computeGroupTable(grp, gi, gi === wc.myGroupIdx ? wc.myResults : null, 2, rolls[gi]));
             const { bracket, bestThirds } = assembleKnockout(groupResults);
             const rating = (p) => p.overall + gauss() * 1.7;
             const ko = runKnockout({ bracket, rounds: [], rating });
-            const merged = { ...wc, myResults, groups: groupResults, bestThirds, ...ko, phase: "knockout" };
+            const merged = { ...wc, groups: groupResults, bestThirds, ...ko, phase: "knockout" };
             setWorldCup(merged);
             routeWorldCupKnockout(merged);
         }
@@ -5400,6 +5417,62 @@ function GolfCareerSim() {
             const fx = wc.fixtures[gi];
             const grpLetter = String.fromCharCode(65 + wc.myGroupIdx);
             const grp = wc.groups[wc.myGroupIdx];
+            // ===== STANDINGS REVEAL after a group game =====
+            if (wc.phase === "groupStandings") {
+                const rolls = wc.groupRolls || wc.groups.map(() => ({}));
+                const through = wc.standingsThrough;
+                const isFinal = through >= 2;
+                // my group's table through the games played so far
+                const myTable = computeGroupTable(grp, wc.myGroupIdx, wc.myResults, through, rolls[wc.myGroupIdx]).players;
+                // a glance at the other groups (top 2 each) through the same number of rounds
+                const others = wc.groups.map((og, oi) => oi === wc.myGroupIdx ? null : computeGroupTable(og, oi, null, through, rolls[oi]))
+                    .map((res, oi) => res ? { letter: String.fromCharCode(65 + oi), top: res.players.slice(0, 2) } : null).filter(Boolean);
+                return (React.createElement(Shell, null,
+                    React.createElement("div", { className: "text-center mb-3" },
+                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } },
+                            "\uD83C\uDF0D WORLD CUP \u00B7 GROUP ",
+                            grpLetter),
+                        React.createElement("h2", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk } }, isFinal ? "FINAL GROUP STANDINGS" : `STANDINGS · AFTER GAME ${through + 1}`),
+                        wc.lastMatch && React.createElement("p", { className: "text-xs mt-1", style: { color: wc.lastMatch.youWon ? C.green : wc.lastMatch.halved ? C.muted : C.red } },
+                            "Your match vs ",
+                            wc.lastMatch.opp.split(" ").slice(-1)[0],
+                            ": ",
+                            wc.lastMatch.youWon ? "WON" : wc.lastMatch.halved ? "HALVED" : "LOST")),
+                    React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
+                        React.createElement("div", { className: "text-xs mb-2", style: { color: C.gold, letterSpacing: 1 } },
+                            "GROUP ",
+                            grpLetter,
+                            " ",
+                            isFinal ? "— FINAL" : `(${through + 1} of 3 played)`),
+                        myTable.map((p, idx) => (React.createElement("div", { key: p.name, className: "flex justify-between items-center text-xs mb-1", style: { color: p.isYou ? C.gold : C.chalk } },
+                            React.createElement("span", { className: "truncate pr-1" },
+                                idx + 1,
+                                ". ",
+                                FLAG[p.country] || "🌐",
+                                " ",
+                                p.isYou ? "YOU" : p.name,
+                                " ",
+                                isFinal && idx < 2 ? "✓" : ""),
+                            React.createElement("span", { style: { color: C.muted } },
+                                p.gpts,
+                                "pt \u00B7 ",
+                                p.gw,
+                                "-",
+                                p.gd,
+                                "-",
+                                p.gl,
+                                p.gdiff !== 0 ? ` · ${p.gdiff > 0 ? "+" : ""}${p.gdiff}` : "")))),
+                        isFinal && React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u2713 = advances to the knockout (top 2 + best third-placed)")),
+                    React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(20,61,41,0.4)" } },
+                        React.createElement("div", { className: "text-xs mb-2", style: { color: C.muted, letterSpacing: 1 } }, "AROUND THE OTHER GROUPS"),
+                        React.createElement("div", { className: "grid grid-cols-2 gap-x-3 gap-y-1" }, others.map((o) => (React.createElement("div", { key: o.letter, className: "text-[10px]" },
+                            React.createElement("span", { style: { color: C.gold } },
+                                "Grp ",
+                                o.letter,
+                                ": "),
+                            React.createElement("span", { style: { color: C.chalk } }, o.top.map((p) => `${FLAG[p.country] || ""}${p.name.split(" ").slice(-1)[0]}`).join(", "))))))),
+                    React.createElement(Btn, { onClick: wcAdvanceFromStandings }, isFinal ? "🏆 INTO THE KNOCKOUT ▸" : `NEXT: GROUP GAME ${gi + 2} ▸`)));
+            }
             return (React.createElement(Shell, null,
                 React.createElement("div", { className: "text-center mb-3" },
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } },
