@@ -1379,6 +1379,8 @@ function GolfCareerSim() {
     const [prep, setPrep] = useState(null);
     const [reserveChoice, setReserveChoice] = useState(null);
     const [worldCup, setWorldCup] = useState(null);
+    const [turnoverOpen, setTurnoverOpen] = useState(false);
+    const [hubMenu, setHubMenu] = useState(null);
     const [wcMatch, setWcMatch] = useState(null);
     const [wcPlayoff, setWcPlayoff] = useState(null);
     const [puttoff, setPuttoff] = useState(null);
@@ -2412,6 +2414,17 @@ function GolfCareerSim() {
                 rows: tour.results.finishers.map((r) => ({ name: clean2(r.name), pos: r.pos, total: r.total, cut: r.cut, isYou: r.isYou, rounds: r.rounds })) };
             st.history.push({ event: ev.e, winner: w.name, score: toPar(w.total, tour.course.par, 4), you: youRes });
             st.pastWinners[ev.e] = [...(st.pastWinners[ev.e] || []), { s: g.season, w: w.name, sc: toPar(w.total, tour.course.par, 4), you: youRes, c: tour.course.name }];
+            // weekly round-up → mailbox
+            {
+                const top3 = tour.results.finishers.filter((r) => !r.cut).slice(0, 3).map((r) => `${ordinal(r.pos)} ${clean2(r.name)}`);
+                const youNote = myLine ? `You finished ${youRes}.` : tour.inField ? "You missed the cut." : "You weren't in the field.";
+                const mb = (st.mailbox || []).slice(0, 40);
+                mb.unshift({ id: `wk-${g.season}-${g.evIdx}`, season: g.season, kind: "result",
+                    title: `${ev.e} — ${w.name} wins`,
+                    body: `${w.name} takes the ${ev.e} at ${tour.course.name} (${toPar(w.total, tour.course.par, 4)}). ${top3.length > 1 ? "Leaderboard: " + top3.join(", ") + ". " : ""}${youNote}`,
+                    read: false });
+                st.mailbox = mb;
+            }
             const eh = st.eventHistory[ev.e] || [];
             st.eventHistory[ev.e] = [...eh, { s: g.season, r: youRes }];
             if (tour.inField) {
@@ -3249,6 +3262,17 @@ function GolfCareerSim() {
             pro: { ...g.pro, age: newAge, attrs: newAttrs, overall: calcOverall(newAttrs) }, agedNote: declined,
             standings: Object.fromEntries([...rosterNames.filter((n) => n !== g.pro.name).map((n) => [n, { pts: 0, money: 0 }]), [g.pro.name, { pts: 0, money: 0 }]]),
             retiredNews: evo.news,
+            mailbox: (() => {
+                const mb = (g.mailbox || []).slice(0, 40);
+                if ((evo.news || []).length) {
+                    const gens = evo.news.filter((n) => n.gen).map((n) => n.in);
+                    mb.unshift({ id: `turn-${g.season}`, season: g.season, kind: "turnover",
+                        title: `Season ${g.season} turnover — ${evo.news.length} retire`,
+                        body: `${evo.news.length} player${evo.news.length !== 1 ? "s" : ""} hung up the clubs and rookies earned cards.${gens.length ? ` Watch for generational talent: ${gens.join(", ")}.` : ""}`,
+                        read: false });
+                }
+                return mb;
+            })(),
             myStats: { ...g.myStats, events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 0, bestFinish: null, birdies: 0, eagles: 0, albatrosses: 0, aces: 0 }, caddiePaidSeason: 0,
             history: [], seasonLog: [], lastRyder: null, prevCaddie: g.caddie, caddie: null, caddieOffers: pickCaddieOffers(g.caddie ? g.caddie.name : null), rerollAvailable: g.mode !== "league",
             rcRace: g.season % 2 === 1 ? Object.fromEntries([...rosterNames, g.pro.name].map((n) => { var _a; return [n, ((g.rcRace || {})[n] || 0) + (((_a = g.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0)]; })) : {},
@@ -3266,6 +3290,10 @@ function GolfCareerSim() {
             const willLeave = !delivered && (g.caddie.special ? chem < 3 : chem < 2) && Math.random() < (g.caddie.special ? 0.7 : 0.4);
             if (willLeave) {
                 st.caddieLeftNote = { name: g.caddie.name, special: !!g.caddie.special };
+                st.mailbox = [{ id: `caddie-${g.season}`, season: g.season, kind: "caddie",
+                        title: `${g.caddie.name} has left`,
+                        body: `${g.caddie.name}${g.caddie.special ? ", a legendary looper," : ""} has walked away after a season that didn't deliver. Pick a new caddie in pre-season.`,
+                        read: false }, ...(st.mailbox || [])];
                 st.prevCaddie = null; // they're gone — no "stay" option, lost chemistry
             }
             else {
@@ -4041,8 +4069,15 @@ function GolfCareerSim() {
                     " paid off \u2014 permanent +1 ",
                     PERK_LABEL[g.coachNote.attr]))),
             g.evIdx === 0 && (g.retiredNews || []).length > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(127,183,217,0.07)", border: "1px solid rgba(127,183,217,0.3)" } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.blue }, className: "mb-1" }, "\uD83D\uDD04 TOUR TURNOVER"),
-                g.retiredNews.slice(0, 5).map((n2, i2) => (React.createElement("p", { key: i2, className: "text-xs mb-0.5", style: { color: C.muted } },
+                React.createElement("button", { onClick: () => setTurnoverOpen(!turnoverOpen), className: "w-full flex justify-between items-center mb-1" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.blue } }, "\uD83D\uDD04 TOUR TURNOVER"),
+                    React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
+                        g.retiredNews.length,
+                        " change",
+                        g.retiredNews.length !== 1 ? "s" : "",
+                        " \u00B7 ",
+                        turnoverOpen ? "hide ▴" : "view all ▾")),
+                React.createElement("div", { className: turnoverOpen ? "max-h-72 overflow-auto" : "" }, (turnoverOpen ? g.retiredNews : g.retiredNews.slice(0, 5)).map((n2, i2) => (React.createElement("p", { key: i2, className: "text-xs mb-0.5", style: { color: C.muted } },
                     React.createElement("span", { style: { color: C.chalk } }, n2.out),
                     " retires \u2014 ",
                     n2.gen ? "⭐ GENERATIONAL TALENT" : "rookie",
@@ -4051,11 +4086,11 @@ function GolfCareerSim() {
                     " (",
                     n2.c,
                     ") ",
-                    n2.gen ? "arrives — the next big thing" : "earns a tour card"))),
-                g.retiredNews.length > 5 && React.createElement("p", { className: "text-[10px]", style: { color: C.muted } },
+                    n2.gen ? "arrives — the next big thing" : "earns a tour card")))),
+                !turnoverOpen && g.retiredNews.length > 5 && React.createElement("button", { onClick: () => setTurnoverOpen(true), className: "text-[10px] mt-1", style: { color: C.blue } },
                     "+",
                     g.retiredNews.length - 5,
-                    " more changes"))),
+                    " more \u2014 tap to see all"))),
             ev && (React.createElement("div", { className: "p-4 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: `1.5px solid ${ev.type === "major" ? C.gold : "rgba(244,247,242,0.2)"}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } },
                     "EVENT ",
@@ -4092,23 +4127,34 @@ function GolfCareerSim() {
                 })(),
                 React.createElement("div", { className: "mt-2" },
                     React.createElement(Btn, { onClick: startEvent }, ev.type === "team" ? "FIND A PARTNER" : (ev.type === "major" || ev.type === "signature") && !qualifiedCheck(ev)(g.pro.name) ? "PLAY THE OPPOSITE EVENT" : "HIT THE RANGE")))),
-            React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3" },
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setRecTab("wins"); setScreen("records"); } }, "\uD83D\uDCCA RECORDS"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("mystats") }, "\u26F3 NUMBERS"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("ryderHQ") }, "\uD83C\uDF0D CUPS HQ"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("cabinet") }, "\uD83C\uDFC6 CABINET"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setSelSched(null); setScreen("schedule"); } }, "\uD83D\uDCC5 SCHEDULE"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("world") }, "\uD83C\uDF10 WORLD RANKINGS"),
-                g.mode === "team" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("team") }, "\uD83E\uDD1D MY TEAM"),
-                g.mode === "league" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("league") }, "\uD83C\uDFDF\uFE0F MY LEAGUE"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("coaches") }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHES"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("equipment") }, "\uD83C\uDFCC\uFE0F EQUIPMENT"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("achievements") }, "\uD83C\uDF96\uFE0F ACHIEVEMENTS"),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("develop") },
+            React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2" },
+                React.createElement(Btn, { small: true, onClick: () => setScreen("develop") },
                     "\uD83D\uDCAA DEVELOP",
                     (g.xp || 0) > 0 ? ` · ${g.xp} XP` : ""),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("worldCupQual") }, "\uD83C\uDF0D WORLD CUP"),
-                g.mode === "league" && !g.isFreeAgent && myLeagueTeam() && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("transferMarket") }, "\uD83D\uDCB0 TRANSFERS")),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("mailbox") },
+                    "\uD83D\uDCEC MAILBOX",
+                    (() => { const u = (g.mailbox || []).filter((m) => !m.read).length; return u ? ` · ${u}` : ""; })())),
+            React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2" }, [["career", "👤 MY CAREER"], ["club", "🏟️ MY CLUB"], ["tour", "🌐 THE TOUR"], ["setup", "🛠️ SETUP"]].map(([k, label]) => (React.createElement(Btn, { key: k, small: true, kind: hubMenu === k ? "gold" : "panel", onClick: () => setHubMenu(hubMenu === k ? null : k) },
+                label,
+                hubMenu === k ? " ▴" : " ▾")))),
+            hubMenu && (React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3 p-2 rounded-xl", style: { background: "rgba(20,61,41,0.4)" } },
+                hubMenu === "career" && React.createElement(React.Fragment, null,
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setRecTab("wins"); setScreen("records"); } }, "\uD83D\uDCCA RECORDS"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("mystats") }, "\u26F3 NUMBERS"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("cabinet") }, "\uD83C\uDFC6 CABINET"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("achievements") }, "\uD83C\uDF96\uFE0F ACHIEVEMENTS")),
+                hubMenu === "club" && React.createElement(React.Fragment, null,
+                    g.mode === "team" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("team") }, "\uD83E\uDD1D MY TEAM"),
+                    g.mode === "league" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("league") }, "\uD83C\uDFDF\uFE0F MY LEAGUE"),
+                    g.mode === "league" && !g.isFreeAgent && myLeagueTeam() && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("transferMarket") }, "\uD83D\uDCB0 TRANSFERS"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("ryderHQ") }, "\uD83C\uDF0D CUPS HQ")),
+                hubMenu === "tour" && React.createElement(React.Fragment, null,
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setSelSched(null); setScreen("schedule"); } }, "\uD83D\uDCC5 SCHEDULE"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("world") }, "\uD83C\uDF10 WORLD RANKINGS"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("worldCupQual") }, "\uD83C\uDF0D WORLD CUP")),
+                hubMenu === "setup" && React.createElement(React.Fragment, null,
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("coaches") }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHES"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("equipment") }, "\uD83C\uDFCC\uFE0F EQUIPMENT")))),
             (() => {
                 const m = g.myStats;
                 const wIdx = owgrList().findIndex((x) => x.name === g.pro.name) + 1;
@@ -4588,6 +4634,28 @@ function GolfCareerSim() {
                         bid.fee,
                         "m"),
                     React.createElement("button", { onClick: () => rejectBid(i), className: "py-2 rounded-md active:scale-95", style: { background: C.panel, color: C.chalk, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, "REJECT \u2014 NOT FOR SALE")))))));
+    }
+    if (screen === "mailbox") {
+        const mail = g.mailbox || [];
+        const markAllRead = async () => { const st = { ...g, mailbox: mail.map((m) => ({ ...m, read: true })) }; setG(st); await save(st); };
+        const iconFor = (k) => k === "result" ? "🏆" : k === "turnover" ? "🔄" : k === "transfer" ? "💰" : k === "caddie" ? "🎒" : "📩";
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: async () => { await markAllRead(); setScreen("hub"); } }),
+            React.createElement("div", { className: "flex justify-between items-baseline mb-2" },
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 26, color: C.chalk } }, "\uD83D\uDCEC MAILBOX"),
+                mail.some((m) => !m.read) && React.createElement("button", { onClick: markAllRead, className: "text-xs", style: { color: C.blue } }, "mark all read")),
+            mail.length === 0 && React.createElement("p", { className: "text-sm text-center mt-6", style: { color: C.muted } }, "No news yet. Play a tournament and the week's round-up will land here."),
+            React.createElement("div", { className: "grid gap-2" }, mail.map((m, i) => (React.createElement("div", { key: m.id || i, className: "p-3 rounded-xl", style: { background: m.read ? C.panel : C.card, border: `1px solid ${m.read ? "rgba(244,247,242,0.08)" : "rgba(232,195,90,0.4)"}` } },
+                React.createElement("div", { className: "flex justify-between items-baseline mb-0.5" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 14, color: m.read ? C.muted : C.gold } },
+                        iconFor(m.kind),
+                        " ",
+                        m.title),
+                    !m.read && React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded", style: { background: C.gold, color: C.bg } }, "NEW")),
+                React.createElement("p", { className: "text-xs", style: { color: C.chalk } }, m.body),
+                m.season != null && React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } },
+                    "Season ",
+                    m.season)))))));
     }
     if (screen === "transferMarket") {
         const mt = myLeagueTeam();
@@ -6554,7 +6622,7 @@ function GolfCareerSim() {
                 React.createElement(Btn, { small: true, kind: "panel", onClick: () => playHoles(true) }, "\u23E9 AUTO TO END"))) : (React.createElement(Btn, { onClick: () => { if (wm.context === "wcGroup")
                     wcFinishGroupMatch(wm);
                 else
-                    wcFinishKnockoutMatch(wm); } }, wm.diff === 0 ? "TO THE PLAYOFF ▸" : "CONTINUE ▸"))));
+                    wcFinishKnockoutMatch(wm); } }, wm.diff === 0 ? (wm.context === "wcGroup" ? "MATCH HALVED — CONTINUE ▸" : "TO THE PLAYOFF ▸") : "CONTINUE ▸"))));
     }
     // ---------- World Cup knockout playoff (3-hole stroke, side by side) ----------
     if (screen === "wcPlayoff" && wcPlayoff) {
