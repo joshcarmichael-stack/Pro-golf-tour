@@ -956,6 +956,8 @@ const runKnockout = (state) => {
 const sessionPlayersN = (team, sIdx, youTier, n) => {
     const you = team.find((t) => t.isYou);
     let pool = team.filter((t) => !t.isYou);
+    // shuffle the pool per session (seeded by session index) so partnerships rotate between sessions
+    pool = pool.map((p, i) => ({ p, r: Math.sin((i + 1) * (sIdx + 2) * 12.9898) * 43758.5453 % 1 })).sort((a, b) => Math.abs(a.r) - Math.abs(b.r)).map((x) => x.p);
     let sel = [];
     if (you) {
         const plays = youTier <= 3 ? true : youTier <= 7 ? sIdx <= 2 : (sIdx === 1 || sIdx === 3);
@@ -1102,6 +1104,7 @@ const MARGINS = ["1 up", "2&1", "2 up", "3&2", "2&1", "4&3", "3&1", "1 up", "5&4
 const sessionPlayers = (team, sIdx, youTier) => {
     const you = team.find((t) => t.isYou);
     let pool = team.filter((t) => !t.isYou);
+    pool = pool.map((p, i) => ({ p, r: Math.sin((i + 1) * (sIdx + 2) * 12.9898) * 43758.5453 % 1 })).sort((a, b) => Math.abs(a.r) - Math.abs(b.r)).map((x) => x.p);
     let sel = [];
     if (you) {
         const plays = youTier <= 3 ? true : youTier <= 7 ? sIdx <= 2 : (sIdx === 1 || sIdx === 3);
@@ -1311,7 +1314,7 @@ const freshStats = () => ({ events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 
     careerMoney: 0, careerWins: 0, careerMajors: 0, careerBirdies: 0, careerEagles: 0, careerAlbatrosses: 0, careerAces: 0,
     fedexTitles: 0, careerTop10s: 0, reachedNo1: false, rc: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, pc: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, ei: { apps: 0, w: 0, l: 0, h: 0, teamWins: 0, winSeasons: [] }, wc: { apps: 0, titles: 0, bestFinish: null } });
 function GolfCareerSim() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10;
     const [g, setG] = useState(null);
     const [screen, setScreen] = useState("loading");
     const [mode, setMode] = useState("standard");
@@ -1592,7 +1595,7 @@ function GolfCareerSim() {
             }
         };
         fillHole(seller, 0);
-        const st = { ...g, leagues, freeAgentPool: faPool,
+        const st = { ...g, leagues, freeAgentPool: faPool, mustReplace: false,
             signingNews: { signed: target.name, dropped: dropName, fee: target.fee, club: mt.name } };
         setG(st);
         await save(st);
@@ -3303,6 +3306,7 @@ function GolfCareerSim() {
             });
             // AI transfer pass: each higher-div team may buy the best affordable player from a lower-div team
             const transfers = [];
+            const incomingBids = []; // bids for YOUR players that you can accept/reject
             const movedThisWindow = new Set(); // a player can only move ONCE per window
             const teamActed = new Set(); // a team trades at most once per window
             leagues.filter((t) => !t.members.some((m) => m.includes("(YOU)"))).forEach((buyer) => {
@@ -3339,20 +3343,31 @@ function GolfCareerSim() {
                     });
                 });
                 if (best && bestGain >= 2) {
-                    const out = buyer.members[wIdx];
-                    buyer.members[wIdx] = best.name;
-                    best.seller.members[best.si] = out; // swap the displaced player down
-                    buyer.budget = Math.round((buyer.budget - best.cost) * 10) / 10;
-                    best.seller.budget = Math.round((best.seller.budget + best.cost) * 10) / 10;
-                    movedThisWindow.add(best.name); // lock the bought player
-                    movedThisWindow.add(out); // and the displaced player — neither moves again
-                    teamActed.add(buyer.id);
-                    teamActed.add(best.seller.id); // both clubs done for the window
-                    transfers.push({ to: buyer.name, player: best.name.replace(" (YOU)", ""), from: best.seller.name, fee: best.cost });
+                    const myTeam = leagues.find((t) => t.members.some((m) => m.includes("(YOU)")));
+                    const sellerIsYou = myTeam && best.seller.id === myTeam.id;
+                    if (sellerIsYou) {
+                        // a club wants one of YOUR players — queue it as a bid you can accept or reject (don't auto-sell)
+                        incomingBids.push({ buyerId: buyer.id, buyerName: buyer.name, buyerDiv: buyer.division,
+                            player: best.name.replace(" (YOU)", ""), fee: best.cost, playerOvr: ovrA(best.name) });
+                        teamActed.add(buyer.id); // this buyer's move is pending your decision
+                    }
+                    else {
+                        const out = buyer.members[wIdx];
+                        buyer.members[wIdx] = best.name;
+                        best.seller.members[best.si] = out; // swap the displaced player down
+                        buyer.budget = Math.round((buyer.budget - best.cost) * 10) / 10;
+                        best.seller.budget = Math.round((best.seller.budget + best.cost) * 10) / 10;
+                        movedThisWindow.add(best.name);
+                        movedThisWindow.add(out);
+                        teamActed.add(buyer.id);
+                        teamActed.add(best.seller.id);
+                        transfers.push({ to: buyer.name, player: best.name.replace(" (YOU)", ""), from: best.seller.name, fee: best.cost });
+                    }
                 }
             });
             st.leagues = leagues;
             st.leagueTransfers = transfers.slice(0, 8);
+            st.incomingBids = incomingBids.length ? incomingBids : null;
             const mt = leagues.find((t) => t.members.some((m) => m.includes("(YOU)")));
             const newDiv = mt ? mt.division : 3;
             // achievement tracking: promotion, best division reached, division title
@@ -3535,6 +3550,8 @@ function GolfCareerSim() {
             nextScreen = "transferWindow";
         if (g.mode === "league" && st.playerOffers && st.playerOffers.length)
             nextScreen = "playerOffers";
+        if (g.mode === "league" && st.incomingBids && st.incomingBids.length)
+            nextScreen = "incomingBids";
         st.awardsThenScreen = nextScreen;
         setG(st);
         await save(st);
@@ -4446,6 +4463,77 @@ function GolfCareerSim() {
             }),
             React.createElement(Btn, { kind: "panel", onClick: decline }, "DECLINE ALL \u00B7 STAY PUT")));
     }
+    if (screen === "incomingBids" && g.incomingBids && g.incomingBids.length) {
+        const mt = myLeagueTeam();
+        const rejectBid = async (idx) => {
+            const bids = g.incomingBids.filter((_, i) => i !== idx);
+            const st = { ...g, incomingBids: bids.length ? bids : null };
+            setG(st);
+            await save(st);
+            if (!bids.length)
+                setScreen(g.awardsThenScreen === "incomingBids" ? "hub" : (g.leagueTransfers ? "transferWindow" : "hub"));
+        };
+        const acceptBid = async (idx) => {
+            const bid = g.incomingBids[idx];
+            const leagues = g.leagues.map((t) => ({ ...t, members: t.members.slice() }));
+            const mine = leagues.find((t) => t.members.some((m) => m.includes("(YOU)")));
+            const buyer = leagues.find((t) => t.id === bid.buyerId);
+            if (mine && buyer) {
+                // remove the sold player from your squad, add their fee to your pot
+                const pi = mine.members.findIndex((m) => m.replace(" (YOU)", "") === bid.player);
+                if (pi >= 0)
+                    mine.members.splice(pi, 1);
+                mine.teamPot = Math.round(((mine.teamPot || mine.budget || 0) + bid.fee) * 10) / 10;
+                mine.budget = Math.round(((mine.budget || 0) + bid.fee) * 10) / 10;
+                // buyer slots them in (drop buyer's weakest to free agents)
+                let wIdx = 0, wOvr = 999;
+                buyer.members.forEach((m, i) => { if (m.includes("(YOU)"))
+                    return; const o = ovrOf(m); if (o < wOvr) {
+                    wOvr = o;
+                    wIdx = i;
+                } });
+                const faPool = [...(g.freeAgentPool || [])];
+                if (buyer.members[wIdx] != null)
+                    faPool.push(buyer.members[wIdx].replace(" (YOU)", ""));
+                buyer.members[wIdx] = bid.player;
+                const bids = g.incomingBids.filter((_, i) => i !== idx);
+                const st = { ...g, leagues, freeAgentPool: faPool, incomingBids: bids.length ? bids : null,
+                    mustReplace: true, signingNews: { sold: bid.player, fee: bid.fee, to: bid.buyerName } };
+                setG(st);
+                await save(st);
+                // accepting forces you to sign a replacement — straight to the transfer market
+                setScreen("transferMarket");
+            }
+        };
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } }, "\uD83D\uDCE8 INCOMING BIDS"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 26, color: C.chalk } }, "CLUBS WANT YOUR PLAYERS"),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } },
+                    mt ? mt.name : "Your club",
+                    " has received bids. Reject to keep your squad intact, or accept the fee \u2014 but you'll have to sign a replacement.")),
+            g.incomingBids.map((bid, i) => (React.createElement("div", { key: i, className: "p-3 rounded-xl mb-2", style: { background: C.card, border: `1px solid ${C.gold}` } },
+                React.createElement("div", { className: "flex justify-between items-baseline" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 18, color: C.chalk } }, bid.player),
+                    React.createElement("span", { style: { color: tint(bid.playerOvr) } },
+                        bid.playerOvr,
+                        " ovr")),
+                React.createElement("p", { className: "text-xs mb-2", style: { color: C.muted } },
+                    bid.buyerName,
+                    " (",
+                    divName(bid.buyerDiv),
+                    ") bid ",
+                    React.createElement("b", { style: { color: C.gold } },
+                        "$",
+                        bid.fee,
+                        "m")),
+                React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                    React.createElement("button", { onClick: () => acceptBid(i), className: "py-2 rounded-md active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } },
+                        "ACCEPT $",
+                        bid.fee,
+                        "m"),
+                    React.createElement("button", { onClick: () => rejectBid(i), className: "py-2 rounded-md active:scale-95", style: { background: C.panel, color: C.chalk, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, "REJECT \u2014 NOT FOR SALE")))))));
+    }
     if (screen === "transferMarket") {
         const mt = myLeagueTeam();
         if (!mt) {
@@ -4479,7 +4567,7 @@ function GolfCareerSim() {
                 }))));
         }
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            !g.mustReplace && React.createElement(BackTop, { onClick: () => setScreen("hub") }),
             React.createElement("div", { className: "mb-2" },
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 26, color: C.chalk } }, "\uD83D\uDCB0 TRANSFER MARKET"),
                 React.createElement("div", { className: "flex justify-between items-baseline" },
@@ -4494,6 +4582,15 @@ function GolfCareerSim() {
                         "$",
                         budget,
                         "m"))),
+            g.mustReplace && (React.createElement("div", { className: "p-2 rounded-lg mb-3", style: { background: "rgba(232,195,90,0.12)", border: `1px solid ${C.gold}` } },
+                React.createElement("p", { className: "text-xs", style: { color: C.gold } },
+                    "\u26A0\uFE0F You sold ", (_f = g.signingNews) === null || _f === void 0 ? void 0 :
+                    _f.sold,
+                    " to ", (_g = g.signingNews) === null || _g === void 0 ? void 0 :
+                    _g.to,
+                    " for $", (_h = g.signingNews) === null || _h === void 0 ? void 0 :
+                    _h.fee,
+                    "m. You're down a player \u2014 sign a replacement to complete the window."))),
             g.signingNews && g.signingNews.signed && (React.createElement("div", { className: "p-2 rounded-lg mb-3", style: { background: "rgba(159,217,139,0.1)", border: `1px solid ${C.green}` } },
                 React.createElement("p", { className: "text-xs", style: { color: C.green } },
                     "\u2713 Signed ",
@@ -4822,8 +4919,8 @@ function GolfCareerSim() {
         return (React.createElement(Shell, null,
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83D\uDCDE TRANSFER WINDOW"),
             React.createElement("p", { className: "text-sm mb-3", style: { color: C.muted } },
-                "Your form has turned heads. Stronger teams want your signature for next season \u2014 or stay loyal to ", (_f = myTeam()) === null || _f === void 0 ? void 0 :
-                _f.name,
+                "Your form has turned heads. Stronger teams want your signature for next season \u2014 or stay loyal to ", (_j = myTeam()) === null || _j === void 0 ? void 0 :
+                _j.name,
                 "."),
             g.teamOffers.map((tid) => {
                 const t = g.teams.find((x) => x.id === tid);
@@ -4850,14 +4947,14 @@ function GolfCareerSim() {
             }),
             React.createElement(Btn, { kind: "panel", onClick: decline },
                 "STAY WITH ",
-                (((_g = myTeam()) === null || _g === void 0 ? void 0 : _g.name) || "MY TEAM").toUpperCase())));
+                (((_k = myTeam()) === null || _k === void 0 ? void 0 : _k.name) || "MY TEAM").toUpperCase())));
     }
     // ---------- world ranking ----------
     if (screen === "world") {
         const list = owgrList();
         const myIdx = list.findIndex((x) => x.name === g.pro.name);
         const ovrList = [...ROSTER().map((p) => { var _a; return ({ name: p.name, ovr: p.overall, age: (_a = p.age) !== null && _a !== void 0 ? _a : aiAgeOf(p.name), country: p.country, rookie: p.rookie }); }),
-            { name: g.pro.name, ovr: calcOverall(effAttrs(g)), age: (_h = g.pro.age) !== null && _h !== void 0 ? _h : 22, country: NATION_CODE[g.pro.nation] || "INT", isYou: true }]
+            { name: g.pro.name, ovr: calcOverall(effAttrs(g)), age: (_l = g.pro.age) !== null && _l !== void 0 ? _l : 22, country: NATION_CODE[g.pro.nation] || "INT", isYou: true }]
             .sort((a, b) => b.ovr - a.ovr);
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
@@ -4999,7 +5096,7 @@ function GolfCareerSim() {
     }
     // ---------- coaching staff ----------
     if (screen === "coaches") {
-        const bank = (_j = g.bank) !== null && _j !== void 0 ? _j : g.myStats.careerMoney;
+        const bank = (_m = g.bank) !== null && _m !== void 0 ? _m : g.myStats.careerMoney;
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHING STAFF"),
@@ -5033,7 +5130,7 @@ function GolfCareerSim() {
     if (screen === "equipment") {
         const equip = g.equip || {};
         const owned = g.ownedGear || ["ball_std", "drv_std", "irn_std", "wdg_std", "put_std"];
-        const bank = (_k = g.bank) !== null && _k !== void 0 ? _k : g.myStats.careerMoney;
+        const bank = (_o = g.bank) !== null && _o !== void 0 ? _o : g.myStats.careerMoney;
         const buyGear = async (item) => {
             if ((g.ownedGear || []).includes(item.id))
                 return;
@@ -5363,7 +5460,7 @@ function GolfCareerSim() {
         const myCode = NATION_CODE[g.pro.nation];
         // my nation's full race (all my countrymen ranked, to show if I'm in the top 2)
         const myNationPlayers = [...ROSTER().filter((p) => p.country === myCode).map((p) => { var _a; return ({ name: p.name, pts: ((_a = rcCombined(g)[p.name]) === null || _a === void 0 ? void 0 : _a.pts) || 0, isYou: false }); }),
-            { name: g.pro.name, pts: ((_l = rcCombined(g)[g.pro.name]) === null || _l === void 0 ? void 0 : _l.pts) || 0, isYou: true }].sort((a, b) => b.pts - a.pts);
+            { name: g.pro.name, pts: ((_p = rcCombined(g)[g.pro.name]) === null || _p === void 0 ? void 0 : _p.pts) || 0, isYou: true }].sort((a, b) => b.pts - a.pts);
         const myRank = myNationPlayers.findIndex((p) => p.isYou) + 1;
         const myNationInField = table.some((n) => n.code === myCode);
         return (React.createElement(Shell, null,
@@ -5495,7 +5592,7 @@ function GolfCareerSim() {
             React.createElement("div", { className: "text-xs", style: { color: C.muted } },
                 "Won: ",
                 w.seasons.map((s) => `Season ${s}`).join(" · "))));
-        const empty = wins.length === 0 && g.myStats.fedexTitles === 0 && g.myStats.rc.teamWins === 0 && (((_m = g.myStats.pc) === null || _m === void 0 ? void 0 : _m.teamWins) || 0) === 0;
+        const empty = wins.length === 0 && g.myStats.fedexTitles === 0 && g.myStats.rc.teamWins === 0 && (((_q = g.myStats.pc) === null || _q === void 0 ? void 0 : _q.teamWins) || 0) === 0;
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk } }, "\uD83C\uDFC6 TROPHY CABINET"),
@@ -5519,7 +5616,7 @@ function GolfCareerSim() {
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold }, className: "float-right" },
                         "\u00D7",
                         g.myStats.fedexTitles))),
-                (((_o = g.myStats.pc) === null || _o === void 0 ? void 0 : _o.teamWins) || 0) > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: "1.5px solid rgba(159,217,139,0.6)" } },
+                (((_r = g.myStats.pc) === null || _r === void 0 ? void 0 : _r.teamWins) || 0) > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: "1.5px solid rgba(159,217,139,0.6)" } },
                     React.createElement("div", { className: "flex justify-between items-baseline" },
                         React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: C.green } }, "\uD83C\uDF0F PRESIDENTS CUP (team)"),
                         React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } },
@@ -5662,8 +5759,8 @@ function GolfCareerSim() {
         if (sideR)
             rows.push(["Ryder Cups played", m.rc.apps], ["Ryder Cup record", `${m.rc.w}-${m.rc.l}-${m.rc.h}`], ["Ryder Cup team wins", m.rc.teamWins]);
         if (sideP)
-            rows.push(["Presidents Cups played", ((_p = m.pc) === null || _p === void 0 ? void 0 : _p.apps) || 0], ["Presidents Cup record", `${((_q = m.pc) === null || _q === void 0 ? void 0 : _q.w) || 0}-${((_r = m.pc) === null || _r === void 0 ? void 0 : _r.l) || 0}-${((_s = m.pc) === null || _s === void 0 ? void 0 : _s.h) || 0}`], ["Presidents Cup team wins", ((_t = m.pc) === null || _t === void 0 ? void 0 : _t.teamWins) || 0]);
-        rows.push(["Bank (spendable)", fmtMoney((_u = g.bank) !== null && _u !== void 0 ? _u : m.careerMoney)]);
+            rows.push(["Presidents Cups played", ((_s = m.pc) === null || _s === void 0 ? void 0 : _s.apps) || 0], ["Presidents Cup record", `${((_t = m.pc) === null || _t === void 0 ? void 0 : _t.w) || 0}-${((_u = m.pc) === null || _u === void 0 ? void 0 : _u.l) || 0}-${((_v = m.pc) === null || _v === void 0 ? void 0 : _v.h) || 0}`], ["Presidents Cup team wins", ((_w = m.pc) === null || _w === void 0 ? void 0 : _w.teamWins) || 0]);
+        rows.push(["Bank (spendable)", fmtMoney((_x = g.bank) !== null && _x !== void 0 ? _x : m.careerMoney)]);
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, g.pro.name.toUpperCase()),
@@ -5680,7 +5777,7 @@ function GolfCareerSim() {
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 20, color: tint(calcOverall(effAttrs(g))) } },
                         calcOverall(effAttrs(g)),
                         " OVR",
-                        ((_v = g.caddie) === null || _v === void 0 ? void 0 : _v.perks) ? " (w/ caddie)" : "")),
+                        ((_y = g.caddie) === null || _y === void 0 ? void 0 : _y.perks) ? " (w/ caddie)" : "")),
                 SLOTS.map((s) => {
                     var _a, _b;
                     const base = g.pro.attrs[s.key];
@@ -5799,7 +5896,7 @@ function GolfCareerSim() {
                             React.createElement(Btn, { onClick: closeEvent }, "CONTINUE")))));
         }
         if (round === 0 && !live) {
-            const myRecord = ((_w = g.eventHistory) === null || _w === void 0 ? void 0 : _w[ev.e]) || [];
+            const myRecord = ((_z = g.eventHistory) === null || _z === void 0 ? void 0 : _z[ev.e]) || [];
             return (React.createElement(Shell, null,
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, ev.type === "major" ? "★ MAJOR CHAMPIONSHIP ★" : ev.e.toUpperCase()),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1 } }, course.name),
@@ -6577,7 +6674,7 @@ function GolfCareerSim() {
             const list = Object.keys(g.standings).map((n) => { var _a; return ({ n, pts: ((g.owgrBase || OWGR_SEED)[n] || 0) + (((_a = g.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0) }); }).sort((a, b) => b.pts - a.pts);
             return list.findIndex((x) => x.n === g.pro.name) + 1;
         })();
-        const caps = (((_x = g.myStats.rc) === null || _x === void 0 ? void 0 : _x.apps) || 0) + (((_y = g.myStats.pc) === null || _y === void 0 ? void 0 : _y.apps) || 0) + (((_z = g.myStats.ei) === null || _z === void 0 ? void 0 : _z.apps) || 0);
+        const caps = (((_0 = g.myStats.rc) === null || _0 === void 0 ? void 0 : _0.apps) || 0) + (((_1 = g.myStats.pc) === null || _1 === void 0 ? void 0 : _1.apps) || 0) + (((_2 = g.myStats.ei) === null || _2 === void 0 ? void 0 : _2.apps) || 0);
         const inForm = myRank > 0 && myRank <= 15;
         const senior = caps >= 3;
         // captain's leaning: star (plays a lot), rotation (eased in), or balanced
@@ -6795,7 +6892,7 @@ function GolfCareerSim() {
                             g.myStats.eagles),
                         React.createElement("span", null,
                             "Earnings: ",
-                            fmtMoney(((_0 = g.standings[g.pro.name]) === null || _0 === void 0 ? void 0 : _0.money) || 0)),
+                            fmtMoney(((_3 = g.standings[g.pro.name]) === null || _3 === void 0 ? void 0 : _3.money) || 0)),
                         React.createElement("span", null,
                             "Career: ",
                             fmtMoney(g.myStats.careerMoney)))),
@@ -6810,16 +6907,16 @@ function GolfCareerSim() {
                 React.createElement(Btn, { onClick: newSeason },
                     "START SEASON ",
                     g.season + 1,
-                    ((_1 = g.pro.age) !== null && _1 !== void 0 ? _1 : 22) + 1 >= 32 ? ` · AGE ${((_2 = g.pro.age) !== null && _2 !== void 0 ? _2 : 22) + 1}` : ""),
-                ((_3 = g.pro.age) !== null && _3 !== void 0 ? _3 : 22) + 1 >= 32 && React.createElement("p", { className: "text-xs mt-1", style: { color: C.bogey } }, "\u23F3 The body slows past 31 \u2014 distance and recovery fade a touch each year. Skill holds."),
-                ((_4 = g.pro.age) !== null && _4 !== void 0 ? _4 : 22) >= 38 && React.createElement("div", { className: "mt-2" },
+                    ((_4 = g.pro.age) !== null && _4 !== void 0 ? _4 : 22) + 1 >= 32 ? ` · AGE ${((_5 = g.pro.age) !== null && _5 !== void 0 ? _5 : 22) + 1}` : ""),
+                ((_6 = g.pro.age) !== null && _6 !== void 0 ? _6 : 22) + 1 >= 32 && React.createElement("p", { className: "text-xs mt-1", style: { color: C.bogey } }, "\u23F3 The body slows past 31 \u2014 distance and recovery fade a touch each year. Skill holds."),
+                ((_7 = g.pro.age) !== null && _7 !== void 0 ? _7 : 22) >= 38 && React.createElement("div", { className: "mt-2" },
                     React.createElement(Btn, { small: true, kind: "red", onClick: async () => { const st = { ...g, retired: true }; setG(st); await save(st); setScreen("retired"); } }, "\uD83C\uDFC1 RETIRE \u2014 END YOUR CAREER")),
                 React.createElement("button", { onClick: resetAll, className: "w-full text-xs mt-3", style: { color: C.muted } }, "Delete career & start over"))));
     }
     // ---------- retirement & hall of fame ----------
     if (screen === "retired") {
         const m = g.myStats;
-        const hofScore = m.careerWins * 2 + m.careerMajors * 8 + m.fedexTitles * 6 + (m.rc.teamWins + (((_5 = m.pc) === null || _5 === void 0 ? void 0 : _5.teamWins) || 0)) * 2 + Math.floor(m.careerMoney / 2e7);
+        const hofScore = m.careerWins * 2 + m.careerMajors * 8 + m.fedexTitles * 6 + (m.rc.teamWins + (((_8 = m.pc) === null || _8 === void 0 ? void 0 : _8.teamWins) || 0)) * 2 + Math.floor(m.careerMoney / 2e7);
         const hof = hofScore >= 30;
         return (React.createElement(Shell, null,
             React.createElement("div", { className: "pt-8 text-center" },
@@ -6828,7 +6925,7 @@ function GolfCareerSim() {
                     g.pro.name.toUpperCase(),
                     " RETIRES"),
                 React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } },
-                    "Age ", (_6 = g.pro.age) !== null && _6 !== void 0 ? _6 : 22,
+                    "Age ", (_9 = g.pro.age) !== null && _9 !== void 0 ? _9 : 22,
                     " \u00B7 ",
                     g.season,
                     " seasons on tour"),
@@ -6858,7 +6955,7 @@ function GolfCareerSim() {
                             m.rc.teamWins),
                         React.createElement("span", null,
                             "Presidents Cup wins: ",
-                            ((_7 = m.pc) === null || _7 === void 0 ? void 0 : _7.teamWins) || 0)),
+                            ((_10 = m.pc) === null || _10 === void 0 ? void 0 : _10.teamWins) || 0)),
                     React.createElement("p", { className: "text-xs mt-2", style: { color: C.muted } }, hof ? "Your locker goes to St Augustine. They'll talk about your era for decades." :
                         m.careerMajors > 0 ? "A major champion's career — the Hall wanted more, but the trophy doesn't care." :
                             m.careerWins > 0 ? "A winner on the biggest tour in the world. Most never manage one." :
