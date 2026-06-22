@@ -2480,6 +2480,14 @@ function GolfCareerSim() {
                 const clean = (nm) => nm.replace(" (YOU)", "");
                 const myTeamObj = st.leagues.find((t) => t.members.some((mn) => mn.includes("(YOU)")));
                 const myTeamId = myTeamObj ? myTeamObj.id : null;
+                // each team plays its best 4 of 5 — the weakest by overall is the RESERVE and doesn't feature
+                const reserveOf = {};
+                st.leagues.forEach((t) => {
+                    if (t.members.length < 5)
+                        return;
+                    const ranked = t.members.map((mn) => ({ key: clean(mn), ovr: mn.includes("(YOU)") ? calcOverall(g.pro.attrs) : ovrOf(mn, st) })).sort((a, b) => b.ovr - a.ovr);
+                    reserveOf[t.id] = ranked[ranked.length - 1].key; // weakest = reserve
+                });
                 const perTeam = {};
                 if (tour.team) {
                     // Zurich pairs: finishers are PAIRINGS with .members; both your squad's pairs belong to your club
@@ -2504,7 +2512,11 @@ function GolfCareerSim() {
                             tid = teamOf[cn];
                         if (tid == null)
                             return;
-                        (perTeam[tid] = perTeam[tid] || []).push({ name: r.isYou ? g.pro.name : cn, pos: r.pos, pts: r.pts || 0, isYou: r.isYou });
+                        // the team's reserve (weakest of 5) doesn't feature — skip their score
+                        const key = r.isYou ? g.pro.name : cn;
+                        if (reserveOf[tid] && reserveOf[tid] === key)
+                            return;
+                        (perTeam[tid] = perTeam[tid] || []).push({ name: key, pos: r.pos, pts: r.pts || 0, isYou: r.isYou });
                     });
                 }
                 const tsp = { ...(st.teamSeasonPts || {}) };
@@ -2531,8 +2543,10 @@ function GolfCareerSim() {
                         tour.results.finishers.forEach((r) => { finByName[clean(r.name)] = r; });
                         (tour.scores || []).forEach((s) => { fieldByName[clean(s.name)] = s; });
                     }
-                    // counted = best 4 of ALL FIVE squad members by points (a missed cut still occupies a slot at 0 pts)
-                    const memberPtsThisWeek = myTeamObj.members.map((mn) => {
+                    // the four who actually played = squad minus the reserve (weakest of 5)
+                    const myReserveKey = reserveOf[myTeamObj.id];
+                    const playingMembers = myTeamObj.members.filter((mn) => clean(mn) !== myReserveKey);
+                    const memberPtsThisWeek = playingMembers.map((mn) => {
                         const cn = clean(mn);
                         const isYouM = mn.includes("(YOU)");
                         const key = isYouM ? g.pro.name : cn;
@@ -2540,7 +2554,7 @@ function GolfCareerSim() {
                         return { key, cn, pts: entry ? entry.pts : 0 };
                     });
                     const counted = memberPtsThisWeek.slice().sort((a, b) => b.pts - a.pts).slice(0, 4).map((x) => x.key);
-                    const allFour = myTeamObj.members.map((mn) => {
+                    const allFour = playingMembers.map((mn) => {
                         const cn = clean(mn);
                         const isYouM = mn.includes("(YOU)");
                         const key = isYouM ? g.pro.name : cn;
@@ -6417,7 +6431,9 @@ function GolfCareerSim() {
             })())) : (React.createElement("div", { className: "text-center" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 30, color: C.gold, lineHeight: 1.1 }, className: "mb-2" }, ryder.kind === "pres"
                     ? (uPts > ePts ? "🇺🇸 USA WIN THE PRESIDENTS CUP" : ePts > uPts ? "🌏 THE INTERNATIONALS WIN THE PRESIDENTS CUP" : `15-15 TIE — ${(g.presHolder || "USA") === "USA" ? "USA" : "THE INTERNATIONALS"} RETAIN`)
-                    : (uPts > ePts ? "🇺🇸 USA WIN THE RYDER CUP" : ePts > uPts ? "🇪🇺 EUROPE WIN THE RYDER CUP" : `14-14 TIE — ${g.ryderHolder} RETAIN`)),
+                    : eiK
+                        ? (uPts > ePts ? "🇪🇺 EUROPE WIN THE CONTINENTAL CUP" : ePts > uPts ? "🌏 THE INTERNATIONALS WIN THE CONTINENTAL CUP" : `15-15 TIE — ${(g.eiHolder || "EUR") === "EUR" ? "EUROPE" : "THE INTERNATIONALS"} RETAIN`)
+                        : (uPts > ePts ? "🇺🇸 USA WIN THE RYDER CUP" : ePts > uPts ? "🇪🇺 EUROPE WIN THE RYDER CUP" : `14-14 TIE — ${g.ryderHolder} RETAIN`)),
                 ryder.youIn && (() => {
                     let w = 0, l = 0, hh = 0;
                     ryder.sessions.forEach((s) => s.matches.forEach((m) => {
@@ -6440,7 +6456,7 @@ function GolfCareerSim() {
                             "-",
                             hh),
                         " ",
-                        (ryder.side === "USA" ? uPts > ePts : ryder.side === "EUR" && eiK ? uPts > ePts : ePts > uPts) ? `· You're a ${presK ? "PRESIDENTS CUP" : eiK ? "EUROPE v INTERNATIONAL" : "RYDER CUP"} WINNER 🏆` : "");
+                        (ryder.side === "USA" ? uPts > ePts : ryder.side === "EUR" && eiK ? uPts > ePts : eiK && ryder.side === "INTL" ? ePts > uPts : ePts > uPts) ? `· You're a ${presK ? "PRESIDENTS CUP" : eiK ? "CONTINENTAL CUP" : "RYDER CUP"} WINNER 🏆` : "");
                 })(),
                 React.createElement(Btn, { onClick: finishRyder }, "CONTINUE TO SEASON REVIEW")))));
     }
