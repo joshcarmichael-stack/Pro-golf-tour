@@ -817,7 +817,73 @@ const resolvePuttoff = (a, b) => {
     return { winner: (a.putting || a.overall) >= (b.putting || b.overall) ? a : b, margin: "in a marathon putt-off", decided: "puttoff" };
 };
 // Simulate the whole World Cup: 48 players → 12 groups of 4 → top2 + best 8 thirds = 32 → knockout
-const simWorldCup = (qualifiers, proName) => {
+const computeGroupTable = (grp, grpIdx, playerResults) => {
+    // grp: 4 players. playerResults: map "a|b" round-key → { out, mg } for matches already played by the user
+    const table = grp.map((p) => ({ ...p, gp: 0, gw: 0, gd: 0, gl: 0, gpts: 0, gdiff: 0, h2h: {} }));
+    const matches = [];
+    const pairs = [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]];
+    const rating = (p) => p.overall + gauss() * 1.7;
+    pairs.forEach((round, rIdx) => {
+        round.forEach(([i, j]) => {
+            if (!grp[i] || !grp[j])
+                return;
+            const involvesYou = grp[i].isYou || grp[j].isYou;
+            let out, mg;
+            const pr = playerResults && playerResults[`${rIdx}`];
+            if (involvesYou && pr) {
+                // user already played this one — use their real result (pr.out is from side A=grp[i] perspective)
+                out = pr.out;
+                mg = pr.mg;
+            }
+            else {
+                out = matchOutcome(rating(grp[i]), rating(grp[j]));
+                mg = out === "H" ? 0 : MARGIN_NUM();
+            }
+            if (out === "A") {
+                table[i].gw++;
+                table[i].gpts += 3;
+                table[j].gl++;
+                table[i].gdiff += mg;
+                table[j].gdiff -= mg;
+                table[i].h2h[grp[j].name] = 1;
+                table[j].h2h[grp[i].name] = -1;
+            }
+            else if (out === "B") {
+                table[j].gw++;
+                table[j].gpts += 3;
+                table[i].gl++;
+                table[j].gdiff += mg;
+                table[i].gdiff -= mg;
+                table[j].h2h[grp[i].name] = 1;
+                table[i].h2h[grp[j].name] = -1;
+            }
+            else {
+                table[i].gd++;
+                table[j].gd++;
+                table[i].gpts += 1;
+                table[j].gpts += 1;
+                table[i].h2h[grp[j].name] = 0;
+                table[j].h2h[grp[i].name] = 0;
+            }
+            table[i].gp++;
+            table[j].gp++;
+            matches.push({ round: rIdx, a: grp[i].name, b: grp[j].name, out, involvesYou, marginNum: out === "A" ? mg : out === "B" ? -mg : 0, margin: marginText(out === "H" ? 0 : mg) });
+        });
+    });
+    table.sort((a, b) => {
+        if (b.gpts !== a.gpts)
+            return b.gpts - a.gpts;
+        if (b.gdiff !== a.gdiff)
+            return b.gdiff - a.gdiff;
+        const h = (a.h2h[b.name] != null ? a.h2h[b.name] : 0);
+        if (h !== 0)
+            return -h;
+        return b.gw - a.gw || b.overall - a.overall;
+    });
+    table.forEach((p, i) => { p.groupRank = i + 1; p.groupLetter = String.fromCharCode(65 + grpIdx); });
+    return { players: table, matches, advance: table.slice(0, 2), third: table[2] };
+};
+const buildWorldCupGroups = (qualifiers) => {
     const field = qualifiers.slice(0, 48);
     const seeded = field.slice().sort((a, b) => b.pts - a.pts);
     const groups = Array.from({ length: 12 }, () => []);
@@ -830,72 +896,22 @@ const simWorldCup = (qualifiers, proName) => {
         gi = 0;
         dir = 1;
     } });
-    const rating = (p) => p.overall + gauss() * 1.7;
-    const pairs = [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]];
-    const groupResults = groups.map((grp, grpIdx) => {
-        const table = grp.map((p) => ({ ...p, gp: 0, gw: 0, gd: 0, gl: 0, gpts: 0, gdiff: 0, h2h: {} }));
-        const matches = [];
-        pairs.forEach((round, rIdx) => {
-            round.forEach(([i, j]) => {
-                if (!grp[i] || !grp[j])
-                    return;
-                const involvesYou = grp[i].isYou || grp[j].isYou;
-                const out = matchOutcome(rating(grp[i]), rating(grp[j]));
-                let mg = 0;
-                if (out === "A") {
-                    mg = MARGIN_NUM();
-                    table[i].gw++;
-                    table[i].gpts += 3;
-                    table[j].gl++;
-                    table[i].gdiff += mg;
-                    table[j].gdiff -= mg;
-                    table[i].h2h[grp[j].name] = 1;
-                    table[j].h2h[grp[i].name] = -1;
-                }
-                else if (out === "B") {
-                    mg = MARGIN_NUM();
-                    table[j].gw++;
-                    table[j].gpts += 3;
-                    table[i].gl++;
-                    table[j].gdiff += mg;
-                    table[i].gdiff -= mg;
-                    table[j].h2h[grp[i].name] = 1;
-                    table[i].h2h[grp[j].name] = -1;
-                }
-                else {
-                    table[i].gd++;
-                    table[j].gd++;
-                    table[i].gpts += 1;
-                    table[j].gpts += 1;
-                    table[i].h2h[grp[j].name] = 0;
-                    table[j].h2h[grp[i].name] = 0;
-                }
-                table[i].gp++;
-                table[j].gp++;
-                matches.push({ round: rIdx, a: grp[i].name, b: grp[j].name, out, involvesYou, marginNum: out === "A" ? mg : out === "B" ? -mg : 0, margin: marginText(out === "H" ? 0 : mg) });
-            });
-        });
-        // sort: points → goal difference → head-to-head → wins
-        table.sort((a, b) => {
-            if (b.gpts !== a.gpts)
-                return b.gpts - a.gpts;
-            if (b.gdiff !== a.gdiff)
-                return b.gdiff - a.gdiff;
-            const h = (a.h2h[b.name] != null ? a.h2h[b.name] : 0);
-            if (h !== 0)
-                return -h; // a beat b → a first
-            return b.gw - a.gw || b.overall - a.overall;
-        });
-        table.forEach((p, i) => { p.groupRank = i + 1; p.groupLetter = String.fromCharCode(65 + grpIdx); });
-        return { players: table, matches, advance: table.slice(0, 2), third: table[2] };
-    });
-    // qualifiers: top 2 from each group (24) + best 8 third-placed (by points, GD, wins)
+    return groups;
+};
+// assemble the 32-team knockout bracket from finished groups, then run it (resumable)
+const assembleKnockout = (groupResults) => {
     const autoQ = groupResults.flatMap((g) => g.advance);
     const thirds = groupResults.map((g) => g.third).filter(Boolean).sort((a, b) => b.gpts - a.gpts || b.gdiff - a.gdiff || b.gw - a.gw || b.overall - a.overall);
     const bestThirds = thirds.slice(0, 8);
     const knockoutQ = bestThirds.map((p) => ({ ...p, viaThird: true }));
     const bracket = [...autoQ, ...knockoutQ].sort((a, b) => b.gpts - a.gpts || b.gdiff - a.gdiff || b.overall - a.overall);
-    // run the knockout (resumable: pauses on a player putt-off)
+    return { bracket, bestThirds };
+};
+const simWorldCup = (qualifiers, proName) => {
+    const groups = buildWorldCupGroups(qualifiers);
+    const rating = (p) => p.overall + gauss() * 1.7;
+    const groupResults = groups.map((grp, grpIdx) => computeGroupTable(grp, grpIdx, null));
+    const { bracket, bestThirds } = assembleKnockout(groupResults);
     const ko = runKnockout({ bracket, rounds: [], rating });
     return { groups: groupResults, bestThirds, ...ko };
 };
@@ -918,11 +934,16 @@ const runKnockout = (state) => {
                     next.push(a);
                 continue;
             }
+            const roundName = WC_ROUND_NAMES[bracket.length] || `Last ${bracket.length}`;
+            // PAUSE for the player to play their own knockout match interactively (resume re-enters with it already in partialMatches)
+            if (a.isYou || b.isYou) {
+                return { pendingPlayerMatch: { a, b, roundName },
+                    resume: { bracket, rounds, rating, roundName, partialMatches: ms, partialNext: next } };
+            }
             const res = koMatch(a, b, rating, true);
             if (res.needsPuttoff) {
-                // pause: hand the putt-off to the UI, remember where we are
-                return { pendingPuttoff: { a: res.a, b: res.b, roundName: WC_ROUND_NAMES[bracket.length] || `Last ${bracket.length}` },
-                    resume: { bracket, rounds, rating, roundName: WC_ROUND_NAMES[bracket.length] || `Last ${bracket.length}`, partialMatches: ms, partialNext: next } };
+                return { pendingPuttoff: { a: res.a, b: res.b, roundName },
+                    resume: { bracket, rounds, rating, roundName, partialMatches: ms, partialNext: next } };
             }
             ms.push({ a: a.name, b: b.name, winner: res.winner.name, involvesYou: a.isYou || b.isYou, margin: res.margin, decided: res.decided });
             next.push(res.winner);
@@ -1314,6 +1335,8 @@ function GolfCareerSim() {
     const [prep, setPrep] = useState(null);
     const [reserveChoice, setReserveChoice] = useState(null);
     const [worldCup, setWorldCup] = useState(null);
+    const [wcMatch, setWcMatch] = useState(null);
+    const [wcPlayoff, setWcPlayoff] = useState(null);
     const [puttoff, setPuttoff] = useState(null);
     const [wcStage, setWcStage] = useState(0);
     const [pendingSign, setPendingSign] = useState(null);
@@ -2866,38 +2889,123 @@ function GolfCareerSim() {
         const qualifiers = table.flatMap((n) => n.qualifiers.map((q) => ({ ...q, country: n.code, nationName: n.name })));
         const youInWC = qualifiers.some((q) => q.isYou);
         const venue = WC_VENUES[(st.wcNo || 0) % WC_VENUES.length];
-        const sim = simWorldCup(qualifiers, st.pro.name);
-        const wcState = { ...sim, qualifiers, youIn: youInWC, venue, season: st.season };
-        setWorldCup(wcState);
-        if (sim.pendingPuttoff) {
-            setPuttoff({ ...sim.pendingPuttoff, putts: [], turn: 0 });
+        if (!youInWC) {
+            // not qualified — sim the whole thing and show the staged reveal
+            const sim = simWorldCup(qualifiers, st.pro.name);
+            setWorldCup({ ...sim, qualifiers, youIn: false, venue, season: st.season });
+            setWcStage(0);
+            setScreen("worldCup");
+            return;
+        }
+        // you qualified — set up interactive group play
+        const groups = buildWorldCupGroups(qualifiers);
+        const myGroupIdx = groups.findIndex((grp) => grp.some((p) => p.isYou));
+        const myGroup = groups[myGroupIdx];
+        // your 3 group fixtures (opponent each round)
+        const pairs = [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]];
+        const myPos = myGroup.findIndex((p) => p.isYou);
+        const fixtures = pairs.map((round, rIdx) => {
+            const pr = round.find((pp) => pp.includes(myPos));
+            const oppPos = pr[0] === myPos ? pr[1] : pr[0];
+            return { round: rIdx, opp: myGroup[oppPos], oppPos, youAreA: pr[0] === myPos };
+        });
+        setWorldCup({ qualifiers, groups, myGroupIdx, venue, season: st.season, youIn: true,
+            phase: "groupIntro", fixtures, myResults: {}, groupGameIdx: 0 });
+        setWcStage(-1); // -1 = group play phase
+        setScreen("worldCup");
+    };
+    // play one of your group matches → record result, advance or finalize
+    const wcStartGroupMatch = () => {
+        const wc = worldCup;
+        const fx = wc.fixtures[wc.groupGameIdx];
+        setWcMatch({ context: "wcGroup", a: fx.youAreA ? { name: g.pro.name, isYou: true } : fx.opp,
+            b: fx.youAreA ? fx.opp : { name: g.pro.name, isYou: true }, youAreA: fx.youAreA,
+            roundName: `Group ${String.fromCharCode(65 + wc.myGroupIdx)} · Match ${wc.groupGameIdx + 1}`,
+            hole: 0, diff: 0, log: [], done: false });
+        setScreen("wcMatch");
+    };
+    const wcFinishGroupMatch = (am) => {
+        const wc = worldCup;
+        const fx = wc.fixtures[wc.groupGameIdx];
+        // result from side-A perspective of the GROUP (grp[i] is lower pos). Our fixture knows youAreA.
+        const youWon = am.diff > 0, halved = am.diff === 0;
+        // translate to group A/B: in computeGroupTable, A = lower-index player. Determine from oppPos.
+        const myPos = wc.groups[wc.myGroupIdx].findIndex((p) => p.isYou);
+        const youAreLower = myPos < fx.oppPos;
+        let out, mg = halved ? 0 : Math.abs(am.diff);
+        if (halved)
+            out = "H";
+        else if (youWon)
+            out = youAreLower ? "A" : "B";
+        else
+            out = youAreLower ? "B" : "A";
+        const myResults = { ...wc.myResults, [fx.round]: { out, mg } };
+        const nextIdx = wc.groupGameIdx + 1;
+        if (nextIdx < wc.fixtures.length) {
+            setWorldCup({ ...wc, myResults, groupGameIdx: nextIdx, phase: "groupNext", lastMatch: { opp: fx.opp.name, youWon, halved, am } });
+            setScreen("worldCup");
+        }
+        else {
+            // all 3 group games played → finalize all groups, assemble knockout, run it
+            const groupResults = wc.groups.map((grp, gi) => computeGroupTable(grp, gi, gi === wc.myGroupIdx ? myResults : null));
+            const { bracket, bestThirds } = assembleKnockout(groupResults);
+            const rating = (p) => p.overall + gauss() * 1.7;
+            const ko = runKnockout({ bracket, rounds: [], rating });
+            const merged = { ...wc, myResults, groups: groupResults, bestThirds, ...ko, phase: "knockout" };
+            setWorldCup(merged);
+            routeWorldCupKnockout(merged);
+        }
+    };
+    // route to the next pause point in the knockout (your match, a putt-off, or the finale)
+    const routeWorldCupKnockout = (wc) => {
+        if (wc.pendingPlayerMatch) {
+            const pm = wc.pendingPlayerMatch;
+            setWcMatch({ context: "wcKnockout", a: pm.a, b: pm.b, youAreA: pm.a.isYou,
+                roundName: pm.roundName, hole: 0, diff: 0, log: [], done: false });
+            setScreen("wcMatch");
+        }
+        else if (wc.pendingPuttoff) {
+            setPuttoff({ ...wc.pendingPuttoff, putts: [], turn: 0 });
             setScreen("puttoff");
         }
         else {
             setWcStage(0);
-            setScreen("worldCup");
+            setScreen("worldCup"); // finished → staged reveal/finale
         }
+    };
+    const wcFinishKnockoutMatch = (am) => {
+        const wc = worldCup;
+        const res = wc.resume;
+        const pm = wc.pendingPlayerMatch;
+        const youWon = am.diff > 0, halved = am.diff === 0;
+        if (halved) {
+            // tie → 3-hole stroke playoff (handled on its own screen), carry the matchup
+            setWcPlayoff({ a: pm.a, b: pm.b, roundName: pm.roundName, holes: [], idx: 0 });
+            setScreen("wcPlayoff");
+            return;
+        }
+        const winner = youWon ? (pm.a.isYou ? pm.a : pm.b) : (pm.a.isYou ? pm.b : pm.a);
+        advanceKnockoutWithWinner(winner, am.hole < 18 ? `${Math.abs(am.diff)}&${18 - am.hole}` : `${Math.abs(am.diff)} up`, "match");
+    };
+    // push the resolved player match into the bracket and continue the knockout
+    const advanceKnockoutWithWinner = (winner, margin, decided) => {
+        const wc = worldCup;
+        const res = wc.resume;
+        const pm = wc.pendingPlayerMatch || wc.pendingPuttoff;
+        res.partialMatches.push({ a: pm.a.name, b: pm.b.name, winner: winner.name, involvesYou: pm.a.isYou || pm.b.isYou, margin, decided });
+        res.partialNext.push(winner);
+        res.playerMatchResolved = true;
+        const ko = runKnockout(res);
+        const merged = { ...wc, ...ko, pendingPlayerMatch: ko.pendingPlayerMatch || null, pendingPuttoff: ko.pendingPuttoff || null, resume: ko.resume || null };
+        setWorldCup(merged);
+        setWcMatch(null);
+        setWcPlayoff(null);
+        setPuttoff(null);
+        routeWorldCupKnockout(merged);
     };
     // resume the knockout after a player putt-off is decided
     const resumeWorldCupAfterPuttoff = (winner) => {
-        const wc = worldCup;
-        const res = wc.resume;
-        // record the just-finished putt-off match into the partial round
-        const a = puttoff.a, b = puttoff.b;
-        res.partialMatches.push({ a: a.name, b: b.name, winner: winner.name, involvesYou: a.isYou || b.isYou, margin: "in a putt-off shootout", decided: "puttoff" });
-        res.partialNext.push(winner);
-        const ko = runKnockout(res);
-        const merged = { ...wc, ...ko, pendingPuttoff: ko.pendingPuttoff || null, resume: ko.resume || null };
-        setWorldCup(merged);
-        setPuttoff(null);
-        if (ko.pendingPuttoff) {
-            setPuttoff({ ...ko.pendingPuttoff, putts: [], turn: 0 });
-            setScreen("puttoff");
-        }
-        else {
-            setWcStage(0);
-            setScreen("worldCup");
-        }
+        advanceKnockoutWithWinner(winner, "in a putt-off shootout", "puttoff");
     };
     const startEuroIntl = (st) => {
         const side = eiSide(st.pro.nation);
@@ -5062,6 +5170,50 @@ function GolfCareerSim() {
     }
     if (screen === "worldCup" && worldCup) {
         const wc = worldCup;
+        // ===== INTERACTIVE GROUP PLAY PHASE (you qualified) =====
+        if (wcStage === -1 && wc.fixtures) {
+            const gi = wc.groupGameIdx;
+            const fx = wc.fixtures[gi];
+            const grpLetter = String.fromCharCode(65 + wc.myGroupIdx);
+            const grp = wc.groups[wc.myGroupIdx];
+            return (React.createElement(Shell, null,
+                React.createElement("div", { className: "text-center mb-3" },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } },
+                        "\uD83C\uDF0D WORLD CUP \u00B7 GROUP ",
+                        grpLetter),
+                    React.createElement("h2", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk } }, wc.phase === "groupIntro" ? "YOUR GROUP" : `MATCH ${gi + 1} OF 3`),
+                    React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, wc.venue)),
+                React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
+                    React.createElement("div", { className: "text-xs mb-1", style: { color: C.gold, letterSpacing: 1 } },
+                        "GROUP ",
+                        grpLetter),
+                    grp.map((p) => (React.createElement("div", { key: p.name, className: "flex justify-between text-xs mb-0.5", style: { color: p.isYou ? C.gold : C.chalk } },
+                        React.createElement("span", null,
+                            FLAG[p.country] || "🌐",
+                            " ",
+                            p.isYou ? "YOU" : p.name),
+                        React.createElement("span", { style: { color: tint(p.overall) } }, p.overall))))),
+                wc.lastMatch && (React.createElement("div", { className: "p-2 rounded-lg mb-3", style: { background: wc.lastMatch.youWon ? "rgba(159,217,139,0.12)" : wc.lastMatch.halved ? "rgba(244,247,242,0.08)" : "rgba(217,108,79,0.12)" } },
+                    React.createElement("p", { className: "text-xs", style: { color: C.chalk } },
+                        "Last match vs ",
+                        wc.lastMatch.opp.split(" ").slice(-1)[0],
+                        ": ",
+                        React.createElement("b", { style: { color: wc.lastMatch.youWon ? C.green : wc.lastMatch.halved ? C.muted : C.red } }, wc.lastMatch.youWon ? "WON" : wc.lastMatch.halved ? "HALVED" : "LOST")))),
+                React.createElement("div", { className: "p-3 rounded-xl mb-3 text-center", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+                    React.createElement("div", { className: "text-xs", style: { color: C.muted } },
+                        "NEXT UP \u00B7 GROUP MATCH ",
+                        gi + 1),
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: C.chalk }, className: "my-1" },
+                        "YOU vs ",
+                        FLAG[fx.opp.country] || "",
+                        " ",
+                        fx.opp.name),
+                    React.createElement("div", { className: "text-[11px]", style: { color: C.muted } },
+                        "Opponent rating ",
+                        fx.opp.overall,
+                        " \u00B7 18-hole match play")),
+                React.createElement(Btn, { onClick: wcStartGroupMatch }, "\u26F3 PLAY YOUR GROUP MATCH \u25B8")));
+        }
         const champ = wc.champion;
         const nameOf = (n) => n === g.pro.name ? "YOU" : n.split(" ").slice(-1)[0];
         const myGroup = wc.groups.find((grp) => grp.players.some((p) => p.isYou));
@@ -6175,6 +6327,144 @@ function GolfCareerSim() {
         setScreen("ryder");
     };
     // ---------- playable cup match ----------
+    // ---------- playable World Cup match (singles, hole-by-hole) ----------
+    if (screen === "wcMatch" && wcMatch) {
+        const wm = wcMatch;
+        const course = COURSES.find((c) => c.name === (CUP_COURSE_OF[worldCup === null || worldCup === void 0 ? void 0 : worldCup.venue] || "Muirfield Village")) || COURSES[0];
+        const oppName = wm.a.isYou ? wm.b.name : wm.a.name;
+        const pl = (n) => n === g.pro.name ? effAttrs(g) : aiP(n);
+        const oppAttrs = pl(oppName);
+        const playHoles = (toFinish) => {
+            setWcMatch((m) => {
+                let am = { ...m, log: [...m.log] };
+                do {
+                    const hole = course.holes[am.hole];
+                    const pAdj = pressureAdj(effAttrs(g), 0.5 + (am.hole / 18) * 0.6);
+                    const my = playHole(effAttrs(g), hole, 0, false, pAdj);
+                    const opp = playHole(oppAttrs, hole, 0, false, 0);
+                    am.log.push({ h: am.hole + 1, par: hole[0], my, opp });
+                    am.diff += my < opp ? 1 : my > opp ? -1 : 0;
+                    am.hole += 1;
+                    const rem = 18 - am.hole;
+                    if (Math.abs(am.diff) > rem || am.hole === 18) {
+                        am.done = true;
+                        break;
+                    }
+                } while (toFinish);
+                return am;
+            });
+        };
+        const status = wm.diff === 0 ? "ALL SQUARE" : wm.diff > 0 ? `${wm.diff} UP` : `${-wm.diff} DOWN`;
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } },
+                    "\uD83C\uDF0D WORLD CUP \u00B7 ",
+                    wm.roundName),
+                React.createElement("div", { className: "text-xs", style: { color: C.muted } }, worldCup === null || worldCup === void 0 ? void 0 :
+                    worldCup.venue,
+                    " \u00B7 single match play"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk, lineHeight: 1.1 }, className: "mt-1" },
+                    "YOU ",
+                    React.createElement("span", { style: { color: C.muted, fontSize: 16 } }, "vs"),
+                    " ",
+                    oppName.split(" ").slice(-1)[0]),
+                React.createElement("div", { className: "my-1", style: { fontFamily: FONT, fontSize: 34, color: wm.diff > 0 ? C.green : wm.diff < 0 ? C.red : C.chalk, lineHeight: 1 } }, wm.done ? (wm.diff === 0 ? "MATCH HALVED" : wm.diff > 0 ? `WON ${wm.hole < 18 ? `${wm.diff}&${18 - wm.hole}` : `${wm.diff} UP`}` : `LOST ${wm.hole < 18 ? `${-wm.diff}&${18 - wm.hole}` : `${-wm.diff} DOWN`}`) : `${status} · THRU ${wm.hole}`)),
+            !wm.done && (React.createElement("div", { className: "p-3 rounded-xl my-2 text-center", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})` } },
+                React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk } },
+                    "HOLE ",
+                    wm.hole + 1),
+                React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold }, className: "ml-2" },
+                    "PAR ",
+                    course.holes[wm.hole][0],
+                    " \u00B7 ",
+                    course.holes[wm.hole][1],
+                    "y"))),
+            React.createElement("div", { className: "p-2 rounded-lg mb-3 max-h-48 overflow-auto", style: { background: C.panel } },
+                wm.log.slice(-6).map((l) => (React.createElement("div", { key: l.h, className: "flex justify-between text-xs mb-0.5", style: { color: C.chalk } },
+                    React.createElement("span", { style: { color: C.muted } },
+                        "H",
+                        l.h,
+                        " (par ",
+                        l.par,
+                        ")"),
+                    React.createElement("span", { style: { color: l.my < l.opp ? C.green : l.my > l.opp ? C.red : C.muted } },
+                        "You ",
+                        l.my,
+                        " \u00B7 Opp ",
+                        l.opp)))),
+                wm.log.length === 0 && React.createElement("p", { className: "text-xs text-center", style: { color: C.muted } }, "First tee. Good luck.")),
+            !wm.done ? (React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                React.createElement(Btn, { small: true, onClick: () => playHoles(false) }, "\u25B8 PLAY HOLE"),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => playHoles(true) }, "\u23E9 AUTO TO END"))) : (React.createElement(Btn, { onClick: () => { if (wm.context === "wcGroup")
+                    wcFinishGroupMatch(wm);
+                else
+                    wcFinishKnockoutMatch(wm); } }, wm.diff === 0 ? "TO THE PLAYOFF ▸" : "CONTINUE ▸"))));
+    }
+    // ---------- World Cup knockout playoff (3-hole stroke, side by side) ----------
+    if (screen === "wcPlayoff" && wcPlayoff) {
+        const po = wcPlayoff;
+        const oppName = po.a.isYou ? po.b.name : po.a.name;
+        const course = COURSES.find((c) => c.name === (CUP_COURSE_OF[worldCup === null || worldCup === void 0 ? void 0 : worldCup.venue] || "Muirfield Village")) || COURSES[0];
+        const myTot = po.holes.reduce((s, h) => s + h.my, 0);
+        const oppTot = po.holes.reduce((s, h) => s + h.opp, 0);
+        const done = po.idx >= 3;
+        const playPoHole = (toEnd) => {
+            setWcPlayoff((p) => {
+                let holes = [...p.holes];
+                let i = p.idx;
+                do {
+                    const hole = course.holes[i % 18];
+                    const my = playHole(effAttrs(g), hole, 0, false, pressureAdj(effAttrs(g), 1.2));
+                    const opp = playHole(po.a.isYou ? aiP(po.b.name) : aiP(po.a.name), hole, 0, false, 0);
+                    holes.push({ par: hole[0], my, opp });
+                    i++;
+                } while (toEnd && i < 3);
+                return { ...p, holes, idx: i };
+            });
+        };
+        const decided = done && myTot !== oppTot;
+        const youWin = myTot < oppTot;
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } },
+                    "\uD83C\uDF0D ",
+                    po.roundName,
+                    " \u00B7 ALL SQUARE"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk } }, "3-HOLE PLAYOFF"),
+                React.createElement("p", { className: "text-xs", style: { color: C.muted } },
+                    "Aggregate stroke play \u2014 lowest total wins. YOU vs ",
+                    oppName.split(" ").slice(-1)[0])),
+            React.createElement("div", { className: "flex justify-center gap-6 my-2" },
+                React.createElement("div", { className: "text-center" },
+                    React.createElement("div", { className: "text-xs", style: { color: C.muted } }, "YOU"),
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 34, color: myTot <= oppTot ? C.green : C.chalk } }, myTot)),
+                React.createElement("div", { className: "text-center" },
+                    React.createElement("div", { className: "text-xs", style: { color: C.muted } }, oppName.split(" ").slice(-1)[0].toUpperCase()),
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 34, color: oppTot < myTot ? C.green : C.chalk } }, oppTot))),
+            React.createElement("div", { className: "p-2 rounded-lg mb-3", style: { background: C.panel } },
+                po.holes.map((h, i) => (React.createElement("div", { key: i, className: "flex justify-between text-xs mb-0.5", style: { color: C.chalk } },
+                    React.createElement("span", { style: { color: C.muted } },
+                        "Playoff hole ",
+                        i + 1,
+                        " (par ",
+                        h.par,
+                        ")"),
+                    React.createElement("span", { style: { color: h.my < h.opp ? C.green : h.my > h.opp ? C.red : C.muted } },
+                        "You ",
+                        h.my,
+                        " \u00B7 Opp ",
+                        h.opp)))),
+                po.holes.length === 0 && React.createElement("p", { className: "text-xs text-center", style: { color: C.muted } }, "Sudden tension \u2014 three holes to settle it.")),
+            !done ? (React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                React.createElement(Btn, { small: true, onClick: () => playPoHole(false) },
+                    "\u25B8 PLAY HOLE ",
+                    po.idx + 1),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => playPoHole(true) }, "\u23E9 AUTO ALL 3"))) : decided ? (React.createElement("div", { className: "p-4 rounded-xl text-center", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `2px solid ${youWin ? C.gold : C.red}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: youWin ? C.gold : C.red } }, youWin ? "🎉 YOU WIN THE PLAYOFF!" : `${oppName} edges it`),
+                React.createElement(Btn, { onClick: () => advanceKnockoutWithWinner(youWin ? (po.a.isYou ? po.a : po.b) : (po.a.isYou ? po.b : po.a), "after a playoff", "playoff") }, "CONTINUE \u25B8"))) : (React.createElement("div", { className: "p-3 rounded-xl text-center", style: { background: C.panel } },
+                React.createElement("p", { className: "text-sm mb-2", style: { color: C.gold } }, "Still level after three! It goes to a putt-off."),
+                React.createElement(Btn, { onClick: () => { const a = po.a, b = po.b; setWcPlayoff(null); setPuttoff({ a, b, roundName: po.roundName, putts: [], turn: 0 }); setScreen("puttoff"); } }, "TO THE PUTT-OFF \u25B8")))));
+    }
     if (screen === "cupMatch" && (ryder === null || ryder === void 0 ? void 0 : ryder.activeMatch)) {
         const am = ryder.activeMatch;
         const sess = ryder.sessions[am.sIdx];
