@@ -1391,6 +1391,10 @@ function GolfCareerSim() {
     const [worldCup, setWorldCup] = useState(null);
     const [turnoverOpen, setTurnoverOpen] = useState(false);
     const [hubMenu, setHubMenu] = useState(null);
+    const [scoutTab, setScoutTab] = useState("filter");
+    const [scoutTeamId, setScoutTeamId] = useState(null);
+    const [scoutFilters, setScoutFilters] = useState({ minOvr: 0, maxAge: 99, nation: "any", signable: false });
+    const [negotiation, setNegotiation] = useState(null);
     const [wcMatch, setWcMatch] = useState(null);
     const [wcPlayoff, setWcPlayoff] = useState(null);
     const [puttoff, setPuttoff] = useState(null);
@@ -1563,6 +1567,25 @@ function GolfCareerSim() {
     };
     const myLeagueTeam = (st = g) => (st.leagues || []).find((t) => t.members.some((mn) => mn.includes("(YOU)")));
     // players you can realistically sign: same/lower division, OR an unhappy reserve (5th man) at a higher-div club
+    // every player across the league system, with the data visible BEFORE scouting (potential hidden)
+    const allLeaguePlayers = (st = g) => {
+        const out = [];
+        (st.leagues || []).forEach((t) => {
+            const ranked = t.members.map((mn) => ({ mn, ovr: ovrOf(mn, st) })).sort((a, b) => b.ovr - a.ovr);
+            t.members.forEach((mn) => {
+                if (mn.includes("(YOU)"))
+                    return;
+                const cn = clean2(mn);
+                const p = aiP(cn, st);
+                if (!p)
+                    return;
+                const isReserve = ranked[ranked.length - 1].mn === mn;
+                out.push({ name: cn, teamId: t.id, team: t.name, division: t.division, overall: ovrOf(mn, st),
+                    age: p.age || 28, country: p.country, isReserve });
+            });
+        });
+        return out;
+    };
     const signablePlayers = (st = g) => {
         const mt = myLeagueTeam(st);
         if (!mt)
@@ -1604,6 +1627,72 @@ function GolfCareerSim() {
         return out.sort((a, b) => b.ovr - a.ovr);
     };
     // execute a signing: you buy `target`, drop `dropName` to free agents; the selling club then reacts (domino, capped)
+    // begin a negotiation with a target — they weigh the move; you can sweeten to persuade
+    const beginNegotiation = (p) => {
+        const mt = myLeagueTeam();
+        if (!mt)
+            return;
+        const baseFee = valOf(p.name);
+        // how keen is the player? driven by division step, the role they'd have, club standing
+        const squadOvrs = mt.members.map((mn) => mn.includes("(YOU)") ? calcOverall(g.pro.attrs) : ovrOf(mn));
+        const wouldStart = squadOvrs.filter((o) => o > p.overall).length < 4; // they'd be a starter if not bottom of the 5
+        let willing = 50;
+        if (p.division > mt.division)
+            willing += 18; // dropping down to us — keen for game time
+        else if (p.division === mt.division)
+            willing += 4; // sideways
+        else
+            willing -= 14; // stepping down a division — reluctant
+        if (wouldStart)
+            willing += 16;
+        else
+            willing -= 12; // role matters
+        if (p.isReserve)
+            willing += 12; // benched elsewhere — wants to play
+        willing += Math.round((mt.division === 0 ? 8 : mt.division === 1 ? 2 : -4)); // prestige of your club
+        willing = Math.max(8, Math.min(88, willing));
+        setNegotiation({ player: p, baseFee, offer: Math.round(baseFee), willing, round: 0,
+            log: [], status: "open", wouldStart });
+        setScreen("negotiation");
+    };
+    const negotiateRespond = async (action) => {
+        const n = negotiation;
+        if (!n)
+            return;
+        let { offer, willing, round, log } = n;
+        if (action === "sweeten")
+            offer = Math.round(offer * 1.15 * 10) / 10; // +15% each sweetener
+        // chance they accept scales with willingness + how far above value you've gone
+        const overPay = (offer / n.baseFee) - 1; // 0 = at value
+        const acceptChance = Math.min(0.95, (willing / 100) + overPay * 0.9 + round * 0.05);
+        const r = Math.random();
+        const budget = (myLeagueTeam().teamPot || myLeagueTeam().budget || 0);
+        if (offer > budget) {
+            setNegotiation({ ...n, offer, status: "open", log: [...log, { who: "you", txt: `Offered $${offer}m — but that's over budget ($${Math.round(budget)}m).` }] });
+            return;
+        }
+        if (r < acceptChance) {
+            setNegotiation({ ...n, offer, status: "accepted", log: [...log, { who: "agent", txt: "He's agreed terms. Get it over the line." }] });
+        }
+        else if (round >= 2 || (action === "final")) {
+            setNegotiation({ ...n, offer, status: "rejected", log: [...log, { who: "agent", txt: pickReason(n) }] });
+        }
+        else {
+            const ask = Math.round(offer * (1.1 + Math.random() * 0.15) * 10) / 10;
+            setNegotiation({ ...n, offer, willing: willing + 8, round: round + 1, status: "open",
+                log: [...log, { who: "agent", txt: `Not quite enough. He'd think harder around $${ask}m.` }] });
+        }
+    };
+    const pickReason = (n) => {
+        const p = n.player;
+        const mt = myLeagueTeam();
+        if (p.division < mt.division)
+            return "He doesn't want to drop a division right now.";
+        if (!n.wouldStart)
+            return "He won't come to sit on the bench — he wants to play.";
+        return "He's just not convinced it's the right move. Maybe another time.";
+    };
+    const offerColorFor = (n) => n.offer > n.baseFee * 1.1 ? C.red : n.offer < n.baseFee * 0.95 ? C.muted : C.gold;
     const executeSigning = async (target, dropName) => {
         const leagues = (g.leagues || []).map((t) => ({ ...t, members: t.members.slice() }));
         const faPool = [...(g.freeAgentPool || [])];
@@ -2831,6 +2920,39 @@ function GolfCareerSim() {
         }
         st.evIdx = g.evIdx + 1;
         st.faPracticedThisGap = false; // practice is available again before the next event
+        // ===== SCOUT REPORTS that have come due =====
+        if (st.scoutPending && Object.keys(st.scoutPending).length) {
+            const reports = { ...(st.scoutReports || {}) };
+            const stillPending = {};
+            Object.entries(st.scoutPending).forEach(([name, readyAt]) => {
+                if (st.evIdx >= readyAt) {
+                    // generate a fogged report: a rating RANGE around true potential + a worded hint
+                    const p = aiP(name, st);
+                    const e = (st.ai && st.ai[name]) || {};
+                    const truePot = e.pot || (p ? Math.max(p.overall, p.overall + 3) : 80);
+                    const curOvr = p ? p.overall : 75;
+                    const age = p ? (p.age || 28) : 28;
+                    const spread = 2 + Math.floor(Math.random() * 3); // ±2–4 fog
+                    const lo = Math.max(curOvr, truePot - spread - Math.floor(Math.random() * 2));
+                    const hi = Math.min(99, truePot + spread + Math.floor(Math.random() * 2));
+                    const headroom = truePot - curOvr;
+                    let hint;
+                    if (age <= 21 && headroom >= 8)
+                        hint = ["A real gem — the ceiling looks enormous.", "Special talent. Could go right to the top.", "Raw, but the tools are all there."][Math.floor(Math.random() * 3)];
+                    else if (age <= 24 && headroom >= 5)
+                        hint = ["Plenty of growth left in him.", "Promising — room to develop further.", "On an upward curve, worth a punt."][Math.floor(Math.random() * 3)];
+                    else if (headroom >= 3)
+                        hint = ["A bit more to come, but not a world-beater.", "Solid pro with modest upside.", "Useful, though close to his level."][Math.floor(Math.random() * 3)];
+                    else
+                        hint = ["What you see is what you get.", "Near his ceiling — unlikely to improve much.", "The finished article, for better or worse."][Math.floor(Math.random() * 3)];
+                    reports[name] = { pot: [lo, hi], hint, done: true };
+                }
+                else
+                    stillPending[name] = readyAt;
+            });
+            st.scoutReports = reports;
+            st.scoutPending = stillPending;
+        }
         if (st.evIdx >= SCHEDULE.length) {
             if (st.champion === st.pro.name) {
                 st.myStats.fedexTitles++;
@@ -4164,6 +4286,7 @@ function GolfCareerSim() {
                     g.mode === "team" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("team") }, "\uD83E\uDD1D MY TEAM"),
                     g.mode === "league" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("league") }, "\uD83C\uDFDF\uFE0F MY LEAGUE"),
                     g.mode === "league" && !g.isFreeAgent && myLeagueTeam() && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("transferMarket") }, "\uD83D\uDCB0 TRANSFERS"),
+                    g.mode === "league" && !g.isFreeAgent && myLeagueTeam() && React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setScoutTab("filter"); setScreen("scoutMarket"); } }, "\uD83D\uDD0D SCOUTING"),
                     React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("ryderHQ") }, "\uD83C\uDF0D CUPS HQ")),
                 hubMenu === "tour" && React.createElement(React.Fragment, null,
                     React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setSelSched(null); setScreen("schedule"); } }, "\uD83D\uDCC5 SCHEDULE"),
@@ -4673,6 +4796,180 @@ function GolfCareerSim() {
                 m.season != null && React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } },
                     "Season ",
                     m.season)))))));
+    }
+    if (screen === "negotiation" && negotiation) {
+        const n = negotiation;
+        const p = n.player;
+        const mt = myLeagueTeam();
+        const budget = Math.round((mt.teamPot || mt.budget || 0) * 10) / 10;
+        const keenWord = n.willing >= 65 ? "keen" : n.willing >= 40 ? "open to it" : "reluctant";
+        const keenColor = n.willing >= 65 ? C.green : n.willing >= 40 ? C.bogey : C.red;
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => { setNegotiation(null); setScreen("scoutMarket"); } }),
+            React.createElement("div", { className: "text-center mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "\uD83D\uDCAC NEGOTIATION"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk } },
+                    FLAG[NATION_CODE[p.country]] || "",
+                    " ",
+                    p.name),
+                React.createElement("p", { className: "text-xs", style: { color: C.muted } },
+                    p.overall,
+                    " ovr \u00B7 ",
+                    p.age,
+                    "y \u00B7 ",
+                    p.team,
+                    " (",
+                    divName(p.division),
+                    ")"),
+                React.createElement("p", { className: "text-xs mt-1" },
+                    "Player is ",
+                    React.createElement("b", { style: { color: keenColor } }, keenWord),
+                    " \u00B7 Your budget $",
+                    budget,
+                    "m")),
+            React.createElement("div", { className: "p-2 rounded-xl mb-3", style: { background: C.panel, minHeight: 60 } },
+                n.log.length === 0 && React.createElement("p", { className: "text-xs text-center", style: { color: C.muted } }, "Open with an offer at his market value, or go straight in higher to show intent."),
+                n.log.map((l, i) => (React.createElement("p", { key: i, className: "text-xs mb-1", style: { color: l.who === "you" ? C.gold : C.chalk } },
+                    React.createElement("b", null, l.who === "you" ? "You:" : "Agent:"),
+                    " ",
+                    l.txt)))),
+            React.createElement("div", { className: "text-center mb-2" },
+                React.createElement("div", { className: "text-xs", style: { color: C.muted } }, "CURRENT OFFER"),
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 32, color: offerColorFor(n) } },
+                    "$",
+                    n.offer,
+                    "m"),
+                React.createElement("div", { className: "text-[10px]", style: { color: C.muted } },
+                    "market value $",
+                    n.baseFee,
+                    "m")),
+            n.status === "open" && (React.createElement("div", { className: "grid gap-2" },
+                React.createElement(Btn, { small: true, onClick: () => negotiateRespond("offer") }, "\uD83D\uDCE8 MAKE THIS OFFER"),
+                React.createElement(Btn, { small: true, kind: "green", onClick: () => negotiateRespond("sweeten") }, "\uD83D\uDCB0 SWEETEN (+15%) & OFFER"),
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setNegotiation(null); setScreen("scoutMarket"); } }, "WALK AWAY"))),
+            n.status === "accepted" && (React.createElement("div", { className: "p-3 rounded-xl text-center", style: { background: "rgba(159,217,139,0.12)", border: `1.5px solid ${C.green}` } },
+                React.createElement("p", { className: "text-sm mb-2", style: { color: C.green } },
+                    "\u2713 Terms agreed at $",
+                    n.offer,
+                    "m!"),
+                React.createElement(Btn, { onClick: () => {
+                        const target = { name: p.name, fromTeamId: p.teamId, fromTeam: p.team, fromDiv: p.division, ovr: p.overall, fee: n.offer, reason: "agreed terms", isReserve: p.isReserve };
+                        setNegotiation(null);
+                        if (mt.members.length >= 5) {
+                            setPendingSign(target);
+                            setScreen("transferMarket");
+                        }
+                        else {
+                            executeSigning(target, null);
+                        }
+                    } }, mt.members.length >= 5 ? "CHOOSE WHO MAKES WAY ▸" : "COMPLETE THE SIGNING ▸"))),
+            n.status === "rejected" && (React.createElement("div", { className: "p-3 rounded-xl text-center", style: { background: "rgba(217,108,79,0.12)", border: `1.5px solid ${C.red}` } },
+                React.createElement("p", { className: "text-sm mb-2", style: { color: C.red } }, "Talks broke down."),
+                React.createElement(Btn, { kind: "panel", onClick: () => { setNegotiation(null); setScreen("scoutMarket"); } }, "BACK TO SCOUTING")))));
+    }
+    if (screen === "scoutMarket") {
+        const mt = myLeagueTeam();
+        if (!mt) {
+            return React.createElement(Shell, null,
+                React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+                React.createElement("p", { style: { color: C.muted }, className: "text-sm" }, "Sign for a club first to scout the market."));
+        }
+        const squadOvrs = mt.members.map((mn) => mn.includes("(YOU)") ? calcOverall(g.pro.attrs) : ovrOf(mn));
+        const squadAvg = Math.round(squadOvrs.reduce((s, o) => s + o, 0) / squadOvrs.length);
+        const myDiv = mt.division;
+        const scouts = g.scoutReports || {};
+        const pending = g.scoutPending || {};
+        const canSign = (p) => p.teamId !== mt.id && p.overall <= squadAvg &&
+            (p.division >= myDiv || (p.division < myDiv && p.isReserve));
+        let list = allLeaguePlayers();
+        if (scoutTab === "team" && scoutTeamId != null)
+            list = list.filter((p) => p.teamId === scoutTeamId);
+        if (scoutTab === "filter") {
+            const f = scoutFilters;
+            list = list.filter((p) => p.overall >= f.minOvr && p.age <= f.maxAge &&
+                (f.nation === "any" || p.country === f.nation) && (!f.signable || canSign(p)));
+            list = list.sort((a, b) => b.overall - a.overall).slice(0, 40);
+        }
+        const startScout = async (name) => {
+            const readyAt = (g.evIdx || 0) + 2;
+            const sp = { ...(g.scoutPending || {}), [name]: readyAt };
+            const st = { ...g, scoutPending: sp };
+            setG(st);
+            await save(st);
+        };
+        const nations = ["any", ...Array.from(new Set(allLeaguePlayers().map((p) => p.country))).sort()];
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk }, className: "mb-1" }, "\uD83D\uDD0D SCOUTING"),
+            React.createElement("p", { className: "text-[11px] mb-2", style: { color: C.muted } },
+                "Scout players to reveal their potential. You can sign players rated up to your squad average (",
+                squadAvg,
+                ")."),
+            React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3" },
+                React.createElement(Btn, { small: true, kind: scoutTab === "filter" ? "gold" : "panel", onClick: () => setScoutTab("filter") }, "\uD83D\uDD0E SEARCH"),
+                React.createElement(Btn, { small: true, kind: scoutTab === "team" ? "gold" : "panel", onClick: () => { setScoutTab("team"); setScoutTeamId(null); } }, "\uD83C\uDFDF\uFE0F BY TEAM")),
+            scoutTab === "filter" && (React.createElement("div", { className: "p-2 rounded-xl mb-3", style: { background: C.panel } },
+                React.createElement("div", { className: "flex justify-between items-center mb-2" },
+                    React.createElement("span", { className: "text-xs", style: { color: C.muted } },
+                        "Min rating: ",
+                        React.createElement("b", { style: { color: C.chalk } }, scoutFilters.minOvr || "any")),
+                    React.createElement("input", { type: "range", min: "0", max: "95", step: "5", value: scoutFilters.minOvr, onChange: (e) => setScoutFilters({ ...scoutFilters, minOvr: +e.target.value }), style: { accentColor: "#E8C35A" } })),
+                React.createElement("div", { className: "flex justify-between items-center mb-2" },
+                    React.createElement("span", { className: "text-xs", style: { color: C.muted } },
+                        "Max age: ",
+                        React.createElement("b", { style: { color: C.chalk } }, scoutFilters.maxAge >= 99 ? "any" : scoutFilters.maxAge)),
+                    React.createElement("input", { type: "range", min: "20", max: "99", step: "1", value: scoutFilters.maxAge, onChange: (e) => setScoutFilters({ ...scoutFilters, maxAge: +e.target.value }), style: { accentColor: "#E8C35A" } })),
+                React.createElement("div", { className: "flex items-center gap-2 flex-wrap" },
+                    React.createElement("span", { className: "text-xs", style: { color: C.muted } }, "Nation:"),
+                    React.createElement("select", { value: scoutFilters.nation, onChange: (e) => setScoutFilters({ ...scoutFilters, nation: e.target.value }), className: "text-xs rounded px-1 py-0.5", style: { background: C.card, color: C.chalk, border: "1px solid rgba(244,247,242,0.2)" } }, nations.map((n) => React.createElement("option", { key: n, value: n }, n === "any" ? "Any" : n))),
+                    React.createElement("button", { onClick: () => setScoutFilters({ ...scoutFilters, signable: !scoutFilters.signable }), className: "text-[10px] px-2 py-0.5 rounded", style: { background: scoutFilters.signable ? C.gold : C.card, color: scoutFilters.signable ? C.bg : C.muted } }, scoutFilters.signable ? "✓ signable only" : "signable only")))),
+            scoutTab === "team" && scoutTeamId == null && (React.createElement("div", { className: "mb-3" }, [0, 1, 2, 3].map((d) => (React.createElement("div", { key: d, className: "mb-2" },
+                React.createElement("div", { className: "text-[11px] mb-1", style: { color: C.gold, letterSpacing: 1 } }, divName(d).toUpperCase()),
+                React.createElement("div", { className: "grid grid-cols-2 gap-1" }, (g.leagues || []).filter((t) => t.division === d).map((t) => (React.createElement("button", { key: t.id, onClick: () => setScoutTeamId(t.id), className: "text-left text-xs p-2 rounded-lg active:scale-95", style: { background: t.id === mt.id ? "rgba(232,195,90,0.15)" : C.panel, color: C.chalk, border: t.id === mt.id ? `1px solid ${C.gold}` : "1px solid transparent" } },
+                    t.name,
+                    t.id === mt.id ? " (you)" : ""))))))))),
+            scoutTab === "team" && scoutTeamId != null && (React.createElement("button", { onClick: () => setScoutTeamId(null), className: "text-xs mb-2", style: { color: C.blue } }, "\u25C2 all teams")),
+            React.createElement("div", { className: "grid gap-2" },
+                list.map((p) => {
+                    const rep = scouts[p.name];
+                    const isPending = pending[p.name] != null;
+                    const sign = canSign(p);
+                    return (React.createElement("div", { key: p.name + p.teamId, className: "p-2.5 rounded-xl", style: { background: C.card, border: `1px solid ${sign ? "rgba(232,195,90,0.35)" : "rgba(244,247,242,0.08)"}` } },
+                        React.createElement("div", { className: "flex justify-between items-baseline" },
+                            React.createElement("span", { style: { fontFamily: FONT, fontSize: 15, color: C.chalk } },
+                                FLAG[NATION_CODE[p.country]] || "",
+                                " ",
+                                p.name),
+                            React.createElement("span", { style: { color: tint(p.overall) } },
+                                p.overall,
+                                " \u00B7 ",
+                                p.age,
+                                "y")),
+                        React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.muted } },
+                            p.team,
+                            " \u00B7 ",
+                            divName(p.division),
+                            p.isReserve ? " · reserve" : ""),
+                        rep ? (React.createElement("div", { className: "text-[11px] p-1.5 rounded mb-1", style: { background: "rgba(127,183,217,0.1)", color: C.chalk } },
+                            React.createElement("b", { style: { color: C.blue } }, "Scout:"),
+                            " potential ",
+                            rep.pot[0],
+                            "\u2013",
+                            rep.pot[1],
+                            ". ",
+                            React.createElement("i", { style: { color: C.muted } }, rep.hint))) : isPending ? (React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.bogey } },
+                            "\uD83D\uDD2D Scout report due in ",
+                            Math.max(1, pending[p.name] - (g.evIdx || 0)),
+                            " event(s)\u2026")) : null,
+                        React.createElement("div", { className: "flex gap-2" },
+                            !rep && !isPending && React.createElement("button", { onClick: () => startScout(p.name), className: "flex-1 py-1.5 rounded text-[11px]", style: { background: C.panel, color: C.blue, fontFamily: FONT, letterSpacing: 1 } }, "\uD83D\uDD2D SCOUT"),
+                            sign && React.createElement("button", { onClick: () => beginNegotiation(p), className: "flex-1 py-1.5 rounded text-[11px]", style: { background: C.gold, color: C.bg, fontFamily: FONT, letterSpacing: 1 } },
+                                "MAKE OFFER \u00B7 $",
+                                valOf(p.name),
+                                "m"),
+                            !sign && React.createElement("div", { className: "flex-1 py-1.5 text-center text-[10px]", style: { color: C.muted } }, "scout only \u2014 above your level"))));
+                }),
+                list.length === 0 && React.createElement("p", { className: "text-sm text-center", style: { color: C.muted } }, "No players match. Loosen the filters."))));
     }
     if (screen === "transferMarket") {
         const mt = myLeagueTeam();
