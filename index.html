@@ -1621,7 +1621,8 @@ function GolfCareerSim() {
             return playerValue({ overall: calcOverall(effAttrs(st)), age: st.pro.age, pot: 99 });
         const ai = aiP(clean, st);
         const e = (st.ai && st.ai[clean]) || {};
-        return ai ? playerValue({ overall: ai.overall, age: ai.age, pot: e.pot || ai.overall }) : 1;
+        const realAge = (e.age != null) ? e.age : aiAgeOf(clean);
+        return ai ? playerValue({ overall: ai.overall, age: realAge, pot: e.pot || ai.overall }) : 1;
     };
     const myLeagueTeam = (st = g) => (st.leagues || []).find((t) => t.members.some((mn) => mn.includes("(YOU)")));
     // players you can realistically sign: same/lower division, OR an unhappy reserve (5th man) at a higher-div club
@@ -1638,8 +1639,10 @@ function GolfCareerSim() {
                 if (!p)
                     return;
                 const isReserve = ranked[ranked.length - 1].mn === mn;
+                // age: prefer the evolved ai age, else the seeded real/age-table value (NOT a flat 28)
+                const realAge = (st.ai && st.ai[cn] && st.ai[cn].age != null) ? st.ai[cn].age : aiAgeOf(cn);
                 out.push({ name: cn, teamId: t.id, team: t.name, division: t.division, overall: ovrOf(mn, st),
-                    age: p.age || 28, country: p.country, isReserve });
+                    age: realAge, country: p.country, isReserve });
             });
         });
         return out;
@@ -3021,7 +3024,7 @@ function GolfCareerSim() {
                     const e = (st.ai && st.ai[name]) || {};
                     const truePot = e.pot || (p ? Math.max(p.overall, p.overall + 3) : 80);
                     const curOvr = p ? p.overall : 75;
-                    const age = p ? (p.age || 28) : 28;
+                    const age = (e.age != null) ? e.age : aiAgeOf(name);
                     const spread = 2 + Math.floor(Math.random() * 3); // ±2–4 fog
                     const lo = Math.max(curOvr, truePot - spread - Math.floor(Math.random() * 2));
                     const hi = Math.min(99, truePot + spread + Math.floor(Math.random() * 2));
