@@ -102,7 +102,42 @@ const buildLeagues = (proName) => {
                 teams[tid].members.push(reserves[rIdx++]);
         }
     }
+    // each team's CAPTAIN = its highest-rated starter (the natural leader)
+    const ovrLookup = {};
+    PLAYERS.forEach((p) => { ovrLookup[p.name] = p.overall; });
+    teams.forEach((t) => {
+        let best = null, bestO = -1;
+        t.members.slice(0, 4).forEach((mn) => { const o = ovrLookup[mn] || 0; if (o > bestO) {
+            bestO = o;
+            best = mn;
+        } });
+        t.captain = best;
+    });
     return teams;
+};
+// course suitability: each course "rewards" certain attributes; a player suited to them performs better
+const COURSE_PROFILE = (course) => {
+    // derive what a course demands from its par/length/difficulty signature (deterministic by name)
+    const n = course.name || "";
+    let h = 0;
+    for (let i = 0; i < n.length; i++)
+        h = (h * 31 + n.charCodeAt(i)) % 9973;
+    const profiles = [
+        { tag: "a long hitter's course — rewards driving distance & power", keys: ["drivingDistance", "longApproach"] },
+        { tag: "tight & technical — rewards driving accuracy & approach play", keys: ["drivingAccuracy", "shortApproach"] },
+        { tag: "a putting test — slick greens reward the flat-stick", keys: ["putting", "chipping"] },
+        { tag: "a grinder's course — rewards scrambling & recovery", keys: ["recovery", "bunker"] },
+        { tag: "an all-rounder's course — rewards approach play & touch", keys: ["longApproach", "shortApproach", "putting"] },
+        { tag: "a second-shot course — rewards iron play above all", keys: ["longApproach", "shortApproach"] },
+    ];
+    return profiles[h % profiles.length];
+};
+// how well a player's attributes fit a course profile → small performance modifier
+const courseSuitability = (attrs, profile) => {
+    if (!attrs || !profile)
+        return 0;
+    const avg = profile.keys.reduce((s, k) => s + (attrs[k] || 75), 0) / profile.keys.length;
+    return avg; // higher = better suited
 };
 const ALLTIME_FIELD = [
     // name, country, [drvAcc, drvDist, longApp, shortApp, chip, putt, recovery, bunker]
@@ -2089,13 +2124,24 @@ function GolfCareerSim() {
             if (mt && mt.members.length >= 5) {
                 const mp = g.teamMemberPts || {};
                 const myOvr = calcOverall(g.pro.attrs);
+                const youAreCaptain = mt.captain && clean2(mt.captain) === g.pro.name;
+                // CAPTAIN: you pick the weekly 4-of-5 yourself (unless you've already picked for this event)
+                if (youAreCaptain && (!g.captainPickFor || g.captainPickFor !== g.evIdx)) {
+                    setScreen("captainPick");
+                    return;
+                }
                 // rank ALL FIVE squad members; selection by overall, season points break ties
                 const ranked = mt.members.map((m) => {
                     const isYou = m.includes("(YOU)");
                     return { name: isYou ? g.pro.name : m.replace(" (YOU)", ""), isYou, ovr: isYou ? myOvr : ovrOf(m), pts: mp[isYou ? g.pro.name : m.replace(" (YOU)", "")] || 0 };
                 }).sort((a, b) => b.ovr - a.ovr || b.pts - a.pts);
-                // the 5th-ranked (last) is the reserve this week
-                const reserve = ranked[ranked.length - 1];
+                // captain's manual bench choice overrides the default weakest, if set for this event
+                let reserve = ranked[ranked.length - 1];
+                if (youAreCaptain && g.captainBench && g.captainPickFor === g.evIdx) {
+                    const benched = ranked.find((r) => r.name === g.captainBench);
+                    if (benched)
+                        reserve = benched;
+                }
                 if (reserve.isYou) {
                     // you're left out of the main team — choose to train or play the alternate
                     setReserveChoice({ ev });
@@ -2678,7 +2724,11 @@ function GolfCareerSim() {
                     if (t.members.length < 5)
                         return;
                     const ranked = t.members.map((mn) => ({ key: clean(mn), ovr: mn.includes("(YOU)") ? calcOverall(g.pro.attrs) : ovrOf(mn, st) })).sort((a, b) => b.ovr - a.ovr);
-                    reserveOf[t.id] = ranked[ranked.length - 1].key; // weakest = reserve
+                    reserveOf[t.id] = ranked[ranked.length - 1].key; // weakest = reserve by default
+                    // if YOU captain this team and benched someone specifically this event, honour it
+                    if (t.id === myTeamId && g.isCaptain && g.captainBench && g.captainPickFor === g.evIdx) {
+                        reserveOf[t.id] = g.captainBench;
+                    }
                 });
                 const perTeam = {};
                 if (tour.team) {
@@ -2713,8 +2763,12 @@ function GolfCareerSim() {
                 }
                 const tsp = { ...(st.teamSeasonPts || {}) };
                 Object.entries(perTeam).forEach(([tid, arr]) => {
+                    const team = st.leagues.find((t) => t.id === +tid);
+                    const capName = team && team.captain ? clean(team.captain) : null;
                     const best4 = arr.slice().sort((a, b) => b.pts - a.pts).slice(0, 4);
-                    tsp[tid] = (tsp[tid] || 0) + best4.reduce((s, x) => s + x.pts, 0);
+                    // the captain's points count DOUBLE toward the club total (glory or pain, amplified)
+                    const sum = best4.reduce((s, x) => s + (x.pts * (capName && x.name === capName ? 2 : 1)), 0);
+                    tsp[tid] = (tsp[tid] || 0) + sum;
                 });
                 st.teamSeasonPts = tsp;
                 if (myTeamObj) {
@@ -2920,6 +2974,9 @@ function GolfCareerSim() {
         }
         st.evIdx = g.evIdx + 1;
         st.faPracticedThisGap = false; // practice is available again before the next event
+        st.captainBench = null;
+        st.captainPickFor = null;
+        st.captainBenchDraft = null; // reset weekly captain pick
         // ===== SCOUT REPORTS that have come due =====
         if (st.scoutPending && Object.keys(st.scoutPending).length) {
             const reports = { ...(st.scoutReports || {}) };
@@ -3609,6 +3666,41 @@ function GolfCareerSim() {
                 st.teamTrophies = tro0;
             }
             st.myDivision = newDiv;
+            // ===== CAPTAINCY: track seniority, detect vacancy, offer the armband when earned =====
+            if (mt) {
+                // seasons at this club (reset if you changed clubs)
+                const sameClub = g.myClubId === mt.id;
+                st.myClubId = mt.id;
+                st.seasonsAtClub = sameClub ? (g.seasonsAtClub || 0) + 1 : 1;
+                // who is the captain now? (may have retired/left — check they're still in the squad)
+                const capStillHere = mt.captain && mt.members.some((m) => clean2(m) === clean2(mt.captain));
+                const myOvrNow = calcOverall(g.pro.attrs);
+                const youAreCaptain = mt.captain && clean2(mt.captain) === g.pro.name;
+                if (!youAreCaptain) {
+                    // form: were you among the team's best this season? seniority: 2+ seasons here
+                    const sf = (g.seasonForm || {})[g.pro.name] || { w: 0, r2: 0, t10: 0, maj: 0 };
+                    const formScore = sf.w * 4 + sf.r2 * 2 + sf.t10 + sf.maj * 5;
+                    const senior = (st.seasonsAtClub || 0) >= 2;
+                    const goodForm = formScore >= 4;
+                    // captaincy opens if: current captain gone, OR you now outrate them clearly
+                    const capOvr = capStillHere ? ovrOf(mt.captain, st) : -1;
+                    const vacancy = !capStillHere || myOvrNow >= capOvr + 1;
+                    if (vacancy && senior && goodForm) {
+                        st.captainOffer = { teamName: mt.name, teamId: mt.id, oldCaptain: capStillHere ? clean2(mt.captain) : null };
+                    }
+                    else if (!capStillHere) {
+                        // no offer to you, but the captain left — promote the new best starter
+                        const starters = mt.members.slice(0, 4).filter((m) => !m.includes("(YOU)"));
+                        let nb = null, nbO = -1;
+                        starters.forEach((m) => { const o = ovrOf(m, st); if (o > nbO) {
+                            nbO = o;
+                            nb = m;
+                        } });
+                        mt.captain = nb || mt.captain;
+                    }
+                }
+                st.isCaptain = youAreCaptain;
+            }
             // ===== TRANSFER OFFERS FOR YOU from bigger clubs (off-season) =====
             {
                 const myVal = playerValue({ overall: calcOverall(g.pro.attrs), age: (g.pro.age || 22) + 1, pot: 99 });
@@ -3773,6 +3865,8 @@ function GolfCareerSim() {
             nextScreen = "playerOffers";
         if (g.mode === "league" && st.incomingBids && st.incomingBids.length)
             nextScreen = "incomingBids";
+        if (g.mode === "league" && st.captainOffer)
+            nextScreen = "captainOffer";
         st.awardsThenScreen = nextScreen;
         setG(st);
         await save(st);
@@ -4797,6 +4891,105 @@ function GolfCareerSim() {
                     "Season ",
                     m.season)))))));
     }
+    if (screen === "captainPick") {
+        const ev = SCHEDULE[g.evIdx];
+        const mt = myLeagueTeam();
+        if (!mt) {
+            setScreen("hub");
+            return null;
+        }
+        const cname = resolveCourseName(ev, g.season);
+        const course = COURSES.find((c) => c.name === cname) || COURSES.find((c) => c.name === ev.course) || COURSES[0];
+        const profile = COURSE_PROFILE(course);
+        const myOvr = calcOverall(g.pro.attrs);
+        const ATTR_LABEL = { drivingAccuracy: "Acc", drivingDistance: "Dist", longApproach: "Long", shortApproach: "Short", chipping: "Chip", putting: "Putt", recovery: "Rec", bunker: "Bnk" };
+        const squad = mt.members.map((m) => {
+            const isYou = m.includes("(YOU)");
+            const name = isYou ? g.pro.name : clean2(m);
+            const attrs = isYou ? effAttrs(g) : (aiP(name) || {});
+            const ovr = isYou ? myOvr : ovrOf(m);
+            const suit = courseSuitability(attrs, profile);
+            // standout attributes (top 2)
+            const top2 = Object.keys(ATTR_LABEL).map((k) => ({ k, v: attrs[k] || 75 })).sort((a, b) => b.v - a.v).slice(0, 2);
+            return { name, isYou, ovr, attrs, suit, top2, suited: suit >= 84 ? "high" : suit >= 78 ? "fair" : "low" };
+        });
+        const benchName = g.captainBenchDraft != null ? g.captainBenchDraft : squad.slice().sort((a, b) => a.ovr - b.ovr)[0].name;
+        const confirmPick = async () => {
+            const st = { ...g, captainBench: benchName, captainPickFor: g.evIdx, captainBenchDraft: null };
+            setG(st);
+            await save(st);
+            setScreen("hub"); // back to hub; pressing the event button now proceeds with the pick locked
+            setTimeout(() => startEvent(), 0);
+        };
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "\uD83C\uDD52 CAPTAIN'S TEAM SELECTION"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk } }, ev.e),
+                React.createElement("p", { className: "text-xs", style: { color: C.muted } }, course.name)),
+            React.createElement("div", { className: "p-2.5 rounded-xl mb-3", style: { background: "rgba(232,195,90,0.1)", border: `1px solid ${C.gold}` } },
+                React.createElement("p", { className: "text-xs", style: { color: C.chalk } },
+                    "\uD83D\uDCCB ",
+                    React.createElement("b", { style: { color: C.gold } }, "Course read:"),
+                    " ",
+                    profile.tag,
+                    "."),
+                React.createElement("p", { className: "text-[10px] mt-0.5", style: { color: C.muted } }, "Pick players suited to it \u2014 a good fit lifts their week, a poor fit can cost you. Tap a player to bench them (4 play, 1 sits).")),
+            React.createElement("div", { className: "grid gap-2 mb-3" }, squad.sort((a, b) => b.ovr - a.ovr).map((p) => {
+                const benched = p.name === benchName;
+                return (React.createElement("button", { key: p.name, onClick: () => setG({ ...g, captainBenchDraft: p.name }), className: "w-full text-left p-2.5 rounded-xl active:scale-[0.99]", style: { background: benched ? "rgba(217,108,79,0.1)" : C.card, border: `1px solid ${benched ? C.red : p.suited === "high" ? "rgba(159,217,139,0.5)" : "rgba(244,247,242,0.1)"}`, opacity: benched ? 0.6 : 1 } },
+                    React.createElement("div", { className: "flex justify-between items-baseline" },
+                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 15, color: p.isYou ? C.gold : C.chalk } },
+                            p.isYou ? "YOU" : p.name,
+                            benched ? " · BENCHED" : ""),
+                        React.createElement("span", { style: { color: tint(p.ovr) } }, p.ovr)),
+                    React.createElement("div", { className: "flex justify-between items-center mt-0.5" },
+                        React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
+                            "Strengths: ",
+                            p.top2.map((t) => `${ATTR_LABEL[t.k]} ${t.v}`).join(", ")),
+                        React.createElement("span", { className: "text-[10px]", style: { color: p.suited === "high" ? C.green : p.suited === "fair" ? C.bogey : C.red } }, p.suited === "high" ? "✓ well suited" : p.suited === "fair" ? "~ decent fit" : "✗ poor fit"))));
+            })),
+            React.createElement(Btn, { onClick: confirmPick }, "LOCK IN TEAM & PLAY \u25B8")));
+    }
+    if (screen === "captainOffer" && g.captainOffer) {
+        const co = g.captainOffer;
+        const acceptCaptaincy = async () => {
+            const leagues = (g.leagues || []).map((t) => ({ ...t, members: t.members.slice() }));
+            const mt = leagues.find((t) => t.id === co.teamId);
+            if (mt)
+                mt.captain = g.pro.name;
+            const st = { ...g, leagues, isCaptain: true, captainOffer: null,
+                mailbox: [{ id: `cap-${g.season}`, season: g.season, kind: "caddie", title: `You're the ${co.teamName} captain`, body: `The armband is yours. You now pick the weekly team and run transfers directly — and your points count double for the club. Lead them well.`, read: false }, ...(g.mailbox || [])] };
+            setG(st);
+            await save(st);
+            setScreen(st.awardsThenScreen && st.awardsThenScreen !== "captainOffer" ? st.awardsThenScreen : "hub");
+        };
+        const declineCaptaincy = async () => {
+            const st = { ...g, captainOffer: null };
+            setG(st);
+            await save(st);
+            setScreen(st.awardsThenScreen && st.awardsThenScreen !== "captainOffer" ? st.awardsThenScreen : "hub");
+        };
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "pt-8 text-center" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 40 } }, "\uD83C\uDD52"),
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 4, color: C.gold } }, "THE ARMBAND"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1.1 }, className: "mb-3" }, "YOU'RE OFFERED THE CAPTAINCY"),
+                React.createElement("div", { className: "p-4 rounded-xl mb-4 text-left", style: { background: C.card, border: `1.5px solid ${C.gold}` } },
+                    React.createElement("p", { className: "text-sm mb-2", style: { color: C.chalk } },
+                        co.oldCaptain ? `${co.oldCaptain} has stepped down as ${co.teamName} captain.` : `The ${co.teamName} captaincy is vacant.`,
+                        " The dressing room wants you to lead."),
+                    React.createElement("p", { className: "text-xs", style: { color: C.muted } },
+                        "As captain you'll ",
+                        React.createElement("b", { style: { color: C.chalk } }, "pick the weekly team"),
+                        ", ",
+                        React.createElement("b", { style: { color: C.chalk } }, "run transfers directly"),
+                        " (no more just suggesting), and read the course to play suited players. But your FedEx points count ",
+                        React.createElement("b", { style: { color: C.gold } }, "double"),
+                        " for the club \u2014 lead from the front, and a bad week stings twice as hard.")),
+                React.createElement("div", { className: "grid gap-2" },
+                    React.createElement(Btn, { onClick: acceptCaptaincy }, "\uD83C\uDD52 ACCEPT THE ARMBAND"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: declineCaptaincy }, "Not yet \u2014 stay in the ranks")))));
+    }
     if (screen === "negotiation" && negotiation) {
         const n = negotiation;
         const p = n.player;
@@ -5219,8 +5412,10 @@ function GolfCareerSim() {
                         .map((r) => ({ ...r, pts: mp[r.clean] || 0 }))
                         .sort((a, b) => b.pts - a.pts || b.ovr - a.ovr);
                     const topName = rows.length && rows[0].pts > 0 ? rows[0].clean : null;
+                    const capName = mt.captain ? clean2(mt.captain) : null;
                     return rows.map((r) => (React.createElement("div", { key: r.mn, className: "flex justify-between text-xs mb-0.5", style: { color: r.you ? C.gold : C.chalk } },
                         React.createElement("span", null,
+                            capName === r.clean ? "🅒 " : "",
                             r.clean,
                             r.you ? " (YOU)" : "",
                             topName === r.clean ? " ⭐" : "",
@@ -5238,7 +5433,9 @@ function GolfCareerSim() {
                             r.pts,
                             " pts"))));
                 })(),
-                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } }, "\u2B50 = squad's top scorer \u00B7 season points decide lineup ties"))),
+                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted } },
+                    "\uD83C\uDD52 = captain (points count double) \u00B7 \u2B50 = top scorer",
+                    g.isCaptain ? " · you lead this team" : ""))),
             React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { className: "flex justify-between mb-1" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold } }, "TABLE \u00B7 THIS SEASON"),
