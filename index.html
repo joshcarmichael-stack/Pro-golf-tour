@@ -536,6 +536,29 @@ const ALT_EVENTS = [
     { e: "Barbasol Championship", c: "Keene Trace Golf Club", purse: 3.8, type: "alt" },
 ];
 const AI_AGES = { "Scottie Scheffler": 29, "Rory McIlroy": 37, "Justin Rose": 45, "Matt Fitzpatrick": 31, "Collin Morikawa": 29, "Tommy Fleetwood": 35, "Xander Schauffele": 32, "Jon Rahm": 31, "Justin Thomas": 33, "Jordan Spieth": 32, "Jason Day": 38, "Adam Scott": 45, "Hideki Matsuyama": 34, "Shane Lowry": 39, "Tyrrell Hatton": 34, "Patrick Cantlay": 34, "Sam Burns": 29, "Keegan Bradley": 40, "Rickie Fowler": 37, "Lucas Glover": 46, "Brian Harman": 39, "Russell Henley": 37, "Harris English": 36, "Alex Noren": 43, "Patrick Reed": 35, "Sungjae Im": 28, "Corey Conners": 34, "Viktor Hovland": 28, "Ludvig Aberg": 26, "Sahith Theegala": 28, "Akshay Bhatia": 24, "Aldrich Potgieter": 21, "Min Woo Lee": 27, "Bryson DeChambeau": 32, "Denny McCarthy": 33, "Cameron Young": 28, "Ben Griffin": 30, "Sepp Straka": 33, "Robert MacIntyre": 29, "Aaron Rai": 31, "Wyndham Clark": 32, "Gary Woodland": 42, "Padraig Harrington": 54, "Zach Johnson": 50, "Stewart Cink": 52, "Kevin Streelman": 47, "Brandt Snedeker": 45, "Webb Simpson": 40, "Francesco Molinari": 43, "Camilo Villegas": 44, "Nicolas Colsaerts": 43, "Bernd Wiesberger": 40, "Marcel Siem": 45, "Ryan Moore": 43, "Chez Reavie": 44, "Joost Luiten": 40, "Richie Ramsay": 42, "Anirban Lahiri": 38, "Ryo Ishikawa": 34, "Matteo Manassero": 33, "Thomas Pieters": 34, "Thorbjorn Olesen": 36, "Kiradech Aphibarnrat": 37 };
+// best-effort approximate ages for further recognisable players (from knowledge, may be off by a year; unlisted names fall back to the name-seeded formula)
+Object.assign(AI_AGES, {
+    "Maverick McNealy": 30, "J.T. Poston": 32, "J.J. Spaun": 35, "Jacob Bridgeman": 25, "Daniel Berger": 32, "Harry Hall": 28,
+    "Chris Gotterup": 26, "Si Woo Kim": 30, "Kristoffer Reitan": 26, "Marco Penge": 27, "Michael Kim": 32, "Matt McCarty": 27,
+    "Nicolas Echavarria": 31, "Andrew Novak": 30, "Ryan Fox": 39, "David Puig": 23, "Nick Taylor": 37, "Ryo Hisatsune": 26,
+    "Max Greyserman": 30, "Bud Cauley": 35, "Matt Wallace": 35, "Haotong Li": 30, "Christiaan Bezuidenhout": 31, "Stephan Jaeger": 36,
+    "Chris Kirk": 40, "Nicolai Hojgaard": 24, "Kurt Kitayama": 32, "Ryan Gerard": 25, "Jake Knapp": 31, "Alex Smalley": 28,
+    "Sam Stevens": 28, "Michael Brennan": 23, "Pierceson Coody": 25, "Sami Valimaki": 27, "Thomas Detry": 32, "Rasmus Hojgaard": 24,
+    "Jayden Schaper": 24, "Jordan Smith": 32, "Patrick Rodgers": 33, "Rasmus Neergaard-Petersen": 26, "Andrew Putnam": 36,
+    "Taylor Pendrith": 34, "Alex Fitzpatrick": 26, "Max McGreevy": 30, "John Parry": 38, "Lucas Herbert": 29, "Garrick Higgo": 26,
+    "Matti Schmid": 27, "Michael Thorbjornsen": 23, "Casey Jarvis": 22, "Daniel Hillier": 26, "Ricky Castillo": 24,
+    "David Lipsky": 37, "Shaun Norris": 43, "Elvis Smylie": 23, "Austin Smotherman": 31, "Erik van Rooyen": 35, "Matthieu Pavon": 33,
+    "Marcus Armitage": 38, "Daniel Brown": 30, "Adrien Saddier": 33, "Will Gordon": 29, "Adrian Meronk": 32, "Callum Tarren": 35,
+    "Ben Kohles": 35, "Taylor Montgomery": 30, "Brian Stuard": 42, "Mark Hubbard": 36, "Dan Bradbury": 25, "Chan Kim": 34,
+    "Vince Whaley": 30, "Hayden Springer": 28, "Carson Young": 29, "Beau Hossler": 30, "Dylan Wu": 29, "Vincent Norrman": 27,
+    "Cristobal Del Solar": 31, "Romain Langasque": 29, "Antoine Rozner": 32, "Patrick Fishburn": 33, "Justin Lower": 36,
+    "Henrik Norlander": 38, "Adam Hadwin": 37, "Takumi Kanaya": 27, "Pablo Larrazabal": 42, "Victor Perez": 33, "Sam Ryder": 35,
+    "Luke List": 40, "Mito Pereira": 30, "Alejandro Tosti": 29, "Dean Burmester": 36, "Dylan Frittelli": 35, "K.H. Lee": 34,
+    "Guido Migliozzi": 28, "Chad Ramey": 33, "Doug Ghim": 29, "Adam Svensson": 31, "Carl Yuan": 28, "Yannik Paul": 31,
+    "Maximilian Kieffer": 35, "Nacho Elvira": 39, "Eugenio Chacarra": 25, "Sebastian Munoz": 32, "Zander Lombard": 30,
+    "Shubhankar Sharma": 29, "Connor Syme": 30, "Jesper Svensson": 25, "Thriston Lawrence": 29, "Keita Nakajima": 25,
+    "Joel Dahmen": 38, "Mac Meissner": 25,
+});
 const BADGES = [
     { id: "firstwin", name: "Winner's Nerve", desc: "First tour win", attr: "putting", test: (m) => m.careerWins >= 1 },
     { id: "fivewins", name: "The Closer", desc: "5 career wins", attr: "shortApproach", test: (m) => m.careerWins >= 5 },
@@ -668,7 +691,7 @@ const equipMods = (equip) => {
 };
 const aiAgeOf = (name) => { if (AI_AGES[name] != null)
     return AI_AGES[name]; let h = 53; for (let i = 0; i < name.length; i++)
-    h = (h * 31 + name.charCodeAt(i)) % 9973; return 24 + (h % 11); };
+    h = (h * 31 + name.charCodeAt(i)) % 9973; return 20 + (h % 19); };
 const ATTR_HINTS = {
     drivingAccuracy: ["The fairways are corridors — leak it offline and you're pitching out sideways all week.", "Position off the tee is everything here. The winner won't be the longest — he'll be the straightest."],
     drivingDistance: ["Length is a cheat code here. The bombers turn long holes into flicks.", "It's a big ballpark — carry numbers off the tee separate the field before anyone hits an iron."],
@@ -2155,10 +2178,20 @@ function GolfCareerSim() {
             return;
         }
         let realEv = ev, cname = resolveCourseName(ev, g.season), filterNames = null, parallel = null;
-        if (ev.type === "major" || ev.type === "signature") {
+        // a FREE AGENT is non-exempt on the main tour — they play the opposite/alternate field for EVERY event until a club signs them
+        if (g.isFreeAgent && ev.type !== "team") {
+            const ok = (ev.type === "major" || ev.type === "signature") ? qualifiedCheck(ev) : (() => true);
+            const qNames = ROSTER().map((p) => p.name).filter(ok);
+            const alt = ALT_EVENTS[g.evIdx % ALT_EVENTS.length];
+            realEv = { ...alt, opposite: ev.e };
+            cname = alt.c;
+            // the alternate field = the weaker players not in the main event (plus you)
+            filterNames = ROSTER().map((p) => p.name).filter((n) => (ev.type === "major" || ev.type === "signature") ? !ok(n) : ovrOf(n) < 78);
+            parallel = { ev, cname: resolveCourseName(ev, g.season), names: qNames };
+        }
+        else if (ev.type === "major" || ev.type === "signature") {
             const ok = qualifiedCheck(ev);
-            // a free agent is non-exempt — never in the signature/major field, always sent to the alternate
-            const youQualify = !g.isFreeAgent && ok(g.pro.name);
+            const youQualify = ok(g.pro.name);
             const qNames = ROSTER().map((p) => p.name).filter(ok);
             if (!youQualify) {
                 const alt = ALT_EVENTS[g.evIdx % ALT_EVENTS.length];
@@ -4347,6 +4380,12 @@ function GolfCareerSim() {
                     "Your record here: ",
                     myRecord.slice(-4).map((h) => `S${h.s}: ${h.r}`).join(" · "))),
                 (() => {
+                    if (g.isFreeAgent && ev.type !== "team") {
+                        return React.createElement("p", { className: "text-xs mt-1", style: { color: C.bogey } },
+                            "\uD83C\uDF92 FREE AGENT \u2014 you'll play the ",
+                            ALT_EVENTS[g.evIdx % ALT_EVENTS.length].e,
+                            " (opposite-field). Sign for a club to earn full tour status.");
+                    }
                     if (ev.type !== "major" && ev.type !== "signature")
                         return null;
                     const youOk = qualifiedCheck(ev)(g.pro.name);
@@ -4359,7 +4398,7 @@ function GolfCareerSim() {
                         ev.type === "major" ? "Get inside the world top 100 (or win) to make these fields." : "World top 50 or FedEx top 30 gets you in."));
                 })(),
                 React.createElement("div", { className: "mt-2" },
-                    React.createElement(Btn, { onClick: startEvent }, ev.type === "team" ? "FIND A PARTNER" : (ev.type === "major" || ev.type === "signature") && !qualifiedCheck(ev)(g.pro.name) ? "PLAY THE OPPOSITE EVENT" : "HIT THE RANGE")))),
+                    React.createElement(Btn, { onClick: startEvent }, ev.type === "team" ? "FIND A PARTNER" : (g.isFreeAgent || ((ev.type === "major" || ev.type === "signature") && !qualifiedCheck(ev)(g.pro.name))) ? "PLAY THE OPPOSITE EVENT" : "HIT THE RANGE")))),
             React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2" },
                 React.createElement(Btn, { small: true, onClick: () => setScreen("develop") },
                     "\uD83D\uDCAA DEVELOP",
