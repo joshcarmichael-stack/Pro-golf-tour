@@ -1313,6 +1313,23 @@ const simRyderSessions = (usa, eur, strategy, homeSide, captainCtx) => {
 };
 // ============ STYLES ============
 const C = { bg: "#0E2A1C", panel: "#143D29", card: "#1B4D34", chalk: "#F4F7F2", gold: "#E8C35A", muted: "#9DBBA8", red: "#D96C4F", green: "#9FD98B", blue: "#7FB7D9", bogey: "#E0A060" };
+// per-area theming — gold stays home's signature; cups go floodlit blue, management cool slate, majors warm prestige.
+// shared constants (text, score colours, result hues) never change so the game stays coherent.
+const THEMES = {
+    home: { bg: "#0E2A1C", panel: "#143D29", card: "#1B4D34", accent: "#E8C35A", accentSoft: "#9FD98B" }, // clubhouse green + gold
+    cup: { bg: "#0A1A30", panel: "#13284A", card: "#1B355F", accent: "#5BA8E8", accentSoft: "#E8C35A" }, // floodlit navy + electric blue (gold for trophies)
+    mgmt: { bg: "#161A20", panel: "#222831", card: "#2C333E", accent: "#6FB3A8", accentSoft: "#E8C35A" }, // boardroom slate + steel teal
+    major: { bg: "#0B2417", panel: "#123A23", card: "#17492C", accent: "#F0CE6A", accentSoft: "#C7A24A" }, // augusta-deep green + rich gold
+};
+const themeFor = (screen, g) => {
+    const cupScreens = ["ryder", "ryderCall", "ryderHQ", "cupMatch", "worldCup", "worldCupQual", "wcMatch", "wcPlayoff", "puttoff", "negotiation"];
+    const mgmtScreens = ["transferMarket", "scoutMarket", "incomingBids", "negotiation", "captainPick", "captainOffer"];
+    if (["ryder", "ryderCall", "ryderHQ", "cupMatch", "worldCup", "worldCupQual", "wcMatch", "wcPlayoff"].includes(screen))
+        return THEMES.cup;
+    if (["transferMarket", "scoutMarket", "incomingBids", "negotiation", "captainPick", "captainOffer"].includes(screen))
+        return THEMES.mgmt;
+    return THEMES.home;
+};
 const FONT = "'Bebas Neue','Arial Narrow',sans-serif";
 const tint = (v) => v >= 90 ? C.gold : v >= 85 ? C.green : v >= 80 ? C.chalk : C.red;
 const scoreColor = (sc, par) => { const d = sc - par; return d <= -2 ? C.gold : d === -1 ? C.green : d === 0 ? C.chalk : d === 1 ? C.bogey : C.red; };
@@ -1355,9 +1372,13 @@ function Btn({ children, onClick, disabled, kind = "gold", small }) {
 function BackTop({ onClick }) {
     return (React.createElement("button", { onClick: onClick, className: "mb-2 px-3 py-1.5 rounded-md active:scale-95", style: { background: C.panel, color: C.chalk, fontFamily: FONT, fontSize: 14, letterSpacing: 2, border: "1px solid rgba(244,247,242,0.25)" } }, "\u2039 BACK"));
 }
-const Shell = ({ children }) => (React.createElement("div", { className: "min-h-screen", style: { background: C.bg } },
-    React.createElement("style", null, `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');`),
-    React.createElement("div", { className: "max-w-md mx-auto p-4 pb-10" }, children)));
+let ACTIVE_THEME = THEMES.home; // set each render by the main component based on current screen
+const Shell = ({ children, theme }) => {
+    const t = theme || ACTIVE_THEME || THEMES.home;
+    return (React.createElement("div", { className: "min-h-screen", style: { background: t.bg, transition: "background 0.4s ease" } },
+        React.createElement("style", null, `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');`),
+        React.createElement("div", { className: "max-w-md mx-auto p-4 pb-10" }, children)));
+};
 const ELITE = PLAYERS.filter((p) => p.rank <= 100);
 const OWGR_SEED = Object.fromEntries(PLAYERS.map((p) => [p.name, p.rank <= 100 ? (101 - p.rank) * 20 : Math.round(12 + (200 - p.rank) * 1.5)]));
 const REGEN_FIRST = {
@@ -1426,6 +1447,17 @@ function GolfCareerSim() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10;
     const [g, setG] = useState(null);
     const [screen, setScreen] = useState("loading");
+    // active area theme (home green / cup blue / management slate / major warm) — set each render
+    {
+        const cupS = ["ryder", "ryderCall", "ryderHQ", "cupMatch", "worldCup", "worldCupQual", "wcMatch", "wcPlayoff"];
+        const mgmtS = ["transferMarket", "scoutMarket", "incomingBids", "negotiation", "captainPick", "captainOffer"];
+        let th = THEMES.home;
+        if (cupS.includes(screen))
+            th = THEMES.cup;
+        else if (mgmtS.includes(screen))
+            th = THEMES.mgmt;
+        ACTIVE_THEME = th;
+    }
     const [mode, setMode] = useState("standard");
     const [name, setName] = useState("");
     const [nation, setNation] = useState("");
