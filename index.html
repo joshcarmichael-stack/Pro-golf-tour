@@ -1312,24 +1312,31 @@ const simRyderSessions = (usa, eur, strategy, homeSide, captainCtx) => {
     return { sessions, usaPts, eurPts, youTeam, youSinglesMod: singlesMod };
 };
 // ============ STYLES ============
-const C = { bg: "#0E2A1C", panel: "#143D29", card: "#1B4D34", chalk: "#F4F7F2", gold: "#E8C35A", muted: "#9DBBA8", red: "#D96C4F", green: "#9FD98B", blue: "#7FB7D9", bogey: "#E0A060" };
-// per-area theming — gold stays home's signature; cups go floodlit blue, management cool slate, majors warm prestige.
-// shared constants (text, score colours, result hues) never change so the game stays coherent.
+let ACTIVE_THEME = null; // set each render based on screen; declared before C so getters can read it
+const C_CONST = { chalk: "#F4F7F2", gold: "#E8C35A", muted: "#9DBBA8", red: "#D96C4F", green: "#9FD98B", blue: "#7FB7D9", bogey: "#E0A060" };
+// C: constants are fixed; bg/panel/card/accent resolve to the ACTIVE area theme so every surface follows the section
+const C = new Proxy(C_CONST, {
+    get(target, prop) {
+        const t = ACTIVE_THEME || THEMES_HOME;
+        if (prop === "bg")
+            return t.bg;
+        if (prop === "panel")
+            return t.panel;
+        if (prop === "card")
+            return t.card;
+        if (prop === "accent")
+            return t.accent;
+        return target[prop];
+    },
+});
+const THEMES_HOME = { bg: "#0E2A1C", panel: "#143D29", card: "#1B4D34", accent: "#E8C35A", accentSoft: "#9FD98B" };
 const THEMES = {
-    home: { bg: "#0E2A1C", panel: "#143D29", card: "#1B4D34", accent: "#E8C35A", accentSoft: "#9FD98B" }, // clubhouse green + gold
-    cup: { bg: "#0A1A30", panel: "#13284A", card: "#1B355F", accent: "#5BA8E8", accentSoft: "#E8C35A" }, // floodlit navy + electric blue (gold for trophies)
+    home: THEMES_HOME, // clubhouse green + gold
+    cup: { bg: "#0A1A30", panel: "#13284A", card: "#1B355F", accent: "#5BA8E8", accentSoft: "#E8C35A" }, // floodlit navy + electric blue
     mgmt: { bg: "#161A20", panel: "#222831", card: "#2C333E", accent: "#6FB3A8", accentSoft: "#E8C35A" }, // boardroom slate + steel teal
     major: { bg: "#0B2417", panel: "#123A23", card: "#17492C", accent: "#F0CE6A", accentSoft: "#C7A24A" }, // augusta-deep green + rich gold
 };
-const themeFor = (screen, g) => {
-    const cupScreens = ["ryder", "ryderCall", "ryderHQ", "cupMatch", "worldCup", "worldCupQual", "wcMatch", "wcPlayoff", "puttoff", "negotiation"];
-    const mgmtScreens = ["transferMarket", "scoutMarket", "incomingBids", "negotiation", "captainPick", "captainOffer"];
-    if (["ryder", "ryderCall", "ryderHQ", "cupMatch", "worldCup", "worldCupQual", "wcMatch", "wcPlayoff"].includes(screen))
-        return THEMES.cup;
-    if (["transferMarket", "scoutMarket", "incomingBids", "negotiation", "captainPick", "captainOffer"].includes(screen))
-        return THEMES.mgmt;
-    return THEMES.home;
-};
+ACTIVE_THEME = THEMES_HOME;
 const FONT = "'Bebas Neue','Arial Narrow',sans-serif";
 const tint = (v) => v >= 90 ? C.gold : v >= 85 ? C.green : v >= 80 ? C.chalk : C.red;
 const scoreColor = (sc, par) => { const d = sc - par; return d <= -2 ? C.gold : d === -1 ? C.green : d === 0 ? C.chalk : d === 1 ? C.bogey : C.red; };
@@ -1372,7 +1379,6 @@ function Btn({ children, onClick, disabled, kind = "gold", small }) {
 function BackTop({ onClick }) {
     return (React.createElement("button", { onClick: onClick, className: "mb-2 px-3 py-1.5 rounded-md active:scale-95", style: { background: C.panel, color: C.chalk, fontFamily: FONT, fontSize: 14, letterSpacing: 2, border: "1px solid rgba(244,247,242,0.25)" } }, "\u2039 BACK"));
 }
-let ACTIVE_THEME = THEMES.home; // set each render by the main component based on current screen
 const Shell = ({ children, theme }) => {
     const t = theme || ACTIVE_THEME || THEMES.home;
     return (React.createElement("div", { className: "min-h-screen", style: { background: t.bg, transition: "background 0.4s ease" } },
@@ -1456,6 +1462,12 @@ function GolfCareerSim() {
             th = THEMES.cup;
         else if (mgmtS.includes(screen))
             th = THEMES.mgmt;
+        else if (g && g.mode && screen === "play") {
+            // warm prestige during a major championship week
+            const ev = SCHEDULE[g.evIdx];
+            if (ev && ev.type === "major")
+                th = THEMES.major;
+        }
         ACTIVE_THEME = th;
     }
     const [mode, setMode] = useState("standard");
