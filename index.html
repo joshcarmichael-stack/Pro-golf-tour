@@ -1445,7 +1445,15 @@ const makeRegen = (slotCountry, taken) => {
     attrs[keys[Math.floor(Math.random() * keys.length)]] = Math.min(ceil, attrs[keys[Math.floor(Math.random() * keys.length)]] + 4);
     return { displayName: nm, country, age: 19 + Math.floor(Math.random() * 5), attrs, overall: calcOverall(attrs), rookie: true, pot: ceil, tier };
 };
-const SAVE_KEY = "golf-career-sim-v4";
+const SAVE_KEY = "golf-career-sim-v4"; // legacy single-slot key, migrated into per-mode slots on first load
+const GAME_MODES = [
+    { id: "standard", emoji: "🏆", name: "TOUR CAREER", desc: "The real modern tour. Start as a 17-year-old nobody ranked outside the world top 200 and grind your way to greatness against today's pros." },
+    { id: "alltime", emoji: "👑", name: "ALL-TIME GREATS", desc: "Fantasy mode. The field is golf's 25 greatest players at their absolute primes — Tiger '00, Jack '72, Hogan '53, Seve '84. Can you beat the legends and top the GOAT board yourself?" },
+    { id: "team", emoji: "🤝", name: "TEAM TOUR", desc: "Franchise mode. 36 four-man teams ranked by talent. You start on the weakest squad — play well, and stronger teams come calling. Your best two finishers each week score for the club in the season-long title race." },
+    { id: "league", emoji: "🏟️", name: "LEAGUE SYSTEM", desc: "Football-style. 40 even teams across 4 divisions, a transfer market driven by team budgets and player values, and promotion to chase. Start as a free agent — three clubs want you. Work your way to the top flight." },
+];
+const MODE_IDS = GAME_MODES.map((m) => m.id);
+const SLOT_KEY = (m) => SAVE_KEY + "-" + (m || "standard"); // one independent save per game mode
 const freshStats = () => ({ events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 0, bestFinish: null,
     birdies: 0, eagles: 0, albatrosses: 0, aces: 0,
     careerMoney: 0, careerWins: 0, careerMajors: 0, careerBirdies: 0, careerEagles: 0, careerAlbatrosses: 0, careerAces: 0,
@@ -1505,52 +1513,96 @@ function GolfCareerSim() {
     const [pendingSign, setPendingSign] = useState(null);
     const [worldTab, setWorldTab] = useState("pts");
     const [rrPair, setRrPair] = useState(null);
-    useEffect(() => {
-        (async () => {
+    const [slots, setSlots] = useState({}); // { modeId: { name, season, retired, savedAt } } for the home-screen menu
+    // repair + normalize a loaded save (shared by every slot load)
+    const repairSave = (s) => {
+        if (s.pro && s.pro.attrs) {
+            const BASE8 = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
+            let fixed = false;
+            BASE8.forEach((k) => { if (typeof s.pro.attrs[k] !== "number" || isNaN(s.pro.attrs[k])) {
+                s.pro.attrs[k] = 72;
+                fixed = true;
+            } });
+            if (s.pro.attrs.composure == null) {
+                s.pro.attrs.composure = 75;
+                fixed = true;
+            }
+            const ov = calcOverall(s.pro.attrs);
+            if (fixed || typeof s.pro.overall !== "number" || isNaN(s.pro.overall))
+                s.pro.overall = ov;
+        }
+        if (!s.retired && s.evIdx >= SCHEDULE.length) {
             try {
-                const res = await window.storage.get(SAVE_KEY);
-                if (res === null || res === void 0 ? void 0 : res.value) {
-                    let s = JSON.parse(res.value);
-                    if (s === null || s === void 0 ? void 0 : s.pro) {
-                        // REPAIR: fix any missing/NaN attributes on the saved pro (e.g. from the composure-creation bug)
-                        if (s.pro && s.pro.attrs) {
-                            const BASE8 = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker"];
-                            let fixed = false;
-                            BASE8.forEach((k) => { if (typeof s.pro.attrs[k] !== "number" || isNaN(s.pro.attrs[k])) {
-                                s.pro.attrs[k] = 72;
-                                fixed = true;
-                            } });
-                            if (s.pro.attrs.composure == null) {
-                                s.pro.attrs.composure = 75;
-                                fixed = true;
-                            }
-                            const ov = calcOverall(s.pro.attrs);
-                            if (fixed || typeof s.pro.overall !== "number" || isNaN(s.pro.overall))
-                                s.pro.overall = ov;
-                        }
-                        // REPAIR: a season finished but never rolled over (evIdx past schedule end, not retired)
-                        if (!s.retired && s.evIdx >= SCHEDULE.length) {
-                            try {
-                                if (s.season % 2 === 0 ? !s.lastRyder : !(s.lastRyder && s.lastRyder.kind === "pres")) {
-                                    // a cup/review was owed but skipped — just complete the rollover safely
-                                }
-                                s = buildNextSeason(s);
-                            }
-                            catch (e) { }
-                        }
-                        // RESTORE a pending reroll spin (anti-exploit: refresh shows the SAME dealt cards, not a fresh spin)
-                        if (s.pendingReroll && s.pendingReroll.picks) {
-                            setRrAttr(s.pendingReroll.attrKey);
-                            setRrPair(s.pendingReroll.picks.map((pk) => ({ name: pk.name, [s.pendingReroll.attrKey]: pk.val })));
-                        }
-                        setG(s);
-                        await save(s);
-                        setScreen(s.retired ? "retired" : "hub");
-                        return;
-                    }
+                s = buildNextSeason(s);
+            }
+            catch (e) { }
+        }
+        return s;
+    };
+    // scan every mode's slot and return light metadata for the home-screen menu
+    const scanSlots = async () => {
+        const found = {};
+        for (const m of MODE_IDS) {
+            try {
+                const r = await window.storage.get(SLOT_KEY(m));
+                if (r === null || r === void 0 ? void 0 : r.value) {
+                    const s = JSON.parse(r.value);
+                    if (s === null || s === void 0 ? void 0 : s.pro)
+                        found[m] = { name: s.pro.name, season: s.season, retired: !!s.retired, savedAt: s.savedAt || 0 };
                 }
             }
             catch (e) { }
+        }
+        return found;
+    };
+    // load a specific mode's save into the active game state
+    const loadSlot = async (m) => {
+        try {
+            const res = await window.storage.get(SLOT_KEY(m));
+            if (res === null || res === void 0 ? void 0 : res.value) {
+                let s = JSON.parse(res.value);
+                if (s === null || s === void 0 ? void 0 : s.pro) {
+                    s = repairSave(s);
+                    if (s.pendingReroll && s.pendingReroll.picks) {
+                        setRrAttr(s.pendingReroll.attrKey);
+                        setRrPair(s.pendingReroll.picks.map((pk) => ({ name: pk.name, [s.pendingReroll.attrKey]: pk.val })));
+                    }
+                    else {
+                        setRrAttr(null);
+                        setRrPair(null);
+                    }
+                    setG(s);
+                    setMode(s.mode || "standard");
+                    await save(s);
+                    setScreen(s.retired ? "retired" : "hub");
+                    return true;
+                }
+            }
+        }
+        catch (e) { }
+        return false;
+    };
+    useEffect(() => {
+        (async () => {
+            // ONE-TIME MIGRATION: fold the old single-slot save into its mode's own slot
+            try {
+                const old = await window.storage.get(SAVE_KEY);
+                if (old === null || old === void 0 ? void 0 : old.value) {
+                    const parsed = JSON.parse(old.value);
+                    const m = (parsed && parsed.mode) || "standard";
+                    const already = await window.storage.get(SLOT_KEY(m)).catch(() => null);
+                    if (!(already === null || already === void 0 ? void 0 : already.value))
+                        await window.storage.set(SLOT_KEY(m), old.value);
+                    await window.storage.delete(SAVE_KEY);
+                }
+            }
+            catch (e) { }
+            const found = await scanSlots();
+            setSlots(found);
+            // resume whichever career was played most recently — Home is always one tap away to switch
+            const active = Object.entries(found).filter(([, v]) => !v.retired).sort((a, b) => (b[1].savedAt || 0) - (a[1].savedAt || 0))[0];
+            if (active && (await loadSlot(active[0])))
+                return;
             setScreen("landing");
         })();
         return () => clearInterval(spinIv.current);
@@ -1587,7 +1639,8 @@ function GolfCareerSim() {
     }, [autoPlay, (_a = tour === null || tour === void 0 ? void 0 : tour.live) === null || _a === void 0 ? void 0 : _a.revealed]);
     const gRef = g;
     const save = async (st) => { try {
-        await window.storage.set(SAVE_KEY, JSON.stringify(st));
+        st.savedAt = Date.now();
+        await window.storage.set(SLOT_KEY(st.mode || "standard"), JSON.stringify(st));
     }
     catch (e) { } };
     // ---------- effective (caddie-boosted) attrs ----------
@@ -2041,13 +2094,20 @@ function GolfCareerSim() {
         save(st);
         setTimeout(() => setScreen(st.mode === "league" && st.isFreeAgent ? "faIntro" : "hub"), 700);
     };
-    const [confirmNew, setConfirmNew] = useState(false);
+    const [confirmEraseId, setConfirmEraseId] = useState(null); // which mode card is showing an erase confirmation
     const goHome = () => setScreen("landing");
+    // erase the CURRENT career's own slot (other modes' saves are untouched)
     const resetAll = async () => {
+        const m = (g === null || g === void 0 ? void 0 : g.mode) || "standard";
+        try {
+            await window.storage.delete(SLOT_KEY(m));
+        }
+        catch (e) { }
         try {
             await window.storage.delete(SAVE_KEY);
         }
-        catch (e) { }
+        catch (e) { } // clean up the legacy key too, if it ever lingers
+        setSlots((s) => { const n = { ...s }; delete n[m]; return n; });
         setG(null);
         setAttrs({});
         setPair(null);
@@ -2058,6 +2118,17 @@ function GolfCareerSim() {
         setRyder(null);
         setZOffers(null);
         setScreen("landing");
+    };
+    // erase a SPECIFIC mode's slot from the home-screen menu (used to start a fresh career in a mode you already have a save for)
+    const eraseSlot = async (m) => {
+        try {
+            await window.storage.delete(SLOT_KEY(m));
+        }
+        catch (e) { }
+        setSlots((s) => { const n = { ...s }; delete n[m]; return n; });
+        if (g && g.mode === m) {
+            setG(null);
+        }
     };
     const hireCaddie = async (c) => {
         // if re-signing the same caddie (from prevCaddie), keep their accumulated chemistry; a new hire starts at 0
@@ -4003,57 +4074,50 @@ function GolfCareerSim() {
         return React.createElement(Shell, null,
             React.createElement("div", null));
     if (screen === "landing") {
+        const modeLabel = (id) => id === "alltime" ? "All-Time Greats" : id === "team" ? "Team Tour" : id === "league" ? "League System" : "Tour Career";
+        const startFresh = (id) => { setConfirmEraseId(null); setMode(id); setAttrs({}); setPair(null); setName(""); setNation(""); setLastTake(null); setScreen("identity"); };
         return (React.createElement(Shell, null,
-            React.createElement("div", { className: "pt-16 text-center" },
+            React.createElement("div", { className: "pt-10 text-center mb-2" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, letterSpacing: 6, color: C.gold } }, "\u26F3 SUNDAY PINS"),
-                React.createElement("h1", { style: { fontFamily: FONT, fontSize: 56, color: C.chalk, lineHeight: 0.95 }, className: "mt-1" },
-                    "A GOLF",
-                    React.createElement("br", null),
-                    "CAREER"),
-                React.createElement("p", { className: "text-xs mt-2", style: { color: C.gold, letterSpacing: 2 } }, "GOLF'S ANSWER TO FOOTBALL MANAGER"),
-                React.createElement("p", { className: "text-sm mt-3 mb-8 px-4", style: { color: C.muted } }, "Build a player from nothing. Climb the world rankings, win majors, make the cup teams, and chase the greatest careers of all time \u2014 hole by hole."),
-                React.createElement("div", { className: "px-2" }, g && g.pro ? (React.createElement(React.Fragment, null,
-                    React.createElement(Btn, { onClick: () => setScreen(g.retired ? "retired" : "hub") }, "\u25B6 CONTINUE CAREER"),
-                    React.createElement("div", { className: "text-xs mt-1 mb-3", style: { color: C.muted } },
-                        g.pro.name,
+                React.createElement("h1", { style: { fontFamily: FONT, fontSize: 44, color: C.chalk, lineHeight: 0.95 }, className: "mt-1" }, "CHOOSE YOUR WORLD"),
+                React.createElement("p", { className: "text-xs mt-2 mb-1", style: { color: C.gold, letterSpacing: 2 } }, "GOLF'S ANSWER TO FOOTBALL MANAGER"),
+                React.createElement("p", { className: "text-xs mb-5 px-2", style: { color: C.muted } }, "Every mode keeps its own save \u2014 jump between careers whenever you like.")),
+            React.createElement("div", { className: "px-1" }, GAME_MODES.map((md) => {
+                const slot = slots[md.id];
+                const isActive = g && g.pro && g.mode === md.id;
+                const confirming = confirmEraseId === md.id;
+                return (React.createElement("div", { key: md.id, className: "w-full mb-3 p-4 rounded-xl text-left", style: { background: md.id === "alltime" ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card, border: isActive ? `1.5px solid ${C.gold}` : md.id === "alltime" ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.2)" } },
+                    React.createElement("div", { className: "flex justify-between items-start" },
+                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: md.id === "alltime" ? C.gold : C.chalk } },
+                            md.emoji,
+                            " ",
+                            md.name),
+                        isActive && React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded", style: { background: C.gold, color: C.bg, fontFamily: FONT, letterSpacing: 1 } }, "\u25CF PLAYING")),
+                    slot ? (React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } },
+                        React.createElement("span", { style: { color: C.chalk } }, slot.name),
                         " \u00B7 ",
-                        g.mode === "alltime" ? "All-Time Greats" : g.mode === "team" ? "Team Tour" : g.mode === "league" ? "League System" : "Tour Career",
-                        " \u00B7 Season ",
-                        g.season),
-                    !confirmNew ? (React.createElement(Btn, { kind: "panel", onClick: () => setConfirmNew(true) }, "\uFF0B START A NEW CAREER")) : (React.createElement("div", { className: "p-3 rounded-xl", style: { background: C.panel, border: `1px solid ${C.red}` } },
+                        slot.retired ? "Retired" : `Season ${slot.season}`)) : (React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, md.desc)),
+                    !confirming ? (React.createElement("div", { className: "grid gap-2 mt-3", style: { gridTemplateColumns: slot ? "1fr auto" : "1fr" } }, slot ? (React.createElement(React.Fragment, null,
+                        React.createElement(Btn, { small: true, onClick: () => loadSlot(md.id) }, "\u25B6 CONTINUE"),
+                        React.createElement("button", { onClick: () => setConfirmEraseId(md.id), className: "px-3 rounded-md text-xs", style: { background: C.panel, color: C.muted, border: "1px solid rgba(244,247,242,0.2)" } }, "New"))) : (React.createElement(Btn, { small: true, onClick: () => startFresh(md.id) }, "\u25B6 START")))) : (React.createElement("div", { className: "p-2.5 rounded-lg mt-3", style: { background: C.panel, border: `1px solid ${C.red}` } },
                         React.createElement("p", { className: "text-xs mb-2", style: { color: C.chalk } },
-                            "Starting a new career will ",
+                            "This will ",
                             React.createElement("b", { style: { color: C.red } }, "permanently erase"),
-                            " your current one (",
-                            g.pro.name,
-                            "). Are you sure?"),
+                            " your ",
+                            modeLabel(md.id),
+                            " career (", slot === null || slot === void 0 ? void 0 :
+                            slot.name,
+                            "). Sure?"),
                         React.createElement("div", { className: "grid grid-cols-2 gap-2" },
-                            React.createElement(Btn, { small: true, kind: "red", onClick: async () => { setConfirmNew(false); await resetAll(); setScreen("modeSelect"); } }, "YES, ERASE"),
-                            React.createElement(Btn, { small: true, kind: "panel", onClick: () => setConfirmNew(false) }, "CANCEL")))))) : (React.createElement(Btn, { onClick: () => setScreen("modeSelect") }, "\u25B6 NEW CAREER"))),
-                React.createElement("p", { className: "text-[10px] mt-6", style: { color: C.muted, opacity: 0.6 } }, "v2 \u00B7 your progress saves automatically"))));
-    }
-    if (screen === "modeSelect") {
-        const MODES = [
-            { id: "standard", emoji: "🏆", name: "TOUR CAREER", desc: "The real modern tour. Start as a 17-year-old nobody ranked outside the world top 200 and grind your way to greatness against today's pros." },
-            { id: "alltime", emoji: "👑", name: "ALL-TIME GREATS", desc: "Fantasy mode. The field is golf's 25 greatest players at their absolute primes — Tiger '00, Jack '72, Hogan '53, Seve '84. Can you beat the legends and top the GOAT board yourself?" },
-            { id: "team", emoji: "🤝", name: "TEAM TOUR", desc: "Franchise mode. 36 four-man teams ranked by talent. You start on the weakest squad — play well, and stronger teams come calling. Your best two finishers each week score for the club in the season-long title race." },
-            { id: "league", emoji: "🏟️", name: "LEAGUE SYSTEM", desc: "Football-style. 40 even teams across 4 divisions, a transfer market driven by team budgets and player values, and promotion to chase. Start as a free agent — three clubs want you. Work your way to the top flight." },
-        ];
-        return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("landing") }),
-            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk } }, "CHOOSE YOUR WORLD"),
-            React.createElement("p", { className: "text-xs mb-3", style: { color: C.muted } }, "Pick the field you want to test yourself against. More modes coming."),
-            MODES.map((md) => (React.createElement("button", { key: md.id, onClick: () => { setMode(md.id); setScreen("identity"); }, className: "w-full mb-3 p-4 rounded-xl text-left active:scale-[0.99]", style: { background: md.id === "alltime" ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card, border: md.id === "alltime" ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.2)" } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 24, color: md.id === "alltime" ? C.gold : C.chalk } },
-                    md.emoji,
-                    " ",
-                    md.name),
-                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, md.desc))))));
+                            React.createElement(Btn, { small: true, kind: "red", onClick: async () => { await eraseSlot(md.id); startFresh(md.id); } }, "YES, ERASE"),
+                            React.createElement(Btn, { small: true, kind: "panel", onClick: () => setConfirmEraseId(null) }, "CANCEL"))))));
+            })),
+            React.createElement("p", { className: "text-[10px] mt-2 text-center", style: { color: C.muted, opacity: 0.6 } }, "v3 \u00B7 your progress saves automatically, per mode")));
     }
     if (screen === "identity") {
         return (React.createElement(Shell, null,
             React.createElement("div", { className: "pt-10 text-center" },
-                React.createElement("button", { onClick: () => setScreen("modeSelect"), className: "mb-2 px-3 py-1 rounded-md", style: { background: C.panel, color: C.chalk, fontFamily: FONT, fontSize: 13, letterSpacing: 2, border: "1px solid rgba(244,247,242,0.25)" } }, "\u2039 MODE"),
+                React.createElement("button", { onClick: () => setScreen("landing"), className: "mb-2 px-3 py-1 rounded-md", style: { background: C.panel, color: C.chalk, fontFamily: FONT, fontSize: 13, letterSpacing: 2, border: "1px solid rgba(244,247,242,0.25)" } }, "\u2039 MODE"),
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, letterSpacing: 5, color: C.gold } }, mode === "alltime" ? "👑 ALL-TIME GREATS" : "⛳ SUNDAY PINS"),
                 React.createElement("h1", { style: { fontFamily: FONT, fontSize: 50, color: C.chalk, lineHeight: 1 } }, "BUILD YOUR PRO"),
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 11, letterSpacing: 3, color: C.muted } }, "SUNDAY PINS \u00B7 A GOLF CAREER"),
