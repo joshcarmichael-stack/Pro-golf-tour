@@ -1337,7 +1337,8 @@ const THEMES = {
     major: { bg: "#0B2417", panel: "#123A23", card: "#17492C", accent: "#F0CE6A", accentSoft: "#C7A24A" }, // augusta-deep green + rich gold
 };
 ACTIVE_THEME = THEMES_HOME;
-const FONT = "'Bebas Neue','Arial Narrow',sans-serif";
+const FONT = "'Fraunces', Georgia, serif"; // vintage scorecard test — was Bebas Neue
+const MONO = "'IBM Plex Mono', 'Courier New', monospace"; // scorecard numbers
 const tint = (v) => v >= 90 ? C.gold : v >= 85 ? C.green : v >= 80 ? C.chalk : C.red;
 const scoreColor = (sc, par) => { const d = sc - par; return d <= -2 ? C.gold : d === -1 ? C.green : d === 0 ? C.chalk : d === 1 ? C.bogey : C.red; };
 const scoreName = (sc, par) => { if (sc === 1)
@@ -1382,7 +1383,7 @@ function BackTop({ onClick }) {
 const Shell = ({ children, theme }) => {
     const t = theme || ACTIVE_THEME || THEMES.home;
     return (React.createElement("div", { className: "min-h-screen", style: { background: t.bg, transition: "background 0.4s ease" } },
-        React.createElement("style", null, `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');`),
+        React.createElement("style", null, `@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono:wght@400;600&display=swap');`),
         React.createElement("div", { className: "max-w-md mx-auto p-4 pb-10" }, children)));
 };
 const ELITE = PLAYERS.filter((p) => p.rank <= 100);
@@ -4746,7 +4747,7 @@ function GolfCareerSim() {
                             ". ",
                             t.name,
                             mine ? " (YOURS)" : ""),
-                        React.createElement("span", null, t.pts)));
+                        React.createElement("span", { style: { fontFamily: MONO } }, t.pts)));
                 }),
                 myRank > 6 && (React.createElement("div", { className: "flex justify-between text-xs mt-1 pt-1", style: { color: C.gold, borderTop: "1px solid rgba(244,247,242,0.15)" } },
                     React.createElement("span", null,
@@ -4754,7 +4755,7 @@ function GolfCareerSim() {
                         ". ",
                         wk.teamName,
                         " (YOURS)"),
-                    React.createElement("span", null, (g.teamSeasonPts || {})[wk.teamId] || 0)))),
+                    React.createElement("span", { style: { fontFamily: MONO } }, (g.teamSeasonPts || {})[wk.teamId] || 0)))),
             g.lastFullBoard && React.createElement("div", { className: "mb-2" },
                 React.createElement(Btn, { kind: "panel", onClick: () => { setG({ ...g, boardReturn: "teamResults" }); setScreen("fullBoard"); } }, "\uD83D\uDCCB VIEW FULL LEADERBOARD")),
             React.createElement(Btn, { onClick: () => setScreen("hub") }, "CONTINUE")));
@@ -5515,7 +5516,7 @@ function GolfCareerSim() {
                                 "\u00B7 $",
                                 valOf(r.mn).toFixed(1),
                                 "m")),
-                        React.createElement("span", { style: { color: r.pts > 0 ? C.green : C.muted } },
+                        React.createElement("span", { style: { color: r.pts > 0 ? C.green : C.muted, fontFamily: MONO } },
                             r.pts,
                             " pts"))));
                 })(),
@@ -5582,7 +5583,7 @@ function GolfCareerSim() {
                                 "\u00B7 ",
                                 r.ovr,
                                 " ovr")),
-                        React.createElement("span", { style: { color: C.muted } },
+                        React.createElement("span", { style: { color: C.muted, fontFamily: MONO } },
                             r.pts,
                             " pts"))));
                 })(),
