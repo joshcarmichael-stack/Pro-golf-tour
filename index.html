@@ -1448,9 +1448,8 @@ const makeRegen = (slotCountry, taken) => {
 const SAVE_KEY = "golf-career-sim-v4"; // legacy single-slot key, migrated into per-mode slots on first load
 const GAME_MODES = [
     { id: "standard", emoji: "🏆", name: "TOUR CAREER", desc: "The real modern tour. Start as a 17-year-old nobody ranked outside the world top 200 and grind your way to greatness against today's pros." },
-    { id: "alltime", emoji: "👑", name: "ALL-TIME GREATS", desc: "Fantasy mode. The field is golf's 25 greatest players at their absolute primes — Tiger '00, Jack '72, Hogan '53, Seve '84. Can you beat the legends and top the GOAT board yourself?" },
-    { id: "team", emoji: "🤝", name: "TEAM TOUR", desc: "Franchise mode. 36 four-man teams ranked by talent. You start on the weakest squad — play well, and stronger teams come calling. Your best two finishers each week score for the club in the season-long title race." },
     { id: "league", emoji: "🏟️", name: "LEAGUE SYSTEM", desc: "Football-style. 40 even teams across 4 divisions, a transfer market driven by team budgets and player values, and promotion to chase. Start as a free agent — three clubs want you. Work your way to the top flight." },
+    { id: "alltime", emoji: "👑", name: "ALL-TIME GREATS", desc: "Fantasy mode. The field is golf's 25 greatest players at their absolute primes — Tiger '00, Jack '72, Hogan '53, Seve '84. Can you beat the legends and top the GOAT board yourself?" },
 ];
 const MODE_IDS = GAME_MODES.map((m) => m.id);
 const SLOT_KEY = (m) => SAVE_KEY + "-" + (m || "standard"); // one independent save per game mode
@@ -4080,7 +4079,7 @@ function GolfCareerSim() {
             React.createElement("div", { className: "pt-10 text-center mb-2" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, letterSpacing: 6, color: C.gold } }, "\u26F3 SUNDAY PINS"),
                 React.createElement("h1", { style: { fontFamily: FONT, fontSize: 44, color: C.chalk, lineHeight: 0.95 }, className: "mt-1" }, "CHOOSE YOUR WORLD"),
-                React.createElement("p", { className: "text-xs mt-2 mb-1", style: { color: C.gold, letterSpacing: 2 } }, "GOLF'S ANSWER TO FOOTBALL MANAGER"),
+                React.createElement("p", { className: "text-xs mt-2 mb-1", style: { color: C.gold, letterSpacing: 2 } }, "A WHOLE CAREER, HOLE BY HOLE"),
                 React.createElement("p", { className: "text-xs mb-5 px-2", style: { color: C.muted } }, "Every mode keeps its own save \u2014 jump between careers whenever you like.")),
             React.createElement("div", { className: "px-1" }, GAME_MODES.map((md) => {
                 const slot = slots[md.id];
