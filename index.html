@@ -20,7 +20,7 @@ if (!window.storage) {
         async get(k) { const v = localStorage.getItem(k); if (v === null)
             throw new Error("not found"); return { key: k, value: v }; },
         async set(k, v) { localStorage.setItem(k, v); return { key: k, value: v }; },
-        async delete(k) { localStorage.removeItem(k); return { key: k, deleted: true }; },
+        async delete(k) { localStorage.removeItem(k); return { key: k, deleted: true }; }
     };
 }
 // ============ DATA ============
@@ -1387,7 +1387,7 @@ const Shell = ({ children, theme }) => {
         React.createElement("div", { className: "max-w-md mx-auto p-4 pb-10" }, children)));
 };
 const ELITE = PLAYERS.filter((p) => p.rank <= 100);
-const OWGR_SEED = Object.fromEntries(PLAYERS.map((p) => [p.name, p.rank <= 100 ? (101 - p.rank) * 20 : Math.round(12 + (200 - p.rank) * 1.5)]));
+const OWGR_SEED = Object.fromEntries(PLAYERS.map((p) => [p.name, p.rank <= 100 ? (101 - p.rank) * 20 : Math.max(2, Math.round(12 + (200 - p.rank) * 1.5))]));
 const REGEN_FIRST = {
     NA: ["Tyler", "Brooks", "Hunter", "Cole", "Mason", "Logan", "Carter", "Wyatt", "Austin", "Chase", "Bryce", "Tanner"],
     GBI: ["Ollie", "Harry", "Callum", "Finlay", "Rory", "Conor", "Lewis", "Archie", "Freddie", "Jamie", "Cian", "Theo"],
@@ -1509,6 +1509,8 @@ function GolfCareerSim() {
     const [wcPlayoff, setWcPlayoff] = useState(null);
     const [puttoff, setPuttoff] = useState(null);
     const [wcStage, setWcStage] = useState(0);
+    const [wcBracketFrom, setWcBracketFrom] = useState("worldCup"); // screen to return to from the bracket view
+    const [wcBracketCap, setWcBracketCap] = useState(null); // limit rounds shown mid-reveal (null = show everything)
     const [pendingSign, setPendingSign] = useState(null);
     const [worldTab, setWorldTab] = useState("pts");
     const [rrPair, setRrPair] = useState(null);
@@ -1535,6 +1537,11 @@ function GolfCareerSim() {
                 s = buildNextSeason(s);
             }
             catch (e) { }
+        }
+        // REPAIR: negative world-ranking bases from the old seed formula (ranks 209+ seeded below zero)
+        if (s.owgrBase) {
+            Object.keys(s.owgrBase).forEach((k) => { if (typeof s.owgrBase[k] !== "number" || isNaN(s.owgrBase[k]) || s.owgrBase[k] < 0)
+                s.owgrBase[k] = 2; });
         }
         return s;
     };
@@ -2094,7 +2101,15 @@ function GolfCareerSim() {
         setTimeout(() => setScreen(st.mode === "league" && st.isFreeAgent ? "faIntro" : "hub"), 700);
     };
     const [confirmEraseId, setConfirmEraseId] = useState(null); // which mode card is showing an erase confirmation
-    const goHome = () => setScreen("landing");
+    const goHome = async () => {
+        if (g)
+            await save(g); // make sure the current career is flushed before leaving
+        try {
+            setSlots(await scanSlots());
+        }
+        catch (e) { }
+        setScreen("landing");
+    };
     // erase the CURRENT career's own slot (other modes' saves are untouched)
     const resetAll = async () => {
         const m = (g === null || g === void 0 ? void 0 : g.mode) || "standard";
@@ -4082,8 +4097,9 @@ function GolfCareerSim() {
                 React.createElement("p", { className: "text-xs mt-2 mb-1", style: { color: C.gold, letterSpacing: 2 } }, "A WHOLE CAREER, HOLE BY HOLE"),
                 React.createElement("p", { className: "text-xs mb-5 px-2", style: { color: C.muted } }, "Every mode keeps its own save \u2014 jump between careers whenever you like.")),
             React.createElement("div", { className: "px-1" }, GAME_MODES.map((md) => {
-                const slot = slots[md.id];
                 const isActive = g && g.pro && g.mode === md.id;
+                // belt-and-braces: if the scan is stale, the mode you're playing still shows its live save
+                const slot = slots[md.id] || (isActive ? { name: g.pro.name, season: g.season, retired: !!g.retired } : null);
                 const confirming = confirmEraseId === md.id;
                 return (React.createElement("div", { key: md.id, className: "w-full mb-3 p-4 rounded-xl text-left", style: { background: md.id === "alltime" ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card, border: isActive ? `1.5px solid ${C.gold}` : md.id === "alltime" ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.2)" } },
                     React.createElement("div", { className: "flex justify-between items-start" },
@@ -4097,7 +4113,10 @@ function GolfCareerSim() {
                         " \u00B7 ",
                         slot.retired ? "Retired" : `Season ${slot.season}`)) : (React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, md.desc)),
                     !confirming ? (React.createElement("div", { className: "grid gap-2 mt-3", style: { gridTemplateColumns: slot ? "1fr auto" : "1fr" } }, slot ? (React.createElement(React.Fragment, null,
-                        React.createElement(Btn, { small: true, onClick: () => loadSlot(md.id) }, "\u25B6 CONTINUE"),
+                        React.createElement(Btn, { small: true, onClick: () => { if (isActive)
+                                setScreen(g.retired ? "retired" : "hub");
+                            else
+                                loadSlot(md.id); } }, "\u25B6 CONTINUE"),
                         React.createElement("button", { onClick: () => setConfirmEraseId(md.id), className: "px-3 rounded-md text-xs", style: { background: C.panel, color: C.muted, border: "1px solid rgba(244,247,242,0.2)" } }, "New"))) : (React.createElement(Btn, { small: true, onClick: () => startFresh(md.id) }, "\u25B6 START")))) : (React.createElement("div", { className: "p-2.5 rounded-lg mt-3", style: { background: C.panel, border: `1px solid ${C.red}` } },
                         React.createElement("p", { className: "text-xs mb-2", style: { color: C.chalk } },
                             "This will ",
@@ -4111,7 +4130,9 @@ function GolfCareerSim() {
                             React.createElement(Btn, { small: true, kind: "red", onClick: async () => { await eraseSlot(md.id); startFresh(md.id); } }, "YES, ERASE"),
                             React.createElement(Btn, { small: true, kind: "panel", onClick: () => setConfirmEraseId(null) }, "CANCEL"))))));
             })),
-            React.createElement("p", { className: "text-[10px] mt-2 text-center", style: { color: C.muted, opacity: 0.6 } }, "v3 \u00B7 your progress saves automatically, per mode")));
+            React.createElement("div", { className: "text-center mt-2" },
+                React.createElement("a", { href: "https://ko-fi.com/sundaypins", target: "_blank", rel: "noopener", className: "text-[11px]", style: { color: C.gold, textDecoration: "none" } }, "\u2615 Enjoying Sunday Pins? Support the game"),
+                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted, opacity: 0.6 } }, "v3 \u00B7 free & solo-built \u00B7 your progress saves automatically, per mode"))));
     }
     if (screen === "identity") {
         return (React.createElement(Shell, null,
@@ -6155,7 +6176,7 @@ function GolfCareerSim() {
                         " \u00B7 18-hole match play")),
                 React.createElement(Btn, { onClick: wcStartGroupMatch }, "\u26F3 PLAY YOUR GROUP MATCH \u25B8")));
         }
-        const champ = wc.champion;
+        const champ = (wcBracketCap == null || wcBracketCap >= doneAll.length) ? wc.champion : null;
         const nameOf = (n) => n === g.pro.name ? "YOU" : n.split(" ").slice(-1)[0];
         const myGroup = wc.groups.find((grp) => grp.players.some((p) => p.isYou));
         const myGroupIdx = wc.groups.indexOf(myGroup);
@@ -6257,6 +6278,8 @@ function GolfCareerSim() {
                             !aWon ? "✓ " : "",
                             nameOf(m.b))));
                 })),
+                React.createElement("div", { className: "mb-2" },
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setWcBracketFrom("worldCup"); setWcBracketCap(stage - 1); setScreen("wcBracket"); } }, "\uD83C\uDF33 BRACKET SO FAR")),
                 React.createElement(Btn, { onClick: next }, isFinal ? "CROWN THE CHAMPION ▸" : "NEXT ROUND ▸")));
         }
         // ---- FINAL STAGE: champion + your summary ----
@@ -6295,6 +6318,8 @@ function GolfCareerSim() {
                         " ",
                         React.createElement("span", { style: { color: C.muted } }, tie ? (m.decided === "puttoff" ? "(putt-off)" : "(playoff)") : won ? `(${m.margin})` : "")));
                 }))),
+            React.createElement("div", { className: "mb-2" },
+                React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setWcBracketFrom("worldCup"); setWcBracketCap(null); setScreen("wcBracket"); } }, "\uD83C\uDF33 VIEW THE FULL BRACKET")),
             React.createElement(Btn, { onClick: finishWorldCup }, "CONTINUE TO THE CUP \u25B8")));
     }
     if (screen === "worldCupQual") {
@@ -7269,6 +7294,70 @@ function GolfCareerSim() {
     };
     // ---------- playable cup match ----------
     // ---------- playable World Cup match (singles, hole-by-hole) ----------
+    if (screen === "wcBracket" && worldCup) {
+        const wc = worldCup;
+        // name → country map (groups are player arrays pre-finalize, {players} objects post-finalize)
+        const cMap = {};
+        (wc.groups || []).forEach((grp) => { const ps = grp.players || grp; (ps || []).forEach((p) => { if (p && p.name)
+            cMap[p.name] = p.country; }); });
+        const sur = (n) => n === g.pro.name ? "YOU" : n.split(" ").slice(-1)[0];
+        const flg = (n) => FLAG[cMap[n]] || "";
+        const COUNTS = [16, 8, 4, 2, 1];
+        const FALLBACK = ["LAST 32", "LAST 16", "QUARTER-FINALS", "SEMI-FINALS", "FINAL"];
+        const doneAll = wc.rounds || [];
+        const done = wcBracketCap == null ? doneAll : doneAll.slice(0, wcBracketCap);
+        const pend = wc.pendingPlayerMatch || wc.pendingPuttoff;
+        const cols = COUNTS.map((cnt, i) => {
+            let matches, name = (done[i] && done[i].name) || FALLBACK[i];
+            if (done[i])
+                matches = done[i].matches.slice();
+            else if (i === done.length && (wc.resume || pend)) {
+                matches = ((wc.resume && wc.resume.partialMatches) || []).slice();
+                name = (wc.resume && wc.resume.roundName) || name;
+                if (pend)
+                    matches.push({ a: pend.a.name, b: pend.b.name, winner: null, live: true, involvesYou: pend.a.isYou || pend.b.isYou });
+            }
+            else
+                matches = [];
+            while (matches.length < cnt)
+                matches.push(null);
+            return { name, matches: matches.slice(0, cnt) };
+        });
+        const champ = wc.champion;
+        const CELL_H = 672; // shared column height so later rounds centre against their feeders
+        const row = (n, m) => {
+            const isW = m && m.winner === n, isL = m && m.winner && m.winner !== n;
+            return (React.createElement("div", { className: "flex items-center gap-1 truncate", style: { color: !n ? C.muted : isW ? C.gold : isL ? C.muted : C.chalk, fontWeight: isW ? 700 : 400, opacity: isL ? 0.6 : 1, fontSize: 10, lineHeight: "14px" } }, n ? React.createElement(React.Fragment, null,
+                flg(n),
+                " ",
+                sur(n),
+                m && m.live ? " ▶" : "") : "—"));
+        };
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen(wcBracketFrom) }),
+            React.createElement("div", { className: "text-center mb-2" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } },
+                    "\uD83C\uDF0D WORLD CUP \u00B7 ",
+                    wc.venue),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk } }, "THE BRACKET"),
+                React.createElement("p", { className: "text-[10px]", style: { color: C.muted } }, "swipe across \u00B7 gold = winner \u00B7 \u25B6 = being played now")),
+            React.createElement("div", { className: "overflow-x-auto -mx-4 px-4 pb-3" },
+                React.createElement("div", { className: "flex gap-2", style: { width: 5 * 118 + 100 } },
+                    cols.map((col, i) => (React.createElement("div", { key: i, className: "flex-none", style: { width: 110 } },
+                        React.createElement("div", { className: "text-center mb-1", style: { fontFamily: FONT, fontSize: 10, letterSpacing: 1, color: C.gold } }, col.name),
+                        React.createElement("div", { className: "flex flex-col justify-around", style: { height: CELL_H } }, col.matches.map((m, j) => (React.createElement("div", { key: j, className: "rounded-md px-1.5 py-1", style: { background: C.panel, border: m && m.involvesYou ? `1px solid ${C.gold}` : "1px solid rgba(244,247,242,0.1)" } },
+                            row(m && m.a, m),
+                            row(m && m.b, m)))))))),
+                    React.createElement("div", { className: "flex-none", style: { width: 92 } },
+                        React.createElement("div", { className: "text-center mb-1", style: { fontFamily: FONT, fontSize: 10, letterSpacing: 1, color: C.gold } }, "CHAMPION"),
+                        React.createElement("div", { className: "flex flex-col justify-around", style: { height: CELL_H } },
+                            React.createElement("div", { className: "rounded-md px-1.5 py-2 text-center", style: { background: champ ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.panel, border: champ ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.1)" } },
+                                React.createElement("div", { style: { fontSize: 16 } }, "\uD83C\uDFC6"),
+                                React.createElement("div", { style: { fontFamily: FONT, fontSize: 11, color: champ ? C.gold : C.muted } }, champ ? React.createElement(React.Fragment, null,
+                                    FLAG[champ.country] || "",
+                                    " ",
+                                    champ.isYou ? "YOU" : sur(champ.name)) : "—"))))))));
+    }
     if (screen === "wcMatch" && wcMatch) {
         const wm = wcMatch;
         const course = COURSES.find((c) => c.name === (CUP_COURSE_OF[worldCup === null || worldCup === void 0 ? void 0 : worldCup.venue] || "Muirfield Village")) || COURSES[0];
@@ -7303,7 +7392,8 @@ function GolfCareerSim() {
                     wm.roundName),
                 React.createElement("div", { className: "text-xs", style: { color: C.muted } }, worldCup === null || worldCup === void 0 ? void 0 :
                     worldCup.venue,
-                    " \u00B7 single match play"),
+                    " \u00B7 single match play \u00B7 ",
+                    React.createElement("button", { onClick: () => { setWcBracketFrom("wcMatch"); setWcBracketCap(null); setScreen("wcBracket"); }, style: { color: C.blue } }, "\uD83C\uDF33 bracket")),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk, lineHeight: 1.1 }, className: "mt-1" },
                     "YOU ",
                     React.createElement("span", { style: { color: C.muted, fontSize: 16 } }, "vs"),
@@ -7878,6 +7968,10 @@ function GolfCareerSim() {
                         m.careerMajors > 0 ? "A major champion's career — the Hall wanted more, but the trophy doesn't care." :
                             m.careerWins > 0 ? "A winner on the biggest tour in the world. Most never manage one." :
                                 "The grind was real. The cheques cashed. No regrets.")),
+                React.createElement("a", { href: "https://ko-fi.com/sundaypins", target: "_blank", rel: "noopener", className: "block p-3 rounded-xl mb-3 text-center", style: { background: C.panel, border: "1px solid rgba(232,195,90,0.35)", textDecoration: "none" } },
+                    React.createElement("span", { className: "text-xs", style: { color: C.chalk } }, "Enjoyed the ride? Sunday Pins is free and solo-built."),
+                    React.createElement("br", null),
+                    React.createElement("span", { className: "text-xs", style: { color: C.gold } }, "\u2615 Buy the dev a coffee \u2192 ko-fi.com/sundaypins")),
                 React.createElement(Btn, { onClick: resetAll, kind: "green" }, "START A NEW CAREER"))));
     }
     return React.createElement(Shell, null,
