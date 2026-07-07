@@ -1580,6 +1580,20 @@ function GolfCareerSim() {
                     setG(s);
                     setMode(s.mode || "standard");
                     await save(s);
+                    // RESUME a World Cup in progress rather than dropping back to hub (a crash/reload no longer loses the run)
+                    const wr = s.wcResume;
+                    if (wr && wr.worldCup) {
+                        if (wr.worldCup.resume)
+                            wr.worldCup.resume.rating = (p) => p.overall + gauss() * 1.7; // functions don't survive JSON — rebuild it
+                        setWorldCup(wr.worldCup);
+                        setWcStage(wr.wcStage != null ? wr.wcStage : 0);
+                        setWcMatch(wr.wcMatch || null);
+                        setWcPlayoff(wr.wcPlayoff || null);
+                        setPuttoff(wr.puttoff || null);
+                        const dest = wr.wcMatch ? "wcMatch" : wr.puttoff ? "puttoff" : wr.wcPlayoff ? "wcPlayoff" : "worldCup";
+                        setScreen(dest);
+                        return true;
+                    }
                     setScreen(s.retired ? "retired" : "hub");
                     return true;
                 }
@@ -3246,7 +3260,7 @@ function GolfCareerSim() {
     // Europe vs International: which side is the player on (USA players don't feature)
     const eiSide = (nat) => nat === "USA" ? null : EUR_NATIONS.includes(nat) ? "EUR" : "INTL";
     const finishWorldCup = async () => {
-        const st = { ...g };
+        const st = { ...g, wcResume: null };
         st.wcNo = (g.wcNo || 0) + 1;
         const champ = worldCup.champion;
         const youWon = champ && champ.isYou;
@@ -3309,6 +3323,15 @@ function GolfCareerSim() {
             startEuroIntl(st);
         }
     };
+    // persist WHEREVER you are in the World Cup so a crash/reload resumes instead of losing the run
+    const wcCheckpoint = async (patch, baseSt) => {
+        try {
+            const st = { ...(baseSt || g), wcResume: patch };
+            setG(st);
+            await save(st);
+        }
+        catch (e) { }
+    };
     const startWorldCup = (st) => {
         const table = worldCupTable(rcCombined(st), st.pro, ROSTER(st));
         const qualifiers = table.flatMap((n) => n.qualifiers.map((q) => ({ ...q, country: n.code, nationName: n.name })));
@@ -3317,9 +3340,11 @@ function GolfCareerSim() {
         if (!youInWC) {
             // not qualified — sim the whole thing and show the staged reveal
             const sim = simWorldCup(qualifiers, st.pro.name);
-            setWorldCup({ ...sim, qualifiers, youIn: false, venue, season: st.season });
+            const wcObj = { ...sim, qualifiers, youIn: false, venue, season: st.season };
+            setWorldCup(wcObj);
             setWcStage(0);
             setScreen("worldCup");
+            wcCheckpoint({ worldCup: wcObj, wcStage: 0, wcMatch: null, wcPlayoff: null, puttoff: null }, st);
             return;
         }
         // you qualified — set up interactive group play
@@ -3334,20 +3359,24 @@ function GolfCareerSim() {
             const oppPos = pr[0] === myPos ? pr[1] : pr[0];
             return { round: rIdx, opp: myGroup[oppPos], oppPos, youAreA: pr[0] === myPos };
         });
-        setWorldCup({ qualifiers, groups, myGroupIdx, venue, season: st.season, youIn: true,
-            phase: "groupIntro", fixtures, myResults: {}, groupGameIdx: 0, groupRolls: groups.map(() => ({})) });
+        const wcObj = { qualifiers, groups, myGroupIdx, venue, season: st.season, youIn: true,
+            phase: "groupIntro", fixtures, myResults: {}, groupGameIdx: 0, groupRolls: groups.map(() => ({})) };
+        setWorldCup(wcObj);
         setWcStage(-1); // -1 = group play phase
         setScreen("worldCup");
+        wcCheckpoint({ worldCup: wcObj, wcStage: -1, wcMatch: null, wcPlayoff: null, puttoff: null }, st);
     };
     // play one of your group matches → record result, advance or finalize
     const wcStartGroupMatch = () => {
         const wc = worldCup;
         const fx = wc.fixtures[wc.groupGameIdx];
-        setWcMatch({ context: "wcGroup", a: fx.youAreA ? { name: g.pro.name, isYou: true } : fx.opp,
+        const wm = { context: "wcGroup", a: fx.youAreA ? { name: g.pro.name, isYou: true } : fx.opp,
             b: fx.youAreA ? fx.opp : { name: g.pro.name, isYou: true }, youAreA: fx.youAreA,
             roundName: `Group ${String.fromCharCode(65 + wc.myGroupIdx)} · Match ${wc.groupGameIdx + 1}`,
-            hole: 0, diff: 0, log: [], done: false });
+            hole: 0, diff: 0, log: [], done: false };
+        setWcMatch(wm);
         setScreen("wcMatch");
+        wcCheckpoint({ worldCup: wc, wcStage: -1, wcMatch: wm, wcPlayoff: null, puttoff: null });
     };
     const wcFinishGroupMatch = (am) => {
         const wc = worldCup;
@@ -3364,17 +3393,21 @@ function GolfCareerSim() {
             out = youAreLower ? "B" : "A";
         const myResults = { ...wc.myResults, [fx.round]: { out, mg } };
         // show standings AFTER this game (round index just played)
-        setWorldCup({ ...wc, myResults, phase: "groupStandings", standingsThrough: wc.groupGameIdx,
-            lastMatch: { opp: fx.opp.name, youWon, halved, am } });
+        const wcObj = { ...wc, myResults, phase: "groupStandings", standingsThrough: wc.groupGameIdx,
+            lastMatch: { opp: fx.opp.name, youWon, halved, am } };
+        setWorldCup(wcObj);
         setScreen("worldCup");
+        wcCheckpoint({ worldCup: wcObj, wcStage: -1, wcMatch: null, wcPlayoff: null, puttoff: null });
     };
     // advance from a standings view to the next group game, or finalize into the knockout
     const wcAdvanceFromStandings = () => {
         const wc = worldCup;
         const nextIdx = wc.groupGameIdx + 1;
         if (nextIdx < wc.fixtures.length) {
-            setWorldCup({ ...wc, groupGameIdx: nextIdx, phase: "groupNext" });
+            const wcObj = { ...wc, groupGameIdx: nextIdx, phase: "groupNext" };
+            setWorldCup(wcObj);
             setScreen("worldCup");
+            wcCheckpoint({ worldCup: wcObj, wcStage: -1, wcMatch: null, wcPlayoff: null, puttoff: null });
         }
         else {
             // all 3 group games done → finalize all groups (using fixed rolls), assemble knockout, run it
@@ -3392,17 +3425,22 @@ function GolfCareerSim() {
     const routeWorldCupKnockout = (wc) => {
         if (wc.pendingPlayerMatch) {
             const pm = wc.pendingPlayerMatch;
-            setWcMatch({ context: "wcKnockout", a: pm.a, b: pm.b, youAreA: pm.a.isYou,
-                roundName: pm.roundName, hole: 0, diff: 0, log: [], done: false });
+            const wm = { context: "wcKnockout", a: pm.a, b: pm.b, youAreA: pm.a.isYou,
+                roundName: pm.roundName, hole: 0, diff: 0, log: [], done: false };
+            setWcMatch(wm);
             setScreen("wcMatch");
+            wcCheckpoint({ worldCup: wc, wcStage: 0, wcMatch: wm, wcPlayoff: null, puttoff: null });
         }
         else if (wc.pendingPuttoff) {
-            setPuttoff({ ...wc.pendingPuttoff, putts: [], turn: 0 });
+            const pt = { ...wc.pendingPuttoff, putts: [], turn: 0 };
+            setPuttoff(pt);
             setScreen("puttoff");
+            wcCheckpoint({ worldCup: wc, wcStage: 0, wcMatch: null, wcPlayoff: null, puttoff: pt });
         }
         else {
             setWcStage(0);
             setScreen("worldCup"); // finished → staged reveal/finale
+            wcCheckpoint({ worldCup: wc, wcStage: 0, wcMatch: null, wcPlayoff: null, puttoff: null });
         }
     };
     const wcFinishKnockoutMatch = (am) => {
@@ -3412,8 +3450,10 @@ function GolfCareerSim() {
         const youWon = am.diff > 0, halved = am.diff === 0;
         if (halved) {
             // tie → 3-hole stroke playoff (handled on its own screen), carry the matchup
-            setWcPlayoff({ a: pm.a, b: pm.b, roundName: pm.roundName, holes: [], idx: 0 });
+            const po = { a: pm.a, b: pm.b, roundName: pm.roundName, holes: [], idx: 0 };
+            setWcPlayoff(po);
             setScreen("wcPlayoff");
+            wcCheckpoint({ worldCup: wc, wcStage: 0, wcMatch: null, wcPlayoff: po, puttoff: null });
             return;
         }
         const winner = youWon ? (pm.a.isYou ? pm.a : pm.b) : (pm.a.isYou ? pm.b : pm.a);
@@ -6186,7 +6226,7 @@ function GolfCareerSim() {
         // STAGES: 0 = opening, 1 = groups, 2..(2+koRounds.length-1) = each KO round, last = champion+summary
         const TOTAL = 2 + koRounds.length + 1; // opening, groups, each KO round, finale
         const stage = Math.min(wcStage, TOTAL - 1);
-        const next = () => setWcStage((s) => Math.min(s + 1, TOTAL - 1));
+        const next = () => { const ns = Math.min(stage + 1, TOTAL - 1); setWcStage(ns); wcCheckpoint({ worldCup: wc, wcStage: ns, wcMatch: null, wcPlayoff: null, puttoff: null }); };
         // ---- STAGE 0: big opening ----
         if (stage === 0) {
             return (React.createElement(Shell, null,
