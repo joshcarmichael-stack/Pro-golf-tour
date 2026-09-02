@@ -351,6 +351,52 @@ const playHole = (attrs, hole, wxAdj, safe, presAdj) => {
         delta = Math.random() < .12 ? 3 : 2;
     return Math.max(1, par + delta);
 };
+// ONE meaningful decision per hole — framed by what the hole actually brings into play, and how well your own attributes suit each option
+const HOLE_CHOICES = (hole) => {
+    const [par, yds, hz] = hole;
+    const spicy = (hz || 0) >= 1;
+    if (par === 3) {
+        return [
+            { id: "attack", label: "🎯 Attack the pin", desc: spicy ? "Fire right at a tucked flag — bunkers guard it tight." : "Go dead at the flag for a real look at birdie.",
+                reward: ["shortApproach", "putting"], risk: ["bunker", "recovery"], riskMul: spicy ? 1.25 : 0.9 },
+            { id: "safe", label: "🛡️ Play to the centre", desc: "Take the flag out of it — two putts from the fat part of the green.", reward: ["putting"], risk: [], riskMul: 0.4 },
+        ];
+    }
+    if (par === 5) {
+        return [
+            { id: "attack", label: "🚀 Go for it in two", desc: spicy ? "Carry the trouble for a real eagle look." : "Rip it and go straight at the green in two.",
+                reward: ["drivingDistance", "longApproach"], risk: ["recovery", "bunker"], riskMul: spicy ? 1.35 : 1.0 },
+            { id: "safe", label: "🛡️ Lay up short", desc: "Take the trouble out of play — a full wedge in for your third.", reward: ["shortApproach"], risk: [], riskMul: 0.35 },
+        ];
+    }
+    const short = yds < 380;
+    return [
+        { id: "attack", label: short ? "🎯 Driver — cut the corner" : "🚀 Attack off the tee",
+            desc: spicy ? "Bring the bunker into play for a short wedge in if it comes off." : "Go hard off the tee to shorten the hole right down.",
+            reward: short ? ["drivingAccuracy", "shortApproach"] : ["drivingDistance", "longApproach"], risk: ["bunker", "recovery"], riskMul: spicy ? 1.3 : 0.95 },
+        { id: "safe", label: short ? "🛡️ Iron off the tee" : "🛡️ Place it in position",
+            desc: "Play it safe down the fairway — a longer approach, but no trouble.", reward: ["longApproach"], risk: [], riskMul: 0.5 },
+    ];
+};
+// resolve a hole using the player's choice. "safe" reuses the existing tested safe-play engine;
+// "attack" runs the normal engine then layers an attribute-driven reward/risk swing on top, so a player who
+// actually suits the aggressive option benefits, and one who's exposed on the risk attributes pays for it.
+const playHoleWithChoice = (attrs, hole, choice, wxAdj) => {
+    if (choice.id === "safe")
+        return { score: playHole(attrs, hole, wxAdj, true, 0), swing: "safe" };
+    const hz = hole[2] || 0;
+    const base = playHole(attrs, hole, wxAdj, false, 0);
+    const rewardFit = choice.reward.reduce((s, k) => s + attrs[k], 0) / choice.reward.length;
+    const riskFit = choice.risk.length ? choice.risk.reduce((s, k) => s + attrs[k], 0) / choice.risk.length : 80;
+    const rewardChance = clampN((rewardFit - 72) * 0.012, 0, 0.35);
+    const riskChance = clampN((0.05 + hz * 0.09) * (choice.riskMul || 1) * (1 - (riskFit - 60) * 0.012), 0.02, 0.45);
+    const r = Math.random();
+    if (r < riskChance)
+        return { score: base + (Math.random() < 0.3 ? 2 : 1), swing: "bad" };
+    if (r < riskChance + rewardChance)
+        return { score: Math.max(1, base - 1), swing: "good" };
+    return { score: base, swing: "even" };
+};
 const wxAdjFor = (wx, skill) => (wx.wind * .9 + wx.rain * .55 + wx.cold * .35) / 18 -
     (wx.wind * (skill[0] - 78) * .021 + wx.rain * (skill[1] - 78) * .016 + wx.cold * (skill[2] - 78) * .014) / 18;
 const simHoles = (attrs, course, wx, skill, extra = 0, prev = null) => {
@@ -1489,6 +1535,7 @@ function GolfCareerSim() {
     const spinIv = useRef(null);
     const [tour, setTour] = useState(null);
     const [autoPlay, setAutoPlay] = useState(false);
+    const [lastChoiceResult, setLastChoiceResult] = useState(null); // { hole, swing, score, par, label } — brief feedback after a shot choice
     const [storyHole, setStoryHole] = useState(null);
     const [fullBoard, setFullBoard] = useState(false);
     const [ryder, setRyder] = useState(null);
@@ -2654,6 +2701,21 @@ function GolfCareerSim() {
     };
     const beginRound = () => setTour({ ...tour, live: { ...genHolesFor(tour, tour.round), revealed: 0 } });
     const advanceHoles = (n) => setTour((t) => ({ ...t, live: { ...t.live, revealed: Math.min(18, t.live.revealed + n) } }));
+    // resolve the NEXT hole using the player's chosen option, overwriting the pre-computed baseline for just that hole
+    const chooseHole = (choiceId) => {
+        const meIdx = tour.scores.findIndex((s) => s.isYou);
+        const me = tour.scores[meIdx];
+        const h = tour.live.revealed;
+        const hole = tour.course.holes[h];
+        const choice = HOLE_CHOICES(hole).find((c) => c.id === choiceId);
+        const adj = wxAdjFor(tour.live.wx, me.wx) + (me.extra || 0);
+        const { score, swing } = playHoleWithChoice(effAttrs(g), hole, choice, adj);
+        const newHoles = tour.live.holes.map((row, i) => (i === meIdx ? row.map((v, j) => (j === h ? score : v)) : row));
+        const newStories = tour.live.stories ? tour.live.stories.map((s, j) => (j === h ? shotStory(hole, score, effAttrs(g)) : s)) : tour.live.stories;
+        setTour({ ...tour, live: { ...tour.live, holes: newHoles, stories: newStories } });
+        setLastChoiceResult({ hole: h, swing, score, par: hole[0], label: choice.label });
+        advanceHoles(1);
+    };
     const finishRound = (genOverride) => {
         setAutoPlay(false);
         setStoryHole(null);
@@ -7055,12 +7117,23 @@ function GolfCareerSim() {
                                 "PROJ \u00B7 ",
                                 projPts,
                                 " PTS"))),
-                    React.createElement("div", { className: "grid grid-cols-3 gap-2" },
+                    !myCut && h < 18 && !autoPlay ? (React.createElement(React.Fragment, null,
+                        lastChoiceResult && lastChoiceResult.hole === h - 1 && (React.createElement("div", { className: "text-center text-xs mb-2", style: { color: lastChoiceResult.swing === "good" ? C.green : lastChoiceResult.swing === "bad" ? C.red : C.muted } },
+                            lastChoiceResult.label,
+                            " \u2192 ",
+                            scoreName(lastChoiceResult.score, lastChoiceResult.par),
+                            lastChoiceResult.swing === "good" ? " — the gamble paid off!" : lastChoiceResult.swing === "bad" ? " — that one bit back." : "")),
+                        React.createElement("div", { className: "grid gap-2 mb-2" }, HOLE_CHOICES(nextHole).map((c) => (React.createElement("button", { key: c.id, onClick: () => chooseHole(c.id), className: "w-full text-left p-2.5 rounded-xl active:scale-[0.98]", style: { background: C.card, border: `1px solid ${c.id === "attack" ? "rgba(232,195,90,0.4)" : "rgba(244,247,242,0.15)"}` } },
+                            React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: c.id === "attack" ? C.gold : C.blue } }, c.label),
+                            React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, c.desc))))),
+                        React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                            React.createElement(Btn, { small: true, kind: "green", onClick: () => setAutoPlay(true) }, "\u25B6 AUTO REST"),
+                            React.createElement(Btn, { small: true, kind: "panel", onClick: () => advanceHoles(18) }, "SKIP TO END \u23ED")))) : (React.createElement("div", { className: "grid grid-cols-3 gap-2" },
                         React.createElement(Btn, { small: true, onClick: () => advanceHoles(1), disabled: autoPlay },
                             "PLAY ",
                             h + 1),
                         React.createElement(Btn, { small: true, kind: autoPlay ? "red" : "green", onClick: () => setAutoPlay(!autoPlay) }, autoPlay ? "⏸ PAUSE" : "▶ AUTO"),
-                        React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setAutoPlay(false); advanceHoles(18); } }, "SKIP \u23ED")),
+                        React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setAutoPlay(false); advanceHoles(18); } }, "SKIP \u23ED"))),
                     React.createElement(StoryModal, null),
                     fullBoard && (React.createElement("div", { className: "fixed inset-0 overflow-y-auto p-4", style: { background: "rgba(14,42,28,0.95)" }, onClick: () => setFullBoard(false) },
                         React.createElement("div", { className: "max-w-sm mx-auto my-4 p-4 rounded-xl", style: { background: C.card, border: `1.5px solid ${C.gold}` }, onClick: (e) => e.stopPropagation() },
