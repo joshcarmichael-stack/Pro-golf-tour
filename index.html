@@ -1375,6 +1375,8 @@ const clutchMakeP = (feet, putting, pressure) => clampN((1 / (1 + Math.pow(feet 
 const clutchLabel = (target, par) => { const d = target - par; return d <= -2 ? "for EAGLE" : d === -1 ? "for BIRDIE" : d === 0 ? "for PAR" : d === 1 ? "for BOGEY" : `for a ${target}`; };
 const rollBreak = () => { const b = Math.round((Math.random() * 4 - 2) * 2) / 2; return b; }; // cups of break, + = breaks left-to-right
 // stroke play: the sim decided `score`; the putt is the last stroke — hole it for `target`, miss and it's target + 1
+// a 1 is an ace and a 2 on a par 4/5 is a holed approach: those went in from off the green, so there's no putt to hit
+const holedFromOffGreen = (score, par) => score === 1 || (score === 2 && par >= 4);
 const strokePutt = (score, par) => {
     const target = score < par ? score : score - 1;
     const feet = target < par ? 6 + Math.round(Math.random() * 16) : target === par ? 3 + Math.round(Math.random() * 7) : 3 + Math.round(Math.random() * 5);
@@ -1382,7 +1384,7 @@ const strokePutt = (score, par) => {
 };
 // match play: you vs them on one hole. null when there's nothing to putt for (already lost it, or an ace)
 const matchPutt = (my, opp, par) => {
-    if (my >= opp + 2 || my === 1)
+    if (my >= opp + 2 || holedFromOffGreen(my, par))
         return null;
     if (my < opp)
         return { target: my, miss: my + 1, feet: 5 + Math.round(Math.random() * 14), brk: rollBreak(), label: clutchLabel(my, par), aim: "win" };
@@ -3031,7 +3033,7 @@ function GolfCareerSim() {
             setLastChoiceResult({ hole: h, swing, score: sc, par: hole[0], label: choice.label, putt });
             advanceHoles(1);
         };
-        const stakes = score > 1 ? strokeClutchStakes(tour, h) : null;
+        const stakes = holedFromOffGreen(score, hole[0]) ? null : strokeClutchStakes(tour, h);
         if (!stakes)
             return commit(score);
         const pt = strokePutt(score, hole[0]);
