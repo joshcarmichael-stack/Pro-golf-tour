@@ -1368,6 +1368,84 @@ const simRyderSessions = (usa, eur, strategy, homeSide, captainCtx) => {
     });
     return { sessions, usaPts, eurPts, youTeam, youSinglesMod: singlesMod };
 };
+// ============ SPONSORS ============
+// one personal sponsor per season: a retainer every week you tee it up, plus a bonus for hitting the contract goal
+const SPONSOR_BRANDS = [
+    { name: "Kestrel Timepieces", emoji: "⌚" }, { name: "Ironwood Apparel", emoji: "👕" }, { name: "Harbourline Bank", emoji: "🏦" },
+    { name: "Albatross Air", emoji: "✈️" }, { name: "Tidewater Motors", emoji: "🚗" }, { name: "Greenkeeper Energy", emoji: "⚡" },
+    { name: "Northgate Insurance", emoji: "🛡️" }, { name: "Copperhill Whisky", emoji: "🥃" }, { name: "Summit Telecom", emoji: "📡" },
+    { name: "Linksider Coffee", emoji: "☕" },
+];
+// by world ranking; each tier lists the goals it asks for as [kind, target]
+const SPONSOR_TIERS = [
+    { id: "elite", label: "FLAGSHIP AMBASSADOR", maxRank: 10, retainer: 250e3, bonus: 4e6, goals: [["wins", 2], ["top10s", 10], ["majors", 1], ["fedex", 5]] },
+    { id: "global", label: "GLOBAL BRAND", maxRank: 50, retainer: 120e3, bonus: 1.8e6, goals: [["top10s", 6], ["wins", 1], ["fedex", 30]] },
+    { id: "national", label: "NATIONAL BRAND", maxRank: 150, retainer: 50e3, bonus: 700e3, goals: [["cuts", 16], ["top10s", 3], ["fedex", 70]] },
+    { id: "local", label: "LOCAL BACKER", maxRank: Infinity, retainer: 20e3, bonus: 250e3, goals: [["cuts", 10], ["top10s", 1], ["fedex", 150]] },
+];
+// the three contract shapes on offer: safe money, balanced, or back yourself
+const SPONSOR_STYLES = [
+    { id: "steady", label: "Steady retainer", ret: 1.35, bon: 0.5 },
+    { id: "balanced", label: "Balanced deal", ret: 1.0, bon: 1.0 },
+    { id: "performance", label: "Performance deal", ret: 0.55, bon: 1.9 },
+];
+const sponsorGoalLabel = (goal) => {
+    const n = goal.n;
+    if (goal.kind === "cuts")
+        return `Make ${n} cut${n !== 1 ? "s" : ""}`;
+    if (goal.kind === "top10s")
+        return `${n} top-10 finish${n !== 1 ? "es" : ""}`;
+    if (goal.kind === "wins")
+        return n === 1 ? "Win a tournament" : `Win ${n} tournaments`;
+    if (goal.kind === "majors")
+        return n === 1 ? "Win a major" : `Win ${n} majors`;
+    return `Finish top ${n} in the FedEx Cup`;
+};
+const roundTo = (v, step) => Math.max(step, Math.round(v / step) * step);
+const fedexRankOf = (st, name) => { const me = (st.standings[name] || {}).pts || 0; return 1 + Object.keys(st.standings).filter((n) => n !== name && ((st.standings[n] || {}).pts || 0) > me).length; };
+const worldRankOf = (st, name) => {
+    const pts = (n) => ((st.owgrBase || OWGR_SEED)[n] || 0) + ((st.standings[n] || {}).pts || 0);
+    const me = pts(name);
+    return 1 + Object.keys(st.standings).filter((n) => n !== name && pts(n) > me).length;
+};
+// progress toward the goal right now; fedex is a rank (lower is better) and only settles at season end
+const sponsorProgress = (st, sp) => {
+    const m = st.myStats || {};
+    const k = sp.goal.kind;
+    if (k === "fedex")
+        return fedexRankOf(st, st.pro.name);
+    return k === "cuts" ? m.cutsMade || 0 : k === "top10s" ? m.top10s || 0 : k === "wins" ? m.wins || 0 : m.majors || 0;
+};
+const sponsorGoalMet = (st, sp) => sp.goal.kind === "fedex" ? sponsorProgress(st, sp) <= sp.goal.n : sponsorProgress(st, sp) >= sp.goal.n;
+// frac: share of the season still to play (a deal signed mid-season asks for proportionally less)
+const makeSponsorOffers = (worldRank, careerMajors, prev, frac = 1) => {
+    let ti = SPONSOR_TIERS.findIndex((t) => worldRank <= t.maxRank);
+    if (careerMajors > 0 && worldRank <= 25)
+        ti = 0; // a major champion in form is a flagship name
+    const tier = SPONSOR_TIERS[ti];
+    const brands = [...SPONSOR_BRANDS].sort(() => Math.random() - 0.5);
+    const goals = [...tier.goals].sort(() => Math.random() - 0.5);
+    const offers = SPONSOR_STYLES.map((sty, i) => {
+        const [kind, n0] = goals[i % goals.length];
+        const n = kind === "fedex" ? n0 : Math.max(1, Math.ceil(n0 * frac));
+        const jitter = () => 0.85 + Math.random() * 0.3;
+        return { id: `${tier.id}-${sty.id}`, name: brands[i].name, emoji: brands[i].emoji, tier: tier.label, style: sty.label,
+            retainer: roundTo(tier.retainer * sty.ret * jitter(), 5e3), bonus: roundTo(tier.bonus * sty.bon * jitter(), 50e3), goal: { kind, n } };
+    });
+    // hit last year's goal and your sponsor wants you back — same brand, better money
+    if (prev && prev.paid) {
+        const brandTaken = offers.findIndex((o) => o.name === prev.name);
+        if (brandTaken >= 0)
+            offers.splice(brandTaken, 1);
+        else
+            offers.pop();
+        const [kind, n0] = tier.goals[0];
+        offers.unshift({ id: `renew-${prev.name}`, name: prev.name, emoji: prev.emoji, tier: tier.label, style: "Renewal", renewal: true,
+            retainer: roundTo(Math.max(prev.retainer * 1.25, tier.retainer), 5e3), bonus: roundTo(Math.max(prev.bonus * 1.2, tier.bonus), 50e3),
+            goal: { kind, n: kind === "fedex" ? n0 : Math.max(1, Math.ceil(n0 * frac)) } });
+    }
+    return offers;
+};
 // ============ STYLES ============
 let ACTIVE_THEME = null; // set each render based on screen; declared before C so getters can read it
 const C_CONST = { chalk: "#F4F7F2", gold: "#E8C35A", muted: "#9DBBA8", red: "#D96C4F", green: "#9FD98B", blue: "#7FB7D9", bogey: "#E0A060" };
@@ -1641,6 +1719,11 @@ function GolfCareerSim() {
                 s = buildNextSeason(s);
             }
             catch (e) { }
+        }
+        // sponsors arrived after this save was made: put offers on the table now, scaled to the season left
+        if (!s.retired && s.sponsor === undefined && !s.sponsorOffers && s.standings) {
+            s.sponsor = null;
+            s.sponsorOffers = makeSponsorOffers(worldRankOf(s, s.pro.name), (s.myStats || {}).careerMajors || 0, null, Math.max(0.25, (SCHEDULE.length - (s.evIdx || 0)) / SCHEDULE.length));
         }
         // REPAIR: negative world-ranking bases from the old seed formula (ranks 209+ seeded below zero)
         if (s.owgrBase) {
@@ -2213,7 +2296,8 @@ function GolfCareerSim() {
             ...(leagues0 ? { leagues: leagues0, teamSeasonPts: {}, teamMemberPts: {}, isFreeAgent: true, faEvents: 0, faProvenScore: 0 } : {}),
             standings: Object.fromEntries([...PLAYERS.map((p) => [p.name, { pts: 0, money: 0 }]), [pro.name, { pts: 0, money: 0 }]]),
             myStats: freshStats(), history: [], seasonLog: [], tally: {}, ryderHolder: "USA", lastRyder: null,
-            eventHistory: {}, courseXP: {}, rcRace: {}, pastWinners: {}, owgrBase: { ...OWGR_SEED }, xp: 0, bank: 0, wxXP: [0, 0, 0], earned: {}, ownedGear: ["ball_std", "drv_std", "irn_std", "wdg_std", "put_std"], coach: null, badges: [], badgeNews: [], caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: false };
+            eventHistory: {}, courseXP: {}, rcRace: {}, pastWinners: {}, owgrBase: { ...OWGR_SEED }, xp: 0, bank: 0,
+            sponsor: null, sponsorOffers: makeSponsorOffers(999, 0, null), rival: null, wxXP: [0, 0, 0], earned: {}, ownedGear: ["ball_std", "drv_std", "irn_std", "wdg_std", "put_std"], coach: null, badges: [], badgeNews: [], caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: false };
         setG(st);
         save(st);
         setTimeout(() => setScreen(st.mode === "league" && st.isFreeAgent ? "faIntro" : "hub"), 700);
@@ -2797,6 +2881,105 @@ function GolfCareerSim() {
         save(st);
         setTour(t);
     };
+    // ---------- RIVAL: one named player you measure yourself against, week in, week out ----------
+    // result of you vs them in one event: 1 you finished ahead, -1 behind, 0 level, null if not both in the field
+    const rivalOutcome = (t, rivalName) => {
+        const me = t.scores.find((s) => s.isYou), them = t.scores.find((s) => s.name === rivalName);
+        if (!me || !them)
+            return null;
+        if (me.cut !== them.cut)
+            return me.cut ? -1 : 1;
+        const fin = (t.results && t.results.finishers) || [];
+        const pm = (fin.find((r) => r.isYou) || {}).pos, pt = (fin.find((r) => r.name === rivalName) || {}).pos;
+        if (pm && pt && pm !== pt)
+            return pm < pt ? 1 : -1; // positions settle playoffs
+        return me.total < them.total ? 1 : me.total > them.total ? -1 : 0;
+    };
+    const pickRival = (st, t) => {
+        const myOvr = calcOverall(st.pro.attrs), myAge = st.pro.age || 22;
+        const inField = new Set(t.scores.map((s) => s.name));
+        const pool = ROSTER(st).filter((p) => p.name !== st.pro.name && inField.has(p.name)).map((p) => {
+            const ovr = typeof p.overall === "number" ? p.overall : calcOverall(p);
+            const age = p.age != null ? p.age : aiAgeOf(p.name);
+            return { name: p.name, fit: Math.abs(ovr - myOvr) + Math.abs(age - myAge) * 0.6 + Math.random() * 2.5, age };
+        }).sort((a, b) => a.fit - b.fit);
+        return pool[0] || null;
+    };
+    const updateRivalAndSponsor = (st, t, myLine) => {
+        const ev = t.ev;
+        const mail = (item) => { st.mailbox = [item, ...(st.mailbox || [])].slice(0, 41); };
+        const tag = `${st.season}-${st.evIdx}`;
+        // ----- rival -----
+        if (t.inField && !t.team) {
+            let rv = st.rival ? { ...st.rival } : null;
+            const alive = new Set(ROSTER(st).map((p) => p.name));
+            if (rv && !alive.has(rv.name)) {
+                mail({ id: `rv-gone-${tag}`, season: st.season, kind: "rival", title: `${rv.name} has retired`, body: `Your rivalry with ${rv.name} ends at ${rv.w}–${rv.l}${rv.h ? `–${rv.h}` : ""}. Someone new will step into that role soon enough.`, read: false });
+                rv = null;
+            }
+            if (rv) {
+                const o = rivalOutcome(t, rv.name);
+                if (o !== null) {
+                    rv.w += o === 1 ? 1 : 0;
+                    rv.l += o === -1 ? 1 : 0;
+                    rv.h += o === 0 ? 1 : 0;
+                    rv.sw = (rv.sw || 0) + (o === 1 ? 1 : 0);
+                    rv.sl = (rv.sl || 0) + (o === -1 ? 1 : 0);
+                    if (o === 1 && st.xpBreakdown) {
+                        st.xp = (st.xp || 0) + 6;
+                        st.xpGainLast = (st.xpGainLast || 0) + 6;
+                        st.xpBreakdown = [...st.xpBreakdown, { label: `Beat your rival ${rv.name.split(" ").slice(-1)[0]}`, amt: 6 }];
+                    }
+                    const fin = (t.results && t.results.finishers) || [];
+                    if (fin[0] && fin[0].name === rv.name)
+                        mail({ id: `rv-win-${tag}`, season: st.season, kind: "rival", title: `Your rival ${rv.name} wins the ${ev.e}`, body: `${rv.name} lifts the trophy while you ${myLine ? `finished ${ordinal(myLine.pos)}` : "missed the cut"}. Head-to-head: ${rv.w}–${rv.l}. That one should sting.`, read: false });
+                    else if (myLine && myLine.pos === 1)
+                        mail({ id: `rv-you-${tag}`, season: st.season, kind: "rival", title: `One up on ${rv.name}`, body: `You win the ${ev.e} and ${rv.name} has to watch. Head-to-head: ${rv.w}–${rv.l}.`, read: false });
+                }
+                // pipped by someone else while you're well clear of your rival → the man who beat you becomes the new nemesis
+                const fin = (t.results && t.results.finishers) || [];
+                if (myLine && myLine.pos === 2 && fin[0] && fin[0].name !== rv.name && !fin[0].isYou && rv.w - rv.l >= 5) {
+                    mail({ id: `rv-new-${tag}`, season: st.season, kind: "rival", title: `New rival: ${fin[0].name}`, body: `You've had the better of ${rv.name} (${rv.w}–${rv.l}). But ${fin[0].name} just pipped you at the ${ev.e} — and the press have a new storyline.`, read: false });
+                    rv = { name: fin[0].name, since: st.season, w: 0, l: 1, h: 0, sw: 0, sl: 1, reason: `Pipped you at the ${ev.e}` };
+                }
+            }
+            else {
+                st.rivalWait = (st.rivalWait || 0) + 1;
+                if (st.rivalWait >= 2) {
+                    const pick = pickRival(st, t);
+                    if (pick) {
+                        const o = rivalOutcome(t, pick.name);
+                        rv = { name: pick.name, since: st.season, w: o === 1 ? 1 : 0, l: o === -1 ? 1 : 0, h: o === 0 ? 1 : 0, sw: o === 1 ? 1 : 0, sl: o === -1 ? 1 : 0,
+                            reason: Math.abs(pick.age - (st.pro.age || 22)) <= 3 ? "Same generation, similar game" : "Your games match up shot for shot" };
+                        mail({ id: `rv-start-${tag}`, season: st.season, kind: "rival", title: `A rivalry is born: ${pick.name}`, body: `${rv.reason} — the press can't stop comparing you with ${pick.name}. Every week you tee it up together, the head-to-head counts. Finish ahead of him for bonus XP.`, read: false });
+                    }
+                }
+            }
+            st.rival = rv;
+        }
+        // ----- sponsor -----
+        const seasonOver = st.evIdx >= SCHEDULE.length;
+        if (st.sponsor && (t.inField || seasonOver)) {
+            const sp = { ...st.sponsor };
+            st.bank = st.bank != null ? st.bank : st.myStats.careerMoney;
+            if (t.inField) { // the retainer is paid for weeks you actually play
+                sp.earned = (sp.earned || 0) + sp.retainer;
+                st.bank += sp.retainer;
+                st.sponsorCareer = (st.sponsorCareer || 0) + sp.retainer;
+            }
+            if (!sp.paid && (sp.goal.kind !== "fedex" || seasonOver) && sponsorGoalMet(st, sp)) {
+                sp.paid = true;
+                sp.earned += sp.bonus;
+                st.bank += sp.bonus;
+                st.sponsorCareer = (st.sponsorCareer || 0) + sp.bonus;
+                mail({ id: `sp-bonus-${tag}`, season: st.season, kind: "sponsor", title: `${sp.name} bonus: ${fmtMoney(sp.bonus)}`, body: `Contract goal hit: ${sponsorGoalLabel(sp.goal)}. ${fmtMoney(sp.bonus)} lands in your bank, and they'll want to talk renewal.`, read: false });
+            }
+            else if (seasonOver && !sp.paid) {
+                mail({ id: `sp-miss-${tag}`, season: st.season, kind: "sponsor", title: `${sp.name} won't renew`, body: `The goal was "${sponsorGoalLabel(sp.goal)}" and it didn't happen. You banked ${fmtMoney(sp.earned)} in retainers this season; new offers arrive in pre-season.`, read: false });
+            }
+            st.sponsor = sp;
+        }
+    };
     const closeEvent = async () => {
         var _a, _b, _c;
         const ev = tour.ev;
@@ -3309,6 +3492,8 @@ function GolfCareerSim() {
             st.scoutReports = reports;
             st.scoutPending = stillPending;
         }
+        if (tour.results)
+            updateRivalAndSponsor(st, tour, myLine);
         if (st.evIdx >= SCHEDULE.length) {
             if (st.champion === st.pro.name) {
                 st.myStats.fedexTitles++;
@@ -3795,6 +3980,9 @@ function GolfCareerSim() {
                 return mb;
             })(),
             myStats: { ...g.myStats, events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 0, bestFinish: null, birdies: 0, eagles: 0, albatrosses: 0, aces: 0 }, caddiePaidSeason: 0,
+            sponsor: null, sponsorOffers: makeSponsorOffers(worldRankOf(g, g.pro.name), (g.myStats || {}).careerMajors || 0, g.sponsor),
+            lastSponsor: g.sponsor ? { name: g.sponsor.name, emoji: g.sponsor.emoji, earned: g.sponsor.earned || 0, paid: !!g.sponsor.paid } : null,
+            rival: g.rival ? { ...g.rival, sw: 0, sl: 0 } : null, lastRival: g.rival ? { name: g.rival.name, sw: g.rival.sw || 0, sl: g.rival.sl || 0 } : null,
             history: [], seasonLog: [], lastRyder: null, prevCaddie: g.caddie, caddie: null, caddieOffers: pickCaddieOffers(g.caddie ? g.caddie.name : null), rerollAvailable: g.mode !== "league",
             rcRace: g.season % 2 === 1 ? Object.fromEntries([...rosterNames, g.pro.name].map((n) => { var _a; return [n, ((g.rcRace || {})[n] || 0) + (((_a = g.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0)]; })) : {},
             owgrBase: Object.fromEntries([...rosterNames, g.pro.name].map((n) => { var _a; return [n, Math.round(((g.owgrBase || OWGR_SEED)[n] || 0) * 0.4 + (((_a = g.standings[n]) === null || _a === void 0 ? void 0 : _a.pts) || 0))]; })), ai: evo.ai };
@@ -4453,6 +4641,61 @@ function GolfCareerSim() {
             React.createElement("p", { className: "text-xs text-center", style: { color: C.muted } }, "Weather-guidance caddies improve your hidden weather skills \u2014 you'll feel it, not see it.")));
     }
     // ---------- pre-season attribute re-roll ----------
+    // ---------- SPONSOR PICK (pre-season, after the caddie) ----------
+    if (g && !(!g.caddie && g.caddieOffers) && g.sponsorOffers && screen === "hub") {
+        const sign = async (o) => {
+            const st = { ...g, sponsor: o ? { ...o, earned: 0, paid: false, season: g.season } : null, sponsorOffers: null };
+            if (o) {
+                st.mailbox = [{ id: `sp-sign-${g.season}-${g.evIdx}`, season: g.season, kind: "sponsor", title: `You've signed with ${o.name}`,
+                        body: `${fmtMoney(o.retainer)} every week you tee it up, plus a ${fmtMoney(o.bonus)} bonus for hitting this season's goal: ${sponsorGoalLabel(o.goal)}.`, read: false }, ...(g.mailbox || [])].slice(0, 41);
+            }
+            setG(st);
+            await save(st);
+        };
+        const weeksLeft = SCHEDULE.length - (g.evIdx || 0);
+        const ls = g.lastSponsor;
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "pt-6 text-center" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 4, color: C.gold } },
+                    "SEASON ",
+                    g.season,
+                    g.evIdx === 0 ? " · PRE-SEASON" : ` · ${weeksLeft} EVENTS LEFT`),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 36, color: C.chalk, lineHeight: 1 } }, "CHOOSE YOUR SPONSOR"),
+                React.createElement("p", { className: "text-sm mt-2 mb-4", style: { color: C.muted } }, "Three brands want your logo on their chest. The retainer pays every week you tee it up; the bonus only lands if you hit the contract goal. Better results next season bring bigger names.")),
+            ls && (React.createElement("div", { className: "px-3 py-2 rounded-lg mb-3 text-xs", style: { background: ls.paid ? "rgba(159,217,139,0.08)" : "rgba(217,108,79,0.1)", border: `1px solid ${ls.paid ? "rgba(159,217,139,0.3)" : "rgba(217,108,79,0.4)"}`, color: C.chalk } },
+                ls.emoji,
+                " Last season with ",
+                React.createElement("b", null, ls.name),
+                `: ${fmtMoney(ls.earned)} earned · `,
+                ls.paid ? React.createElement("span", { style: { color: C.green } }, "goal hit — they've offered a renewal") : React.createElement("span", { style: { color: C.red } }, "goal missed — no renewal"))),
+            g.sponsorOffers.map((o) => {
+                const seasonTake = o.retainer * weeksLeft;
+                return (React.createElement("button", { key: o.id, onClick: () => sign(o), className: "w-full mb-3 p-3 rounded-xl text-left active:scale-[0.99]", style: { background: o.renewal ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card, border: o.renewal ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.2)" } },
+                    React.createElement("div", { className: "flex justify-between items-baseline" },
+                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 21, color: o.renewal ? C.gold : C.chalk } },
+                            o.emoji,
+                            " ",
+                            o.name),
+                        React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded", style: { background: "rgba(244,247,242,0.08)", color: C.muted, letterSpacing: 1 } }, o.renewal ? "RENEWAL" : o.style.toUpperCase())),
+                    React.createElement("div", { className: "text-[10px] mb-2", style: { color: C.gold, letterSpacing: 2, fontFamily: FONT } }, o.tier),
+                    React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2" },
+                        React.createElement("div", { className: "p-2 rounded-md", style: { background: "rgba(244,247,242,0.05)" } },
+                            React.createElement("div", { className: "text-[9px]", style: { color: C.muted, letterSpacing: 1 } }, "RETAINER / EVENT"),
+                            React.createElement("div", { style: { fontFamily: FONT, fontSize: 18, color: C.chalk } }, fmtMoney(o.retainer)),
+                            React.createElement("div", { className: "text-[9px]", style: { color: C.muted } },
+                                "~",
+                                fmtMoney(seasonTake),
+                                " if you play every week")),
+                        React.createElement("div", { className: "p-2 rounded-md", style: { background: "rgba(232,195,90,0.08)" } },
+                            React.createElement("div", { className: "text-[9px]", style: { color: C.muted, letterSpacing: 1 } }, "GOAL BONUS"),
+                            React.createElement("div", { style: { fontFamily: FONT, fontSize: 18, color: C.gold } }, fmtMoney(o.bonus)),
+                            React.createElement("div", { className: "text-[9px]", style: { color: C.muted } }, "paid when the goal is hit"))),
+                    React.createElement("p", { className: "text-xs", style: { color: C.chalk } },
+                        "🎯 ",
+                        sponsorGoalLabel(o.goal))));
+            }),
+            React.createElement("button", { onClick: () => sign(null), className: "w-full text-center text-xs py-2", style: { color: C.muted } }, "Play unsponsored this season")));
+    }
     if (g && g.rerollAvailable && screen === "hub") {
         const promoted = g.mode === "league" && g.promotedNote != null;
         return (React.createElement(Shell, null,
@@ -4558,6 +4801,50 @@ function GolfCareerSim() {
                     " \u00B7 ",
                     g.caddie.special ? "10%" : "6%",
                     " cut"))),
+            g.sponsor && (() => {
+                const sp = g.sponsor;
+                const prog = sponsorProgress(g, sp);
+                const isRank = sp.goal.kind === "fedex";
+                const pct = sp.paid ? 1 : isRank ? Math.min(1, sp.goal.n / Math.max(prog, 1)) : Math.min(1, prog / sp.goal.n);
+                return (React.createElement("div", { className: "px-3 py-2 rounded-lg mb-3", style: { background: "rgba(244,247,242,0.04)", border: "1px solid rgba(244,247,242,0.18)" } },
+                    React.createElement("div", { className: "flex items-center justify-between" },
+                        React.createElement("span", { className: "text-xs", style: { color: C.chalk } },
+                            sp.emoji,
+                            " ",
+                            React.createElement("b", null, sp.name)),
+                        React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
+                            fmtMoney(sp.retainer),
+                            "/event · ",
+                            fmtMoney(sp.earned || 0),
+                            " earned")),
+                    React.createElement("div", { className: "flex items-center justify-between text-[10px] mt-1", style: { color: sp.paid ? C.green : C.chalk } },
+                        React.createElement("span", null,
+                            "🎯 ",
+                            sponsorGoalLabel(sp.goal),
+                            " → ",
+                            fmtMoney(sp.bonus)),
+                        React.createElement("span", { style: { color: sp.paid ? C.green : C.muted } }, sp.paid ? "✓ BONUS PAID" : isRank ? `now ${ordinal(prog)}` : `${prog}/${sp.goal.n}`)),
+                    React.createElement("div", { className: "h-1 rounded-full mt-1", style: { background: "rgba(244,247,242,0.1)" } },
+                        React.createElement("div", { className: "h-full rounded-full", style: { width: `${Math.round(pct * 100)}%`, background: sp.paid ? C.green : C.gold } }))));
+            })(),
+            g.rival && (React.createElement("div", { className: "px-3 py-2 rounded-lg mb-3 flex items-center justify-between", style: { background: "rgba(224,160,96,0.08)", border: "1px solid rgba(224,160,96,0.35)" } },
+                React.createElement("span", { className: "text-xs truncate pr-2", style: { color: C.chalk } },
+                    "⚔️ ",
+                    React.createElement("b", null, g.rival.name),
+                    React.createElement("span", { className: "text-[10px] ml-1", style: { color: C.muted } },
+                        "#",
+                        worldRankOf(g, g.rival.name))),
+                React.createElement("span", { className: "text-[10px] whitespace-nowrap", style: { color: g.rival.w > g.rival.l ? C.green : g.rival.w < g.rival.l ? C.red : C.muted } },
+                    "H2H ",
+                    g.rival.w,
+                    "–",
+                    g.rival.l,
+                    g.rival.h ? `–${g.rival.h}` : "",
+                    g.rival.since < g.season && React.createElement("span", { style: { color: C.muted } },
+                        " · season ",
+                        g.rival.sw || 0,
+                        "–",
+                        g.rival.sl || 0)))),
             g.isFreeAgent && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: `1.5px solid ${C.gold}` } },
                 React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } }, "\uD83C\uDF92 FREE AGENT"),
@@ -5202,7 +5489,7 @@ function GolfCareerSim() {
     if (screen === "mailbox") {
         const mail = g.mailbox || [];
         const markAllRead = async () => { const st = { ...g, mailbox: mail.map((m) => ({ ...m, read: true })) }; setG(st); await save(st); };
-        const iconFor = (k) => k === "result" ? "🏆" : k === "turnover" ? "🔄" : k === "transfer" ? "💰" : k === "caddie" ? "🎒" : "📩";
+        const iconFor = (k) => k === "result" ? "🏆" : k === "turnover" ? "🔄" : k === "transfer" ? "💰" : k === "caddie" ? "🎒" : k === "rival" ? "⚔️" : k === "sponsor" ? "💼" : "📩";
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: async () => { await markAllRead(); setScreen("hub"); } }),
             React.createElement("div", { className: "flex justify-between items-baseline mb-2" },
@@ -6900,6 +7187,8 @@ function GolfCareerSim() {
     // ---------- event ----------
     if (screen === "event" && tour) {
         const { ev, course, weather, round, live, results } = tour;
+        const isRv = (n) => !!(g.rival && g.rival.name === n);
+        const RV = "\u2694\uFE0F "; // rival marker
         const par = course.par;
         const fmtName = (e) => tour.team ? "TEAM " + e.name.toUpperCase() : e.name;
         const roundFmt = (r) => tour.team ? (r % 2 === 0 ? "FOUR-BALL" : "ALT SHOT") : "";
@@ -7023,6 +7312,12 @@ function GolfCareerSim() {
                         if (leadIdx >= 0 && live.holes[leadIdx] && live.holes[leadIdx][h - 1] - fieldHoleStat.parH >= 1)
                             ticker.push(`Leader ${board[0].name} drops one at ${h}`);
                     }
+                    const rvx = g.rival && fieldHoleStat.scs.find((x) => x.name === g.rival.name);
+                    if (rvx && rvx.sc !== fieldHoleStat.parH) {
+                        const dd = rvx.sc - fieldHoleStat.parH;
+                        const rvI = board.findIndex((b) => b.name === rvx.name);
+                        ticker.unshift(`⚔️ Your rival ${rvx.name} ${dd <= -2 ? "eagles" : dd === -1 ? "birdies" : dd === 1 ? "bogeys" : "cards a " + rvx.sc + " at"} ${h}${rvI >= 0 ? ` — now ${boardPos[rvI]} (${thruPar(board[rvI].totalDelta)})` : ""}`);
+                    }
                     ticker = ticker.slice(0, 2);
                 }
             }
@@ -7145,10 +7440,11 @@ function GolfCareerSim() {
                             rankOf(h) <= 4 ? " — survive it" : rankOf(h) >= 15 ? " — scoring chance" : ""),
                         React.createElement(HoleMap, { hole: nextHole, seed: course.name + "#" + h })),
                     React.createElement("div", { className: "p-2.5 rounded-xl mb-2", style: { background: C.panel } },
-                        board.slice(0, 5).map((b, i) => (React.createElement("div", { key: b.name, className: "flex justify-between text-xs mb-0.5", style: { color: b.isYou ? C.gold : C.chalk } },
+                        board.slice(0, 5).map((b, i) => (React.createElement("div", { key: b.name, className: "flex justify-between text-xs mb-0.5", style: { color: b.isYou ? C.gold : isRv(b.name) ? C.bogey : C.chalk } },
                             React.createElement("span", { className: "truncate pr-2" },
                                 boardPos[i],
                                 ". ",
+                                isRv(b.name) ? RV : "",
                                 b.name,
                                 b.isYou ? " (YOU)" : ""),
                             React.createElement("span", null, thruPar(b.totalDelta))))),
@@ -7159,6 +7455,12 @@ function GolfCareerSim() {
                                 me.name,
                                 " (YOU)"),
                             React.createElement("span", null, thruPar(board[myBoardPos - 1].totalDelta)))),
+                        (() => {
+                            const ri = board.findIndex((b) => isRv(b.name));
+                            return ri >= 5 ? (React.createElement("div", { className: "flex justify-between text-xs mt-0.5", style: { color: C.bogey } },
+                                React.createElement("span", { className: "truncate pr-2" }, `${boardPos[ri]}. ${RV}${board[ri].name}`),
+                                React.createElement("span", null, thruPar(board[ri].totalDelta)))) : null;
+                        })(),
                         React.createElement("button", { onClick: () => setFullBoard(true), className: "w-full text-center text-xs mt-1 pt-1", style: { color: C.blue, borderTop: "1px solid rgba(244,247,242,0.1)" } }, "VIEW FULL LEADERBOARD \u25B8")),
                     React.createElement("div", { className: "p-2.5 rounded-xl mb-2 grid grid-cols-3 gap-1 text-center", style: { background: "rgba(20,61,41,0.6)" } },
                         React.createElement("div", null,
@@ -7201,10 +7503,11 @@ function GolfCareerSim() {
                                 ev.e.toUpperCase(),
                                 " \u00B7 THRU ",
                                 h),
-                            board.slice(0, 20).map((b, i) => (React.createElement("div", { key: b.name, className: "flex justify-between text-xs mb-0.5", style: { color: b.isYou ? C.gold : C.chalk } },
+                            board.slice(0, 20).map((b, i) => (React.createElement("div", { key: b.name, className: "flex justify-between text-xs mb-0.5", style: { color: b.isYou ? C.gold : isRv(b.name) ? C.bogey : C.chalk } },
                                 React.createElement("span", { className: "truncate pr-2" },
                                     boardPos[i],
                                     ". ",
+                                    isRv(b.name) ? RV : "",
                                     b.name,
                                     b.isYou ? " (YOU)" : ""),
                                 React.createElement("span", null, thruPar(b.totalDelta))))),
@@ -7312,10 +7615,11 @@ function GolfCareerSim() {
             const LINE = "1px solid rgba(244,247,242,0.12)";
             const row = (s, i) => {
                 const mv = moveOf(i), td = todayOf(s);
-                return (React.createElement("div", { key: s.name, className: "grid items-center text-sm py-1", style: { gridTemplateColumns: "34px 1fr 30px 34px 34px", color: s.isYou ? C.gold : C.chalk, background: s.isYou ? "rgba(232,195,90,0.12)" : "transparent", borderTop: LINE, margin: "0 -6px", padding: "4px 6px" } },
+                return (React.createElement("div", { key: s.name, className: "grid items-center text-sm py-1", style: { gridTemplateColumns: "34px 1fr 30px 34px 34px", color: s.isYou ? C.gold : isRv(s.name) ? C.bogey : C.chalk, background: s.isYou ? "rgba(232,195,90,0.12)" : "transparent", borderTop: LINE, margin: "0 -6px", padding: "4px 6px" } },
                     React.createElement("span", { style: { fontFamily: MONO, fontSize: 12, color: s.isYou ? C.gold : C.muted } }, posLbl[i]),
                     React.createElement("span", { className: "truncate pr-1" },
                         React.createElement("span", { className: "mr-1.5" }, flagOf(s.name)),
+                        isRv(s.name) ? RV : "",
                         s.name),
                     React.createElement("span", { className: "text-right", style: { fontFamily: MONO, fontSize: 10, color: mv > 0 ? C.green : mv < 0 ? C.red : "rgba(244,247,242,0.3)" } }, !prevPos ? "" : mv > 0 ? `▲${mv}` : mv < 0 ? `▼${-mv}` : "–"),
                     React.createElement("span", { className: "text-right", style: { fontFamily: MONO, fontSize: 11, color: C.muted } }, td === null ? "" : thruPar(td)),
@@ -7371,6 +7675,14 @@ function GolfCareerSim() {
                         cutInGap && cutRow("cutgap"),
                         nearFrom > 10 ? dots("d1") : React.createElement("div", { style: { borderTop: LINE } }),
                         rowsWithCut(nearFrom, nearTo))),
+                    (() => {
+                        // your rival, if he isn't already on show
+                        const ri = alive.findIndex((x) => isRv(x.name));
+                        if (ri >= 10 && !(nearFrom >= 0 && ri >= nearFrom && ri < nearTo))
+                            return React.createElement(React.Fragment, null, dots("drv"), row(alive[ri], ri));
+                        const rc = ri < 0 && board.find((x) => isRv(x.name) && x.cut);
+                        return rc ? React.createElement("div", { className: "text-xs py-1", style: { color: C.bogey, borderTop: LINE } }, `${RV}Your rival ${rc.name} missed the cut (${toPar(rc.total, par, 2)})`) : null;
+                    })(),
                     me.cut && (React.createElement("div", { className: "text-sm py-1", style: { color: C.red, borderTop: LINE } },
                         "MC — ",
                         me.name,
@@ -7441,6 +7753,36 @@ function GolfCareerSim() {
                     React.createElement("div", { className: "text-xs", style: { color: C.muted } },
                         me.rounds.join("-"),
                         " \u00B7 No points, no cheque. Next week."))),
+                (() => {
+                    // this week's head-to-head with your rival, and your sponsor's retainer
+                    const rv = !tour.team && g.rival && tour.scores.find((x) => x.name === g.rival.name);
+                    const o = rv ? rivalOutcome(tour, rv.name) : null;
+                    const rvRes = rv && results.finishers.find((r) => r.name === rv.name);
+                    const sp = tour.inField && g.sponsor;
+                    if (!rv && !sp)
+                        return null;
+                    return (React.createElement("div", { className: "p-3 rounded-xl mb-3 text-left", style: { background: C.panel } },
+                        rv && (React.createElement("div", { className: "flex justify-between items-baseline text-xs" },
+                            React.createElement("span", { style: { color: C.bogey } },
+                                RV,
+                                rv.name,
+                                ": ",
+                                React.createElement("b", null, rvRes ? ordinal(rvRes.pos) : "MC")),
+                            React.createElement("span", { style: { color: o === 1 ? C.green : o === -1 ? C.red : C.muted } }, o === 1 ? "you beat him · +6 XP" : o === -1 ? "he had the better week" : "dead level"))),
+                        rv && (React.createElement("div", { className: "text-[10px] mt-0.5", style: { color: C.muted } },
+                            "Head-to-head becomes ",
+                            g.rival.w + (o === 1 ? 1 : 0),
+                            "–",
+                            g.rival.l + (o === -1 ? 1 : 0),
+                            g.rival.h + (o === 0 ? 1 : 0) ? `–${g.rival.h + (o === 0 ? 1 : 0)}` : "")),
+                        sp && (React.createElement("div", { className: "text-xs", style: { color: C.chalk, marginTop: rv ? 6 : 0 } },
+                            sp.emoji,
+                            " ",
+                            sp.name,
+                            ": +",
+                            fmtMoney(sp.retainer),
+                            " retainer"))));
+                })(),
                 React.createElement("div", { className: "p-3 rounded-xl mb-3 text-left", style: { background: C.panel } },
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "TOP 10"),
                     results.finishers.slice(0, 10).map((r) => (React.createElement("div", { key: r.name, className: "flex justify-between text-xs mb-0.5", style: { color: r.isYou ? C.gold : C.chalk } },
@@ -8131,6 +8473,34 @@ function GolfCareerSim() {
                         React.createElement("span", null,
                             "Career: ",
                             fmtMoney(g.myStats.careerMoney)))),
+                (g.rival || g.sponsor) && (React.createElement("div", { className: "p-4 rounded-xl mb-3 text-left text-sm", style: { background: C.panel, color: C.chalk } },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "RIVAL & SPONSOR"),
+                    g.rival && (React.createElement("div", { className: "flex justify-between mb-1" },
+                        React.createElement("span", null,
+                            "⚔️ vs ",
+                            g.rival.name),
+                        React.createElement("span", { style: { color: (g.rival.sw || 0) > (g.rival.sl || 0) ? C.green : (g.rival.sw || 0) < (g.rival.sl || 0) ? C.red : C.muted } },
+                            g.rival.sw || 0,
+                            "–",
+                            g.rival.sl || 0,
+                            " this season"))),
+                    g.rival && (React.createElement("p", { className: "text-xs mb-2", style: { color: C.muted } },
+                        (g.rival.sw || 0) > (g.rival.sl || 0) ? `You had the better of ${g.rival.name.split(" ").slice(-1)[0]} this year.` : (g.rival.sw || 0) < (g.rival.sl || 0) ? `${g.rival.name.split(" ").slice(-1)[0]} edged the year. Next season's a fresh ledger.` : "Nothing between you.",
+                        " All-time: ",
+                        g.rival.w,
+                        "–",
+                        g.rival.l,
+                        g.rival.h ? `–${g.rival.h}` : "",
+                        ".")),
+                    g.sponsor && (React.createElement("div", { className: "flex justify-between" },
+                        React.createElement("span", null,
+                            g.sponsor.emoji,
+                            " ",
+                            g.sponsor.name),
+                        React.createElement("span", { style: { color: C.gold } }, fmtMoney(g.sponsor.earned || 0)))),
+                    g.sponsor && (React.createElement("p", { className: "text-xs", style: { color: g.sponsor.paid ? C.green : C.red } },
+                        sponsorGoalLabel(g.sponsor.goal),
+                        g.sponsor.paid ? " — done. Expect a renewal offer." : " — missed. They won't be back.")))),
                 React.createElement("div", { className: "p-4 rounded-xl mb-3 text-left", style: { background: C.card, border: "1px solid rgba(244,247,242,0.2)" } },
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold }, className: "mb-2" }, "PERFORMANCE REVIEW"),
                     ins.map((it) => (React.createElement("div", { key: it.k, className: "mb-2.5" },
