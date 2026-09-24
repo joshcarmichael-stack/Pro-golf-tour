@@ -784,6 +784,13 @@ const moneyFor = (pos, purseM, madeCut) => {
 const fmtMoney = (n) => n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${Math.round(n / 1000)}K`;
 const toPar = (total, par, rounds) => { const d = total - par * rounds; return d === 0 ? "E" : d > 0 ? `+${d}` : `${d}`; };
 const thruPar = (d) => d === 0 ? "E" : d > 0 ? `+${d}` : `${d}`;
+// golf-style positions: players level on score share the spot ("T5"); key(x) is the score to compare (lower is better)
+const tiedPositions = (list, key) => {
+    const vals = list.map(key), count = {};
+    vals.forEach((v) => { count[v] = (count[v] || 0) + 1; });
+    const sorted = [...vals].sort((a, b) => a - b);
+    return vals.map((v) => (count[v] > 1 ? "T" : "") + (sorted.indexOf(v) + 1));
+};
 const ordinal = (n) => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
 // ---------- Ryder Cup engine ----------
 const buildRyder = (standings, pro, proEligibleSide, plist = PLAYERS) => {
@@ -6989,6 +6996,8 @@ function GolfCareerSim() {
                 return { name: s.name, isYou: s.isYou, totalDelta: (s.total - par * round) + rdDelta };
             }).filter(Boolean).sort((a, b) => a.totalDelta - b.totalDelta);
             const myBoardPos = board.findIndex((b) => b.isYou) + 1;
+            const boardPos = tiedPositions(board, (b) => b.totalDelta);
+            const myPosLabel = myBoardPos > 0 ? boardPos[myBoardPos - 1] : "";
             const holeRanks = course.holes.map((x, i) => [x[3], i]).sort((a, b) => b[0] - a[0]).map(([, i]) => i);
             const rankOf = (i) => holeRanks.indexOf(i) + 1;
             const holeFieldStat = (idx) => {
@@ -7096,7 +7105,7 @@ function GolfCareerSim() {
                             "on ",
                             justPlayed.hole,
                             " \u00B7 tap for detail \u00B7 ",
-                            myBoardPos > 0 ? `${ordinal(myBoardPos)}` : ""))),
+                            myPosLabel))),
                     fieldHoleStat && (React.createElement("div", { className: "text-center text-xs mb-1", style: { color: C.muted } },
                         "Hole ",
                         h,
@@ -7138,14 +7147,14 @@ function GolfCareerSim() {
                     React.createElement("div", { className: "p-2.5 rounded-xl mb-2", style: { background: C.panel } },
                         board.slice(0, 5).map((b, i) => (React.createElement("div", { key: b.name, className: "flex justify-between text-xs mb-0.5", style: { color: b.isYou ? C.gold : C.chalk } },
                             React.createElement("span", { className: "truncate pr-2" },
-                                i + 1,
+                                boardPos[i],
                                 ". ",
                                 b.name,
                                 b.isYou ? " (YOU)" : ""),
                             React.createElement("span", null, thruPar(b.totalDelta))))),
                         myBoardPos > 5 && (React.createElement("div", { className: "flex justify-between text-xs mt-1 pt-1", style: { color: C.gold, borderTop: "1px solid rgba(244,247,242,0.15)" } },
                             React.createElement("span", null,
-                                myBoardPos,
+                                myPosLabel,
                                 ". ",
                                 me.name,
                                 " (YOU)"),
@@ -7194,14 +7203,14 @@ function GolfCareerSim() {
                                 h),
                             board.slice(0, 20).map((b, i) => (React.createElement("div", { key: b.name, className: "flex justify-between text-xs mb-0.5", style: { color: b.isYou ? C.gold : C.chalk } },
                                 React.createElement("span", { className: "truncate pr-2" },
-                                    i + 1,
+                                    boardPos[i],
                                     ". ",
                                     b.name,
                                     b.isYou ? " (YOU)" : ""),
                                 React.createElement("span", null, thruPar(b.totalDelta))))),
                             myBoardPos > 20 && (React.createElement("div", { className: "flex justify-between text-xs mt-1 pt-1", style: { color: C.gold, borderTop: "1px solid rgba(244,247,242,0.15)" } },
                                 React.createElement("span", null,
-                                    myBoardPos,
+                                    myPosLabel,
                                     ". ",
                                     me.name,
                                     " (YOU)"),
@@ -7284,55 +7293,108 @@ function GolfCareerSim() {
         const me = tour.scores.find((s) => s.isYou);
         const myIdx = board.filter((s) => !s.cut).findIndex((s) => s.isYou);
         if (!results) {
+            // ---------- between rounds: broadcast-style leaderboard ----------
+            const alive = board.filter((s) => !s.cut);
+            const posLbl = tiedPositions(alive, (s) => s.total);
+            const todayOf = (s) => s.rounds.length === round ? s.rounds[round - 1] - par : null;
+            // places gained this round (vs the standings before it) — needs a previous round to compare
+            const prevTot = (s) => s.total - (s.rounds[round - 1] || 0);
+            const prevPos = round >= 2 ? tiedPositions(alive, prevTot) : null;
+            const moveOf = (i) => prevPos ? parseInt(prevPos[i].replace("T", ""), 10) - parseInt(posLbl[i].replace("T", ""), 10) : 0;
+            const cMap = {};
+            ROSTER().forEach((p) => { cMap[p.name] = p.country; });
+            cMap[g.pro.name] = g.pro.nation;
+            const flagOf = (n) => { const c = cMap[n]; return c ? (FLAG[NATION_CODE[c] || c] || "") : ""; };
+            const hasCutRule = tour.team || !noCut(ev.type);
+            const projCut = round === 1 && hasCutRule && alive.length ? alive[Math.min(cutIdxOf(tour), alive.length - 1)].total : null;
+            const cutTotal = round === 2 && tour.cutScore !== undefined ? tour.cutScore : projCut;
+            const myI = alive.findIndex((s) => s.isYou);
+            const LINE = "1px solid rgba(244,247,242,0.12)";
+            const row = (s, i) => {
+                const mv = moveOf(i), td = todayOf(s);
+                return (React.createElement("div", { key: s.name, className: "grid items-center text-sm py-1", style: { gridTemplateColumns: "34px 1fr 30px 34px 34px", color: s.isYou ? C.gold : C.chalk, background: s.isYou ? "rgba(232,195,90,0.12)" : "transparent", borderTop: LINE, margin: "0 -6px", padding: "4px 6px" } },
+                    React.createElement("span", { style: { fontFamily: MONO, fontSize: 12, color: s.isYou ? C.gold : C.muted } }, posLbl[i]),
+                    React.createElement("span", { className: "truncate pr-1" },
+                        React.createElement("span", { className: "mr-1.5" }, flagOf(s.name)),
+                        s.name),
+                    React.createElement("span", { className: "text-right", style: { fontFamily: MONO, fontSize: 10, color: mv > 0 ? C.green : mv < 0 ? C.red : "rgba(244,247,242,0.3)" } }, !prevPos ? "" : mv > 0 ? `▲${mv}` : mv < 0 ? `▼${-mv}` : "–"),
+                    React.createElement("span", { className: "text-right", style: { fontFamily: MONO, fontSize: 11, color: C.muted } }, td === null ? "" : thruPar(td)),
+                    React.createElement("span", { className: "text-right", style: { fontFamily: FONT, fontSize: 16, color: s.isYou ? C.gold : C.chalk } }, toPar(s.total, par, round))));
+            };
+            const cutRow = (key) => (React.createElement("div", { key, className: "flex items-center gap-2 my-0.5", style: { color: C.red, fontSize: 10, letterSpacing: 2, fontFamily: FONT } },
+                React.createElement("span", { className: "flex-1", style: { borderTop: `1px dashed ${C.red}` } }),
+                round === 1 ? "PROJECTED CUT " : "CUT ",
+                toPar(cutTotal, par, round),
+                React.createElement("span", { className: "flex-1", style: { borderTop: `1px dashed ${C.red}` } })));
+            // first player outside the cut line (-1: nobody); rows [a, b) get the line dropped in there
+            const crossIdx = cutTotal === null ? -1 : alive.findIndex((s) => s.total > cutTotal);
+            const rowsWithCut = (a, b) => {
+                const out = [];
+                for (let i = a; i < b; i++) {
+                    if (i > 0 && i === crossIdx)
+                        out.push(cutRow("cut" + i));
+                    out.push(row(alive[i], i));
+                }
+                return out;
+            };
+            const nearFrom = myI >= 10 ? Math.max(10, myI - 2) : -1;
+            const nearTo = myI >= 10 ? Math.min(alive.length, myI + 3) : -1;
+            const dots = (key) => React.createElement("div", { key, className: "text-center text-xs", style: { color: C.muted, borderTop: LINE, lineHeight: "18px" } }, "· · ·");
+            const cutInGap = crossIdx >= 10 && crossIdx < nearFrom; // line falls among the rows we skip
+            const showCard = me.lastHoles && me.rounds.length === round;
+            const myRound = showCard ? me.rounds[round - 1] : 0;
+            const cutGap = cutTotal !== null && !me.cut ? cutTotal - me.total : null;
             return (React.createElement(Shell, null,
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } }, ev.e.toUpperCase()),
                 React.createElement("div", { className: "flex justify-between items-baseline" },
                     React.createElement("h2", { style: { fontFamily: FONT, fontSize: 26, color: C.chalk } },
                         "AFTER ROUND ",
                         round),
-                    React.createElement("span", { className: "text-xs", style: { color: C.muted } }, ev.e)),
-                round === 2 && tour.cutScore !== undefined && (React.createElement("div", { className: "text-xs mb-1", style: { color: C.red } },
-                    "Cut line: ",
-                    toPar(tour.cutScore, par, 2),
-                    " \u00B7 ",
-                    me.cut ? "You MISSED the cut" : "You made the cut")),
-                React.createElement("div", { className: "p-3 rounded-xl my-2", style: { background: C.panel } },
-                    board.filter((s) => !s.cut).slice(0, 10).map((s, i) => (React.createElement("div", { key: s.name, className: "flex justify-between text-sm mb-0.5", style: { color: s.isYou ? C.gold : C.chalk } },
-                        React.createElement("span", { className: "truncate pr-2" },
-                            i + 1,
-                            ". ",
-                            s.name,
-                            s.isYou ? " (YOU)" : ""),
-                        React.createElement("span", null,
-                            toPar(s.total, par, round),
-                            " ",
-                            React.createElement("span", { style: { color: C.muted, fontSize: 11 } },
-                                "(",
-                                s.rounds.join("-"),
-                                ")"))))),
-                    !me.cut && myIdx >= 10 && (React.createElement("div", { className: "flex justify-between text-sm mt-1 pt-1", style: { color: C.gold, borderTop: "1px solid rgba(244,247,242,0.15)" } },
-                        React.createElement("span", null,
-                            myIdx + 1,
-                            ". ",
-                            me.name,
-                            " (YOU)"),
-                        React.createElement("span", null,
-                            toPar(me.total, par, round),
-                            " ",
-                            React.createElement("span", { style: { color: C.muted, fontSize: 11 } },
-                                "(",
-                                me.rounds.join("-"),
-                                ")")))),
-                    me.cut && (React.createElement("div", { className: "text-sm mt-1 pt-1", style: { color: C.red, borderTop: "1px solid rgba(244,247,242,0.15)" } },
-                        "MC \u2014 ",
+                    !me.cut && myI >= 0 && (React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: C.gold } }, posLbl[myI]))),
+                cutTotal !== null && (React.createElement("div", { className: "inline-block text-xs px-2 py-1 rounded-md mb-1", style: { background: me.cut || (cutGap !== null && cutGap < 0) ? "rgba(217,108,79,0.18)" : "rgba(159,217,139,0.14)", color: me.cut || (cutGap !== null && cutGap < 0) ? C.red : C.green } },
+                    round === 1 ? "Projected cut " : "Cut ",
+                    toPar(cutTotal, par, round),
+                    " · ",
+                    me.cut ? "You MISSED the cut"
+                        : round === 2 ? "You made the cut"
+                            : cutGap > 0 ? `you're ${cutGap} inside` : cutGap === 0 ? "you're right on the number" : `you're ${-cutGap} outside — work to do`)),
+                React.createElement("div", { className: "px-3 pt-2 pb-1 rounded-xl my-2", style: { background: C.panel } },
+                    React.createElement("div", { className: "grid text-[9px] pb-1", style: { gridTemplateColumns: "34px 1fr 30px 34px 34px", color: C.muted, letterSpacing: 1 } },
+                        React.createElement("span", null, "POS"),
+                        React.createElement("span", null, "PLAYER"),
+                        React.createElement("span", { className: "text-right" }, prevPos ? "MOVE" : ""),
+                        React.createElement("span", { className: "text-right" }, `R${round}`),
+                        React.createElement("span", { className: "text-right" }, "TOT")),
+                    rowsWithCut(0, Math.min(10, alive.length)),
+                    nearFrom >= 0 && (React.createElement(React.Fragment, null,
+                        crossIdx > 10 && cutInGap && dots("d0"),
+                        cutInGap && cutRow("cutgap"),
+                        nearFrom > 10 ? dots("d1") : React.createElement("div", { style: { borderTop: LINE } }),
+                        rowsWithCut(nearFrom, nearTo))),
+                    me.cut && (React.createElement("div", { className: "text-sm py-1", style: { color: C.red, borderTop: LINE } },
+                        "MC — ",
                         me.name,
                         ": ",
                         toPar(me.total, par, 2),
                         " (",
                         me.rounds.join("-"),
                         ")"))),
+                showCard && (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: C.card, border: "1px solid rgba(244,247,242,0.2)" } },
+                    React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
+                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 2, color: C.gold } },
+                            "YOUR ROUND ",
+                            round),
+                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 18, color: myRound <= par ? C.green : C.bogey } },
+                            myRound,
+                            " (",
+                            thruPar(myRound - par),
+                            ")")),
+                    React.createElement("div", { className: "grid grid-cols-9 gap-0.5" }, course.holes.map((hh, i) => (React.createElement("div", { key: i, className: "text-center py-0.5 rounded", style: { background: "rgba(244,247,242,0.06)" } },
+                        React.createElement("div", { style: { color: C.muted, fontSize: 8 } }, i + 1),
+                        React.createElement(ScoreMark, { sc: me.lastHoles[i], par: hh[0], size: 13 }))))))),
                 React.createElement("div", { className: "grid gap-2" },
                     React.createElement(Btn, { onClick: beginRound }, me.cut ? `SIM ROUND ${round + 1} (SPECTATING)` : `PLAY ROUND ${round + 1}${tour.team ? ` · ${round % 2 === 0 ? "FOUR-BALL" : "ALT SHOT"}` : ""} · ${wxIcon(weather[round])}`),
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => simRounds(4) }, "SIM TO THE FINISH \u23ED\u23ED"))));
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => simRounds(4) }, "SIM TO THE FINISH ⏭⏭"))));
         }
         const myRes = results.finishers.find((r) => r.isYou);
         return (React.createElement(Shell, null,
