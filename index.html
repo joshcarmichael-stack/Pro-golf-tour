@@ -1368,6 +1368,148 @@ const simRyderSessions = (usa, eur, strategy, homeSide, captainCtx) => {
     });
     return { sessions, usaPts, eurPts, youTeam, youSinglesMod: singlesMod };
 };
+// ============ CLUTCH PUTT ============
+// the big moments stop the sim and hand you the putter: time the LINE (allowing for break), then the PACE
+// tour make-rate from a distance: ~70% at 5ft, ~35% at 10ft, ~10% at 20ft, nudged by putting and nerves
+const clutchMakeP = (feet, putting, pressure) => clampN((1 / (1 + Math.pow(feet / 7.5, 2.2))) * (1 + ((putting || 75) - 80) * 0.015) * (1 - (pressure || 0) * 0.1), 0.03, 0.97);
+const clutchLabel = (target, par) => { const d = target - par; return d <= -2 ? "for EAGLE" : d === -1 ? "for BIRDIE" : d === 0 ? "for PAR" : d === 1 ? "for BOGEY" : `for a ${target}`; };
+const rollBreak = () => { const b = Math.round((Math.random() * 4 - 2) * 2) / 2; return b; }; // cups of break, + = breaks left-to-right
+// stroke play: the sim decided `score`; the putt is the last stroke — hole it for `target`, miss and it's target + 1
+const strokePutt = (score, par) => {
+    const target = score < par ? score : score - 1;
+    const feet = target < par ? 6 + Math.round(Math.random() * 16) : target === par ? 3 + Math.round(Math.random() * 7) : 3 + Math.round(Math.random() * 5);
+    return { target, miss: target + 1, feet, brk: rollBreak(), label: clutchLabel(target, par) };
+};
+// match play: you vs them on one hole. null when there's nothing to putt for (already lost it, or an ace)
+const matchPutt = (my, opp, par) => {
+    if (my >= opp + 2 || my === 1)
+        return null;
+    if (my < opp)
+        return { target: my, miss: my + 1, feet: 5 + Math.round(Math.random() * 14), brk: rollBreak(), label: clutchLabel(my, par), aim: "win" };
+    if (my === opp)
+        return { target: my - 1, miss: my, feet: 7 + Math.round(Math.random() * 15), brk: rollBreak(), label: clutchLabel(my - 1, par), aim: "win" };
+    return { target: opp, miss: my, feet: 3 + Math.round(Math.random() * 9), brk: rollBreak(), label: clutchLabel(opp, par), aim: "halve" };
+};
+function ClutchPutt({ putt, onDone }) {
+    const { feet, brk, putting = 75, pressure = 0.5 } = putt;
+    const [phase, setPhase] = useState("read"); // read → line → pace → roll → done
+    const [needle, setNeedle] = useState(0);
+    const [lineTap, setLineTap] = useState(null);
+    const [paceTap, setPaceTap] = useState(null);
+    const [roll, setRoll] = useState(0);
+    const t0 = useRef(0);
+    // zones: tighter from distance and nerves, wider for a good putter; the needle speeds up and shakes under pressure
+    const lineHalf = clampN(0.15 - feet * 0.0035 + (putting - 75) * 0.002 - pressure * 0.02, 0.045, 0.2);
+    const paceHalf = clampN(0.14 - feet * 0.003 + (putting - 75) * 0.002 - pressure * 0.02, 0.045, 0.19);
+    const lineAim = clampN(0.5 - brk * 0.1, 0.15, 0.85); // aim to the high side
+    const paceAim = 0.35 + clampN(feet / 30, 0, 1) * 0.45;
+    const speed = 0.65 + pressure * 0.22 + feet * 0.006; // sweeps per second
+    const wobble = clampN(pressure * 0.025 - ((putt.composure || 75) - 75) * 0.001, 0, 0.05);
+    useEffect(() => {
+        if (phase !== "line" && phase !== "pace")
+            return;
+        t0.current = performance.now();
+        let raf;
+        const tick = (now) => {
+            const t = (now - t0.current) / 1000;
+            const ph = (t * speed) % 2;
+            setNeedle(clampN((ph < 1 ? ph : 2 - ph) + Math.sin(t * 13) * wobble, 0, 1));
+            raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+    }, [phase]);
+    const lineErr = lineTap === null ? 0 : (lineTap - lineAim) / lineHalf; // |x| <= 1 is on line
+    const paceErr = paceTap === null ? 0 : (paceTap - paceAim) / paceHalf; // < -1 short, > 1 long
+    const made = Math.abs(lineErr) <= 1 && Math.abs(paceErr) <= 1;
+    useEffect(() => {
+        if (phase !== "roll")
+            return;
+        const start = performance.now();
+        let raf;
+        const tick = (now) => {
+            const k = Math.min(1, (now - start) / 1400);
+            setRoll(1 - Math.pow(1 - k, 2.2)); // decelerating roll
+            if (k < 1)
+                raf = requestAnimationFrame(tick);
+            else
+                setPhase("done");
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+    }, [phase]);
+    const tap = () => {
+        if (phase === "line") {
+            setLineTap(needle);
+            setPhase("pace");
+        }
+        else if (phase === "pace") {
+            setPaceTap(needle);
+            setPhase("roll");
+        }
+    };
+    const auto = () => { onDone(Math.random() < clutchMakeP(feet, putting, pressure)); };
+    // green geometry: ball at the bottom, cup at the top, the roll bends with the break
+    const BX = 100, BY = 232, CX = 100, CY = 58;
+    const endX = made ? CX : CX + clampN(lineErr, -3, 3) * 9 + (Math.abs(lineErr) <= 1 ? (paceErr > 0 ? 6 : -6) : 0);
+    const endY = made ? CY : CY - clampN(paceErr, -3, 3) * 16;
+    const ctrlX = BX - brk * 34, ctrlY = (BY + CY) / 2;
+    const bez = (a, c, b, t) => (1 - t) * (1 - t) * a + 2 * (1 - t) * t * c + t * t * b;
+    const bx = phase === "roll" || phase === "done" ? bez(BX, ctrlX, endX, roll) : BX;
+    const by = phase === "roll" || phase === "done" ? bez(BY, ctrlY, endY, roll) : BY;
+    const verdict = made ? (feet >= 15 ? "DRAINED IT!" : "IN THE HOLE!")
+        : Math.abs(lineErr) > 1 && Math.abs(paceErr) <= 1 ? (Math.abs(lineErr) < 1.6 ? "LIPPED OUT!" : lineErr < 0 ? "Pulled it left" : "Pushed it right")
+            : paceErr < -1 ? "Left it short" : paceErr > 1 ? "Ran it by" : "Never had the line";
+    const breakTxt = brk === 0 ? "Dead straight" : `${Math.abs(brk)} cup${Math.abs(brk) !== 1 ? "s" : ""} ${brk > 0 ? "left-to-right" : "right-to-left"}`;
+    const meter = (aim, half, tapped, labels) => (React.createElement("div", { className: "relative h-9 rounded-md my-2 overflow-hidden", style: { background: "rgba(244,247,242,0.08)", border: "1px solid rgba(244,247,242,0.2)" } },
+        React.createElement("div", { className: "absolute top-0 bottom-0", style: { left: `${(aim - half) * 100}%`, width: `${half * 200}%`, background: "rgba(159,217,139,0.35)", borderLeft: `1px solid ${C.green}`, borderRight: `1px solid ${C.green}` } }),
+        React.createElement("div", { className: "absolute top-0 bottom-0", style: { left: `${aim * 100}%`, width: 1, background: C.green } }),
+        React.createElement("div", { className: "absolute inset-0 flex justify-between items-center px-2 text-[9px]", style: { color: C.muted, letterSpacing: 1 } },
+            React.createElement("span", null, labels[0]),
+            React.createElement("span", null, labels[1])),
+        React.createElement("div", { className: "absolute top-0 bottom-0", style: { left: `calc(${(tapped !== null ? tapped : needle) * 100}% - 2px)`, width: 4, background: tapped !== null ? C.gold : C.chalk, boxShadow: "0 0 6px rgba(0,0,0,0.5)" } })));
+    return (React.createElement("div", { className: "pt-4 text-center select-none" },
+        React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } }, putt.title || "CLUTCH PUTT"),
+        React.createElement("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.chalk, lineHeight: 1.05 } },
+            feet,
+            " FT ",
+            putt.label.toUpperCase()),
+        React.createElement("p", { className: "text-sm mt-1", style: { color: C.bogey } }, putt.stakes),
+        React.createElement("svg", { viewBox: "0 0 200 260", width: "100%", style: { maxWidth: 300, margin: "8px auto", display: "block" } },
+            React.createElement("defs", null,
+                React.createElement("linearGradient", { id: "cpSlope", x1: brk > 0 ? "0" : "1", y1: "0", x2: brk > 0 ? "1" : "0", y2: "0" },
+                    React.createElement("stop", { offset: "0", stopColor: "#8FD18F" }),
+                    React.createElement("stop", { offset: "1", stopColor: brk === 0 ? "#8FD18F" : "#5FAE6A" }))),
+            React.createElement("ellipse", { cx: 100, cy: 140, rx: 96, ry: 124, fill: "#4E9A5C" }),
+            React.createElement("ellipse", { cx: 100, cy: 140, rx: 90, ry: 118, fill: "url(#cpSlope)" }),
+            brk !== 0 && [70, 120, 170].map((y) => React.createElement("text", { key: y, x: 100, y, textAnchor: "middle", fontSize: 14, fill: "rgba(14,42,28,0.35)" }, brk > 0 ? "→ →" : "← ←")),
+            (phase === "read" || phase === "line") && React.createElement("path", { d: `M ${BX} ${BY} Q ${ctrlX} ${ctrlY} ${CX} ${CY}`, fill: "none", stroke: "rgba(244,247,242,0.45)", strokeWidth: 1.2, strokeDasharray: "3 4" }),
+            React.createElement("circle", { cx: CX, cy: CY, r: 6, fill: "#0E2A1C" }),
+            React.createElement("line", { x1: CX, y1: CY, x2: CX, y2: CY - 40, stroke: "#F4F7F2", strokeWidth: 1.2, opacity: phase === "roll" || phase === "done" ? 0.25 : 1 }),
+            React.createElement("path", { d: `M ${CX} ${CY - 40} l 14 4 l -14 4 z`, fill: "#D96C4F", opacity: phase === "roll" || phase === "done" ? 0.25 : 1 }),
+            !(phase === "done" && made) && React.createElement("circle", { cx: bx, cy: by, r: 4.5, fill: "#FFFFFF", stroke: "rgba(0,0,0,0.3)", strokeWidth: 0.8 })),
+        React.createElement("p", { className: "text-xs", style: { color: C.muted } },
+            breakTxt,
+            " · tour make rate from here ~",
+            Math.round(clutchMakeP(feet, putting, pressure) * 100),
+            "%"),
+        putt.record && putt.record.a > 0 && React.createElement("p", { className: "text-[10px] mt-0.5", style: { color: C.gold } }, `Your clutch putts: ${putt.record.m}/${putt.record.a} holed`),
+        phase === "read" && (React.createElement("div", { className: "mt-3" },
+            React.createElement("p", { className: "text-xs mb-3", style: { color: C.chalk } }, "Tap once to set the LINE (the green zone allows for the break), then again for the PACE."),
+            React.createElement(Btn, { onClick: () => setPhase("line") }, "⛳ STEP UP TO IT"),
+            React.createElement("button", { onClick: auto, className: "w-full text-xs mt-3", style: { color: C.muted } }, "Let the sim putt it"))),
+        (phase === "line" || phase === "pace") && (React.createElement("div", { className: "mt-2", onPointerDown: tap },
+            React.createElement("div", { className: "text-xs", style: { color: phase === "line" ? C.gold : C.muted, letterSpacing: 2, fontFamily: FONT } }, "1 · LINE"),
+            meter(lineAim, lineHalf, lineTap, ["LEFT", "RIGHT"]),
+            phase === "pace" && React.createElement("div", { className: "text-xs", style: { color: C.gold, letterSpacing: 2, fontFamily: FONT } }, "2 · PACE"),
+            phase === "pace" && meter(paceAim, paceHalf, null, ["SOFT", "FIRM"]),
+            React.createElement("button", { className: "w-full rounded-md py-4 mt-1 active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 22, letterSpacing: 2 } }, phase === "line" ? "TAP — SET THE LINE" : "TAP — STROKE IT"))),
+        phase === "roll" && React.createElement("p", { className: "mt-4", style: { fontFamily: FONT, fontSize: 20, color: C.chalk } }, "…"),
+        phase === "done" && (React.createElement("div", { className: "mt-3" },
+            React.createElement("div", { style: { fontFamily: FONT, fontSize: 30, color: made ? C.gold : C.red } }, verdict),
+            React.createElement("p", { className: "text-sm mb-3", style: { color: C.chalk } }, made ? putt.makeTxt : putt.missTxt),
+            React.createElement(Btn, { onClick: () => onDone(made) }, "CONTINUE")))));
+}
 // ============ SPONSORS ============
 // one personal sponsor per season: a retainer every week you tee it up, plus a bonus for hitting the contract goal
 const SPONSOR_BRANDS = [
@@ -1670,6 +1812,7 @@ function GolfCareerSim() {
     const spinIv = useRef(null);
     const [tour, setTour] = useState(null);
     const [autoPlay, setAutoPlay] = useState(false);
+    const [clutch, setClutch] = useState(null); // a live clutch-putt moment: putt spec + onDone(made)
     const [lastChoiceResult, setLastChoiceResult] = useState(null); // { hole, swing, score, par, label } — brief feedback after a shot choice
     const [storyHole, setStoryHole] = useState(null);
     const [fullBoard, setFullBoard] = useState(false);
@@ -1814,6 +1957,36 @@ function GolfCareerSim() {
         })();
         return () => clearInterval(spinIv.current);
     }, []);
+    // is the NEXT hole (index h) a clutch moment in this stroke-play round? returns the stakes line, or null
+    // every clutch putt counts toward a career record, shown on the putt screen
+    const startClutch = (spec) => setClutch({ ...spec, record: g.clutch || { m: 0, a: 0 }, onDone: (made) => {
+            setG((pg) => { const c = pg.clutch || { m: 0, a: 0 }; return { ...pg, clutch: { m: c.m + (made ? 1 : 0), a: c.a + 1 } }; });
+            spec.onDone(made);
+        } });
+    const strokeClutchStakes = (t, h) => {
+        if (!t || !t.live || t.team || h >= 18)
+            return null;
+        const rows = t.scores.map((s, i) => s.cut || !t.live.holes[i] ? null : { d: (s.total - t.course.par * t.round) + t.live.holes[i].slice(0, h).reduce((a, sc, j) => a + sc - t.course.holes[j][0], 0), you: s.isYou }).filter(Boolean).sort((a, b) => a.d - b.d);
+        const me = rows.find((r) => r.you);
+        if (!me)
+            return null;
+        const pos = 1 + rows.filter((r) => r.d < me.d).length, tied = rows.filter((r) => r.d === me.d).length > 1;
+        const gap = me.d - rows[0].d, r = t.round, toPlay = 18 - h;
+        const second = rows.find((x) => !x.you);
+        if (r === 3 && h >= 13 && gap <= 3 && (gap > 0 || !second || second.d - me.d <= 3)) { // in the hunt, or a lead that can still be lost
+            return gap > 0 ? `Final round \u00B7 ${gap} off the lead with ${toPlay} to play`
+                : tied ? `Final round \u00B7 tied for the lead with ${toPlay} to play`
+                    : `Final round \u00B7 you lead by ${second ? second.d - me.d : 0} with ${toPlay} to play`;
+        }
+        if (r === 1 && h >= 15 && !noCut(t.ev.type)) {
+            const cut = rows[Math.min(cutIdxOf(t), rows.length - 1)].d;
+            if (Math.abs(me.d - cut) <= 1)
+                return `Cut line \u00B7 ${me.d === cut ? "right on the number" : me.d < cut ? "one inside" : "one outside"} with ${toPlay} to play`;
+        }
+        if (r <= 2 && h === 17 && pos <= 10)
+            return `Closing hole of round ${r + 1} \u00B7 ${tied ? "T" : ""}${pos} on the board`;
+        return null;
+    };
     const dramaNow = (t) => {
         if (!t || !t.live || t.team || t.round !== 3)
             return false;
@@ -1835,8 +2008,8 @@ function GolfCareerSim() {
     useEffect(() => {
         if (!autoPlay || !(tour === null || tour === void 0 ? void 0 : tour.live))
             return;
-        if (tour.live.revealed >= 18) {
-            setAutoPlay(false);
+        if (tour.live.revealed >= 18 || strokeClutchStakes(tour, tour.live.revealed)) {
+            setAutoPlay(false); // a clutch hole coming up: hand control back
             return;
         }
         const t = setTimeout(() => {
@@ -2851,11 +3024,22 @@ function GolfCareerSim() {
         const choice = HOLE_CHOICES(hole).find((c) => c.id === choiceId);
         const adj = wxAdjFor(tour.live.wx, me.wx) + (me.extra || 0);
         const { score, swing } = playHoleWithChoice(effAttrs(g), hole, choice, adj);
-        const newHoles = tour.live.holes.map((row, i) => (i === meIdx ? row.map((v, j) => (j === h ? score : v)) : row));
-        const newStories = tour.live.stories ? tour.live.stories.map((s, j) => (j === h ? shotStory(hole, score, effAttrs(g)) : s)) : tour.live.stories;
-        setTour({ ...tour, live: { ...tour.live, holes: newHoles, stories: newStories } });
-        setLastChoiceResult({ hole: h, swing, score, par: hole[0], label: choice.label });
-        advanceHoles(1);
+        const commit = (sc, putt) => {
+            const newHoles = tour.live.holes.map((row, i) => (i === meIdx ? row.map((v, j) => (j === h ? sc : v)) : row));
+            const newStories = tour.live.stories ? tour.live.stories.map((s, j) => (j === h ? [...shotStory(hole, sc, effAttrs(g)), ...(putt ? [putt] : [])] : s)) : tour.live.stories;
+            setTour({ ...tour, live: { ...tour.live, holes: newHoles, stories: newStories } });
+            setLastChoiceResult({ hole: h, swing, score: sc, par: hole[0], label: choice.label, putt });
+            advanceHoles(1);
+        };
+        const stakes = score > 1 ? strokeClutchStakes(tour, h) : null;
+        if (!stakes)
+            return commit(score);
+        const pt = strokePutt(score, hole[0]);
+        const a = effAttrs(g);
+        setAutoPlay(false);
+        startClutch({ ...pt, title: `${tour.ev.e.toUpperCase()} \u00B7 HOLE ${h + 1}`, stakes, putting: a.putting, composure: a.composure, pressure: tour.round === 3 ? 1 + (h - 13) * 0.1 : 0.6,
+            makeTxt: `${scoreName(pt.target, hole[0])} on ${h + 1}.`, missTxt: `It's a ${scoreName(pt.miss, hole[0]).toLowerCase()} on ${h + 1}.`,
+            onDone: (made) => { setClutch(null); commit(made ? pt.target : pt.miss, `\u26F3 ${pt.feet}ft putt ${pt.label} \u2014 ${made ? "HOLED" : "missed"}`); } });
     };
     const finishRound = (genOverride) => {
         setAutoPlay(false);
@@ -4431,6 +4615,8 @@ function GolfCareerSim() {
         return out;
     };
     // ============ RENDER ============
+    if (clutch)
+        return React.createElement(Shell, null, React.createElement(ClutchPutt, { key: clutch.title + clutch.feet + clutch.stakes, putt: clutch, onDone: clutch.onDone }));
     if (screen === "loading")
         return React.createElement(Shell, null,
             React.createElement("div", null));
@@ -6460,7 +6646,13 @@ function GolfCareerSim() {
         const myMakeP = Math.max(0.15, Math.min(0.92, cur.base + (myPutting - 75) * 0.015));
         const oppMakeP = Math.max(0.15, Math.min(0.92, cur.base + (oppPutting - 75) * 0.015));
         const attempt = () => {
-            const myMake = Math.random() < myMakeP;
+            const feet = parseInt(cur.d, 10) || 10;
+            const brk = /straight/.test(cur.d) ? 0 : /left-to-right/.test(cur.d) ? 1.5 : /big breaker/.test(cur.d) ? (Math.random() < 0.5 ? -2 : 2) : rollBreak();
+            startClutch({ feet, brk, label: "in the shootout", title: `${puttoff.roundName} \u00B7 PUTT-OFF ROUND ${roundIdx + 1}`, stakes: `${cur.d} \u00B7 ${opp.name} putts after you`,
+                putting: myPutting, composure: effAttrs(g).composure, pressure: 1.1 + Math.min(roundIdx, 4) * 0.1, makeTxt: "Over to him\u2026", missTxt: "Now he can win it\u2026",
+                onDone: (made) => { setClutch(null); settle(made); } });
+        };
+        const settle = (myMake) => {
             const oppMake = Math.random() < oppMakeP;
             const newPutts = [...rounds, { desc: cur.d, myMake, oppMake }];
             // decided if exactly one made
@@ -7484,6 +7676,7 @@ function GolfCareerSim() {
                             lastChoiceResult.label,
                             " \u2192 ",
                             scoreName(lastChoiceResult.score, lastChoiceResult.par),
+                            lastChoiceResult.putt ? ` \u00B7 ${lastChoiceResult.putt.replace("\u26F3 ", "")}` : "",
                             lastChoiceResult.swing === "good" ? " — the gamble paid off!" : lastChoiceResult.swing === "bad" ? " — that one bit back." : "")),
                         React.createElement("div", { className: "grid gap-2 mb-2" }, HOLE_CHOICES(nextHole).map((c) => (React.createElement("button", { key: c.id, onClick: () => chooseHole(c.id), className: "w-full text-left p-2.5 rounded-xl active:scale-[0.98]", style: { background: C.card, border: `1px solid ${c.id === "attack" ? "rgba(232,195,90,0.4)" : "rgba(244,247,242,0.15)"}` } },
                             React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: c.id === "attack" ? C.gold : C.blue } }, c.label),
@@ -7805,7 +7998,78 @@ function GolfCareerSim() {
                 React.createElement(Btn, { onClick: closeEvent }, "CONTINUE"))));
     }
     const cupCourseOf = () => COURSES.find((c) => c.name === (CUP_COURSE_OF[ryder.venue] || "Muirfield Village"));
+    // shared by every match-play format: does this hole get a clutch putt, and what's riding on it?
+    // back nine: whenever the match is within 3; front nine: now and then; always when the hole can end the match
+    const matchClutchStakes = (am, pt, oppName) => {
+        const rem = 18 - am.hole - 1; // holes left after this one
+        const winEnds = Math.abs(am.diff + 1) > rem && am.diff + 1 > 0;
+        const loseEnds = Math.abs(am.diff - 1) > rem && am.diff - 1 < 0;
+        const onLine = pt.aim === "win" ? winEnds : loseEnds;
+        if (!onLine && !(am.hole >= 9 ? Math.abs(am.diff) <= 3 : Math.random() < 0.35))
+            return null;
+        const st = am.diff === 0 ? "all square" : am.diff > 0 ? `${am.diff} up` : `${-am.diff} down`;
+        const what = pt.aim === "win" ? (winEnds ? "to WIN THE MATCH" : "to win the hole") : (loseEnds ? "to keep the match alive" : "to halve the hole");
+        return `${what} \u00B7 ${oppName} in with a ${pt.oppScore} \u00B7 ${st} thru ${am.hole}`;
+    };
+    const cupHoleScores = (ry, am) => {
+        const sess = ry.sessions[am.sIdx];
+        const m = sess.matches[am.mIdx];
+        const course = COURSES.find((c) => c.name === (CUP_COURSE_OF[ry.venue] || "Muirfield Village"));
+        const mode = sess.label.includes("SINGLES") ? "s" : sess.label.includes("FOUR-BALL") ? "fb" : "fs";
+        const sideAId = ry.kind === "ei" ? "EUR" : "USA";
+        const sideBId = ry.kind === "pres" ? "INTL" : ry.kind === "ei" ? "INTL" : "EUR";
+        const mySideId = m.youSideA ? sideAId : sideBId;
+        const oppSideId = m.youSideA ? sideBId : sideAId;
+        const pl = (n) => n === g.pro.name ? effAttrs(g) : aiP(n);
+        const myNames = m.youSideA ? m.a : m.b;
+        const oppNames = m.youSideA ? m.b : m.a;
+        const myAdj = (ry.homeSide === mySideId ? -0.011 : 0) + (mode === "s" ? -(ry.youSinglesMod || 0) * 0.011 : 0);
+        const oppAdj = (ry.homeSide === oppSideId ? -0.011 : 0);
+        const hole = course.holes[am.hole];
+        const sideScore = (names, adj, isMe) => {
+            const pAdj = isMe ? pressureAdj(pl(names[0]), 0.5 + (am.hole / 18) * 0.6) : 0;
+            if (mode === "fb")
+                return Math.min(playHole(pl(names[0]), hole, adj, false, pAdj), playHole(pl(names[1]), hole, adj, false, isMe ? pressureAdj(pl(names[1]), 0.5 + (am.hole / 18) * 0.6) : 0));
+            if (mode === "fs")
+                return playHole(blendAttrs(pl(names[0]), pl(names[1])), hole, adj, false, pAdj);
+            return playHole(pl(names[0]), hole, adj, false, pAdj);
+        };
+        return { my: sideScore(myNames, myAdj, true), opp: sideScore(oppNames, oppAdj, false), par: hole[0], oppLabel: oppNames.map((n) => n.split(" ").slice(-1)[0]).join(" & ") };
+    };
+    // log one hole into a match-play state (cup or World Cup); returns the updated copy
+    const logMatchHole = (m0, my, opp, par) => {
+        const am = { ...m0, log: [...m0.log] };
+        am.log.push({ h: am.hole + 1, par, my, opp });
+        am.diff += my < opp ? 1 : my > opp ? -1 : 0;
+        am.hole += 1;
+        if (Math.abs(am.diff) > 18 - am.hole || am.hole === 18)
+            am.done = true;
+        return am;
+    };
+    // offer a clutch putt on one match-play hole; resolve(myFinal) is called with your score once it's settled
+    const matchClutch = (am, my, opp, par, oppLabel, title, resolve) => {
+        const pt = matchPutt(my, opp, par);
+        const stakes = pt && matchClutchStakes(am, { ...pt, oppScore: opp }, oppLabel);
+        if (!stakes)
+            return false;
+        const a = effAttrs(g);
+        const ends = stakes.startsWith("to WIN THE MATCH");
+        startClutch({ ...pt, title, stakes, putting: a.putting, composure: a.composure, pressure: 0.7 + (am.hole / 18) * 0.6 + (ends ? 0.2 : 0),
+            makeTxt: pt.aim === "win" ? (ends ? "THAT'S THE MATCH!" : "Hole won.") : "Hole halved \u2014 still in it.",
+            missTxt: pt.aim === "win" ? (pt.miss < opp ? "Still wins the hole." : "Hole halved.") : "Hole lost.",
+            onDone: (made) => { setClutch(null); resolve(made ? pt.target : pt.miss); } });
+        return true;
+    };
     const playCupHole = (toFinish) => {
+        if (!toFinish && ryder && ryder.activeMatch && !ryder.activeMatch.done) {
+            const am0 = ryder.activeMatch;
+            const { my, opp, par, oppLabel } = cupHoleScores(ryder, am0);
+            const title = `${ryder.kind === "pres" ? "PRESIDENTS CUP" : ryder.kind === "ei" ? "EURO v INTERNATIONAL" : "RYDER CUP"} \u00B7 HOLE ${am0.hole + 1}`;
+            if (matchClutch(am0, my, opp, par, oppLabel, title, (myFinal) => setRyder((ry) => ({ ...ry, activeMatch: logMatchHole(ry.activeMatch, myFinal, opp, par) }))))
+                return;
+            setRyder((ry) => ({ ...ry, activeMatch: logMatchHole(ry.activeMatch, my, opp, par) }));
+            return;
+        }
         setRyder((ry) => {
             let am = { ...ry.activeMatch, log: [...ry.activeMatch.log] };
             const sess = ry.sessions[am.sIdx];
@@ -7933,6 +8197,15 @@ function GolfCareerSim() {
         const pl = (n) => n === g.pro.name ? effAttrs(g) : aiP(n);
         const oppAttrs = pl(oppName);
         const playHoles = (toFinish) => {
+            if (!toFinish && !wm.done) {
+                const hole = course.holes[wm.hole];
+                const my = playHole(effAttrs(g), hole, 0, false, pressureAdj(effAttrs(g), 0.5 + (wm.hole / 18) * 0.6));
+                const opp = playHole(oppAttrs, hole, 0, false, 0);
+                const apply = (myF) => setWcMatch((m) => logMatchHole(m, myF, opp, hole[0]));
+                if (!matchClutch(wm, my, opp, hole[0], oppName.split(" ").slice(-1)[0], `WORLD CUP \u00B7 HOLE ${wm.hole + 1}`, apply))
+                    apply(my);
+                return;
+            }
             setWcMatch((m) => {
                 let am = { ...m, log: [...m.log] };
                 do {
@@ -8008,6 +8281,21 @@ function GolfCareerSim() {
         const oppTot = po.holes.reduce((s, h) => s + h.opp, 0);
         const done = po.idx >= 3;
         const playPoHole = (toEnd) => {
+            if (!toEnd && po.idx < 3) {
+                const hole = course.holes[po.idx % 18];
+                const my = playHole(effAttrs(g), hole, 0, false, pressureAdj(effAttrs(g), 1.2));
+                const opp = playHole(po.a.isYou ? aiP(po.b.name) : aiP(po.a.name), hole, 0, false, 0);
+                const apply = (myF) => setWcPlayoff((p) => ({ ...p, holes: [...p.holes, { par: hole[0], my: myF, opp }], idx: p.idx + 1 }));
+                const pt = matchPutt(my, opp, hole[0]);
+                if (!pt)
+                    return apply(my);
+                const run = myTot - oppTot, a = effAttrs(g);
+                startClutch({ ...pt, title: `WORLD CUP PLAYOFF \u00B7 HOLE ${po.idx + 1} OF 3`, putting: a.putting, composure: a.composure, pressure: 1.1 + po.idx * 0.15,
+                    stakes: `${pt.aim === "win" ? "to win the hole" : "to halve the hole"} \u00B7 ${oppName.split(" ").slice(-1)[0]} in with a ${opp} \u00B7 ${run === 0 ? "level" : run < 0 ? `${-run} ahead` : `${run} behind`} in the playoff`,
+                    makeTxt: pt.aim === "win" ? "Hole won." : "Hole halved.", missTxt: pt.aim === "win" ? (pt.miss < opp ? "Still wins the hole." : "Hole halved.") : "Hole lost.",
+                    onDone: (made) => { setClutch(null); apply(made ? pt.target : pt.miss); } });
+                return;
+            }
             setWcPlayoff((p) => {
                 let holes = [...p.holes];
                 let i = p.idx;
