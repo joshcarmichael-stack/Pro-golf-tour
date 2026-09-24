@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Sunday Pins — Golf Career Sim</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
+<meta name="theme-color" content="#0E2A1C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -1389,6 +1393,53 @@ const tint = (v) => v >= 90 ? C.gold : v >= 85 ? C.green : v >= 80 ? C.chalk : C
 const scoreColor = (sc, par) => { const d = sc - par; return d <= -2 ? C.gold : d === -1 ? C.green : d === 0 ? C.chalk : d === 1 ? C.bogey : C.red; };
 const scoreName = (sc, par) => { if (sc === 1)
     return "HOLE IN ONE!!"; const d = sc - par; return d <= -3 ? "ALBATROSS!!" : d === -2 ? "EAGLE!" : d === -1 ? "BIRDIE" : d === 0 ? "PAR" : d === 1 ? "BOGEY" : d === 2 ? "DOUBLE BOGEY" : "TRIPLE+"; };
+// classic scorecard marks: circle = birdie, double circle = eagle or better, square = bogey, double square = double bogey or worse
+function ScoreMark({ sc, par, size = 14 }) {
+    const d = sc - par, col = scoreColor(sc, par);
+    const ring = d !== 0 ? { border: `1.2px solid ${col}`, borderRadius: d < 0 ? "50%" : 3 } : {};
+    const dbl = d <= -2 || d >= 2 ? { outline: `1.2px solid ${col}`, outlineOffset: 1.5, borderRadius: d < 0 ? "50%" : 3 } : {};
+    return (React.createElement("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: size + 6, height: size + 6, margin: "2px 0", fontFamily: FONT, fontSize: size, lineHeight: 1, color: col, ...ring, ...dbl } }, sc));
+}
+// ---------- HOLE MAP: a small flyover of the hole, drawn from par / yardage / hazard level ----------
+// seeded per course + hole so the same hole always looks the same
+const seedRand = (str) => { let s = 2166136261; for (let i = 0; i < str.length; i++)
+    s = Math.imul(s ^ str.charCodeAt(i), 16777619); return () => { s = Math.imul(s ^ (s >>> 15), 2246822507); s = Math.imul(s ^ (s >>> 13), 3266489909); return ((s ^= s >>> 16) >>> 0) / 4294967296; }; };
+const HOLE_INK = { rough: "#123524", fairway: "#3F8A57", green: "#7CCB86", fringe: "#5AAA69", sand: "#E4D4A0", water: "#4C8DBF", tee: "#9FD98B", pin: "#F4F7F2", flag: "#D96C4F" };
+function HoleMap({ hole, seed }) {
+    const [par, yds, hz = 0] = hole;
+    const rnd = seedRand(seed);
+    const H = 60, mid = H / 2;
+    const tx = 14, gx = Math.round(clampN(14 + (yds / 620) * 266, par === 3 ? 130 : 170, 270)); // longer holes stretch further across
+    const bend = par === 3 ? 0 : (rnd() < 0.34 ? 0 : rnd() < 0.5 ? -1 : 1) * (8 + rnd() * 8); // dogleg left / right / straight
+    const gy = mid + (par === 3 ? (rnd() - 0.5) * 8 : bend * 0.5);
+    const kx = tx + (gx - tx) * (par === 5 ? 0.5 : 0.6), ky = mid + bend; // landing zone / corner
+    const fairway = par === 3 ? null : `M ${tx + 14} ${mid} Q ${kx - 20} ${mid + bend * 0.2} ${kx} ${ky} T ${gx - 12} ${gy}`;
+    const side = rnd() < 0.5 ? -1 : 1; // which side the trouble sits
+    const bunkers = [[gx - 4 + side * 2, gy + side * 11, 6, 3]];
+    if (hz >= 1 && par !== 3)
+        bunkers.push([kx + 6, ky - side * 9, 7, 3]);
+    if (hz >= 1)
+        bunkers.push([gx + 9, gy - side * 9, 4, 3]);
+    if (hz >= 3)
+        bunkers.push([gx - 16, gy - side * 10, 5, 2.5]);
+    const water = hz >= 3 || (par === 3 && hz === 2)
+        ? `M ${gx - 30} ${gy - 12} q 8 -3 12 5 q 4 9 -2 15 q -8 5 -14 -2 q -5 -9 4 -18 z` // fronting the green
+        : hz === 2
+            ? `M ${kx - 34} ${mid + side * 18} q 20 ${side * -6} 44 0 q 10 ${side * 4} 0 ${side * 8} q -26 ${side * 3} -46 0 q -6 ${side * -4} 2 ${side * -8} z` // along the fairway
+            : null;
+    const apron = par === 3 ? `M ${gx - 34} ${gy} L ${gx - 8} ${gy}` : null; // short run-up in front of a par-3 green
+    return (React.createElement("svg", { viewBox: `0 0 292 ${H}`, width: "100%", height: H, className: "mt-2 rounded-lg block", style: { background: HOLE_INK.rough }, role: "img", "aria-label": `Hole layout: par ${par}, ${yds} yards` },
+        fairway && React.createElement("path", { d: fairway, fill: "none", stroke: HOLE_INK.fairway, strokeWidth: 15, strokeLinecap: "round", strokeLinejoin: "round" }),
+        apron && React.createElement("path", { d: apron, stroke: HOLE_INK.fairway, strokeWidth: 11, strokeLinecap: "round" }),
+        water && React.createElement("path", { d: water, fill: HOLE_INK.water, opacity: 0.85 }),
+        React.createElement("rect", { x: tx - 5, y: mid - 4, width: 11, height: 8, rx: 2, fill: HOLE_INK.tee }),
+        bunkers.map(([x, y, rx, ry], i) => React.createElement("ellipse", { key: i, cx: x, cy: y, rx, ry, fill: HOLE_INK.sand })),
+        React.createElement("ellipse", { cx: gx, cy: gy, rx: 13, ry: 9, fill: HOLE_INK.fringe }),
+        React.createElement("ellipse", { cx: gx, cy: gy, rx: 11, ry: 7.5, fill: HOLE_INK.green }),
+        React.createElement("line", { x1: gx + 2, y1: gy + 1, x2: gx + 2, y2: gy - 15, stroke: HOLE_INK.pin, strokeWidth: 1 }),
+        React.createElement("path", { d: `M ${gx + 2} ${gy - 15} l 8 2.5 l -8 2.5 z`, fill: HOLE_INK.flag }),
+        React.createElement("text", { x: 6, y: H - 6, fontSize: 9, fontFamily: MONO, fill: C.muted }, `${yds}y`)));
+}
 const ARCHETYPES = [
     { id: "bomber", emoji: "💣", name: "THE BOMBER", blurb: "Prodigious length off the tee. Overpowers par 5s, but the short game needs work.",
         strong: { drivingDistance: 88, drivingAccuracy: 78, longApproach: 80 }, weak: 66 },
@@ -1429,7 +1480,6 @@ function BackTop({ onClick }) {
 const Shell = ({ children, theme }) => {
     const t = theme || ACTIVE_THEME || THEMES.home;
     return (React.createElement("div", { className: "min-h-screen", style: { background: t.bg, transition: "background 0.4s ease" } },
-        React.createElement("style", null, `@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono:wght@400;600&display=swap');`),
         React.createElement("div", { className: "max-w-md mx-auto p-4 pb-10" }, children)));
 };
 const ELITE = PLAYERS.filter((p) => p.rank <= 100);
@@ -7038,7 +7088,7 @@ function GolfCareerSim() {
                         const sc = i < h ? live.holes[meIdx][i] : null;
                         return (React.createElement("button", { key: i, onClick: () => sc && setStoryHole(i), className: "text-center py-1 rounded", style: { background: i === h ? "rgba(232,195,90,0.25)" : "rgba(244,247,242,0.06)", border: i === h ? `1px solid ${C.gold}` : "1px solid transparent" } },
                             React.createElement("div", { style: { color: C.muted, fontSize: 8 } }, i + 1),
-                            React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, color: sc ? scoreColor(sc, hh[0]) : "rgba(244,247,242,0.25)" } }, sc !== null && sc !== void 0 ? sc : "·")));
+                            sc ? React.createElement(ScoreMark, { sc, par: hh[0] }) : React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, lineHeight: "24px", color: "rgba(244,247,242,0.25)" } }, "·")));
                     })),
                     justPlayed && (React.createElement("button", { onClick: () => setStoryHole(h - 1), className: "w-full text-center mb-1" },
                         React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: scoreColor(justPlayed.sc, justPlayed.par), letterSpacing: 1 } }, scoreName(justPlayed.sc, justPlayed.par)),
@@ -7083,7 +7133,8 @@ function GolfCareerSim() {
                             "Ranked ",
                             ordinal(rankOf(h)),
                             " hardest on the course",
-                            rankOf(h) <= 4 ? " — survive it" : rankOf(h) >= 15 ? " — scoring chance" : "")),
+                            rankOf(h) <= 4 ? " — survive it" : rankOf(h) >= 15 ? " — scoring chance" : ""),
+                        React.createElement(HoleMap, { hole: nextHole, seed: course.name + "#" + h })),
                     React.createElement("div", { className: "p-2.5 rounded-xl mb-2", style: { background: C.panel } },
                         board.slice(0, 5).map((b, i) => (React.createElement("div", { key: b.name, className: "flex justify-between text-xs mb-0.5", style: { color: b.isYou ? C.gold : C.chalk } },
                             React.createElement("span", { className: "truncate pr-2" },
@@ -7218,7 +7269,7 @@ function GolfCareerSim() {
                             ")")),
                     React.createElement("div", { className: "grid grid-cols-9 gap-0.5" }, course.holes.map((hh, i) => (React.createElement("button", { key: i, onClick: () => setStoryHole(i), className: "text-center py-1 rounded", style: { background: "rgba(244,247,242,0.06)" } },
                         React.createElement("div", { style: { color: C.muted, fontSize: 8 } }, i + 1),
-                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, color: scoreColor(live.holes[meIdx][i], hh[0]) } }, live.holes[meIdx][i]))))))),
+                        React.createElement(ScoreMark, { sc: live.holes[meIdx][i], par: hh[0] }))))))),
                 analysis.length > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: C.panel } },
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "ROUND ANALYSIS vs FIELD"),
                     analysis.map((a) => (React.createElement("div", { key: a.label, className: "flex justify-between text-xs mb-1" },
@@ -7781,7 +7832,8 @@ function GolfCareerSim() {
                 React.createElement("p", { className: "text-xs", style: { color: C.muted } }, holeDesc(course.holes[am.hole])),
                 Math.abs(am.diff) >= 18 - am.hole - 1 && Math.abs(am.diff) <= 18 - am.hole && (React.createElement("p", { className: "text-xs mt-0.5", style: { color: C.bogey } },
                     "\u26A1 ",
-                    am.diff < 0 ? "Lose this hole and the match is over." : "Win this hole and you close it out.")))),
+                    am.diff < 0 ? "Lose this hole and the match is over." : "Win this hole and you close it out.")),
+                React.createElement(HoleMap, { hole: course.holes[am.hole], seed: course.name + "#" + am.hole }))),
             !am.done ? (React.createElement("div", { className: "grid grid-cols-2 gap-2" },
                 React.createElement(Btn, { small: true, onClick: () => playCupHole(false) },
                     "PLAY HOLE ",
