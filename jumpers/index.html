@@ -290,11 +290,14 @@ const audio = (() => {
 const cv = $("c"), ctx = cv.getContext("2d");
 const W = 680, H = 680, CX = W/2, HOR = 90, CAMH = 2.6, DC = 24, F = 1300;
 const GOAL_HW = 3.0, GOAL_H = 2.2, POST_Z = 0.25, POST_W = 0.12, KEEPER_Z = 0.9, BALL_R = 0.11;
-const G = 5.5;           // floaty cross gravity (game units)
+const G = 7;             // cross gravity (a touch floaty so it's playable)
 const G_FREE = 9.8;
-const REACH = 1.2;       // how far from your kicking foot you can still strike the ball
-const SWEET = 0.35;      // within this distance = perfect contact
-const STRIKE_TOP = 1.35; // ball must be below this height (and falling) to volley
+const PLAYER_Z = 12.5;   // the player runs along this line, side to side only
+const REACH = 1.1;       // how far along the ball's path you can still meet it
+const REACH_Z = 0.9;     // how far off your line (towards/away from goal) you can still reach
+const SWEET = 0.25;      // within this depth offset = perfect contact
+const STRIKE_TOP = 1.35; // ball must be below this height to strike it
+const FULL_BONUS = 50;   // extra points for a volley struck before the ball bounces
 const KEEPER_REACH = 1.55;
 const ATTEMPTS = 5;
 
@@ -487,7 +490,7 @@ function nextAttempt(){
   game.swung = false; game.banner = null; game.meterP = null;
   keeper.baseX = (Math.random() < 0.5 ? -1 : 1) * rand(0.35, 1.9);
   keeper.x = keeper.baseX; keeper.dive = null;
-  player.x = player.tx = rand(-1, 1); player.z = player.tz = 13; player.kick = -1;
+  player.x = player.tx = rand(-1, 1); player.z = player.tz = PLAYER_Z; player.kick = -1;
   ball = null;
   const n = profile ? profile.name : "You";
   game.commentary = pick([
@@ -501,13 +504,16 @@ function nextAttempt(){
 
 function launchCross(){
   const side = game.side;
-  const tx = rand(-3.8, 3.8), tz = rand(8.5, 14.5), T = rand(2.05, 2.5);
-  const x0 = side * 10, y0 = 1.1, z0 = clamp(tz + rand(-3, 1.5), 6, 16);
-  const vx = (tx - x0)/T, vz = (tz - z0)/T, vy = (0 - y0 + 0.5*G*T*T)/T;
-  const t1 = (vy + Math.sqrt(vy*vy - 2*G*(STRIKE_TOP - y0)))/G;
-  ball = {mode:"cross", x0, y0, z0, vx, vy, vz, t:0, T, t1, x:x0, y:y0, z:z0, spin:0, spinRate: side*-9, trail:[]};
+  // first bounce can land anywhere across the pitch; flight is low and flat
+  const tx = rand(-5.8, 5.8), T = rand(1.05, 1.6);
+  const x0 = side * 10, y0 = rand(0.5, 1.0);
+  const fz = PLAYER_Z - 0.35;
+  // small drift towards/away from goal: always reachable from your line, but not always square
+  const z0 = fz + rand(-0.6, 0.6), vz = rand(-0.35, 0.35);
+  const vx = (tx - x0)/T, vy = (0 - y0 + 0.5*G*T*T)/T;
+  ball = {mode:"cross", x:x0, y:y0, z:z0, vx, vy, vz, t:0, bounces:0, spin:0, spinRate: side*-9, trail:[]};
   game.mode = "cross";
-  game.commentary = `.......ball whipped in from the ${side < 0 ? "left" : "right"}`;
+  game.commentary = `.......` + pick(["ball whipped in low from the", "driven in from the", "fizzed across from the"]) + ` ${side < 0 ? "left" : "right"}`;
   audio.kick(0.3);
 }
 
@@ -515,9 +521,19 @@ function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
 
 function footPos(){ return {x: player.x + 0.2, z: player.z - 0.35}; }
 
+// Where the ball is relative to your kicking foot, measured along its line of travel:
+// negative = still arriving (early), positive = already past you (late).
+function ballRel(){
+  const f = footPos();
+  const dir = -game.side;   // travel direction in x
+  return {along: (ball.x - f.x)*dir, dz: ball.z - f.z, y: ball.y};
+}
+// timing progress 0..1 while the ball is inside your reach, else null
 function crossWindowP(){
-  if (!ball || ball.mode !== "cross" || ball.t < ball.t1) return null;
-  return clamp((ball.t - ball.t1)/(ball.T - ball.t1), 0, 1);
+  if (!ball || ball.mode !== "cross") return null;
+  const r = ballRel();
+  if (Math.abs(r.along) > REACH || Math.abs(r.dz) > REACH_Z || r.y > STRIKE_TOP) return null;
+  return (r.along + REACH)/(2*REACH);
 }
 // meter position (0 = left post side, 1 = right) for window progress p
 function aimU(p){ return game.side < 0 ? p : 1 - p; }
@@ -526,21 +542,22 @@ function shoot(){
   if (game.mode !== "cross" || game.swung || !ball || ball.mode !== "cross") return;
   game.swung = true;
   player.kick = 0;
-  const f = footPos();
-  const dist = Math.hypot(ball.x - f.x, ball.z - f.z);
-  if (ball.t < ball.t1){
-    toFree();
-    endAttempt("miss", "TOO EARLY!", "Swung before it arrived. Fresh air!");
-    audio.groan(); return;
-  }
-  if (dist > REACH){
-    toFree();
-    endAttempt("miss", "AIR SHOT!", "Nowhere near it. The scouts wince.");
-    audio.groan(); return;
-  }
-  const q = clamp((REACH - dist)/(REACH - SWEET), 0, 1);  // contact quality
+  const r = ballRel();
   const p = crossWindowP();
+  if (p === null){
+    toFree();
+    if (r.along < -REACH) endAttempt("miss", "TOO EARLY!", "Swung before it arrived. Fresh air!");
+    else if (r.along > REACH) endAttempt("miss", "TOO LATE!", "It's gone past you. Wake up!");
+    else if (r.y > STRIKE_TOP) endAttempt("miss", "AIR SHOT!", "Too high to volley. Swung at thin air.");
+    else endAttempt("miss", "AIR SHOT!", "Nowhere near it. The scouts wince.");
+    audio.groan(); return;
+  }
+  // contact quality: how square you are to the ball, and how high you had to hit it
+  const qz = clamp((REACH_Z - Math.abs(r.dz))/(REACH_Z - SWEET), 0, 1);
+  const qh = r.y > 0.9 ? 1 - (r.y - 0.9)/(STRIKE_TOP - 0.9)*0.55 : 1;
+  const q = qz*qh;
   const u = aimU(p);
+  ball.onFull = ball.bounces === 0;
   const spray = 0.25 + (1-q)*0.9;
   const aimX = (u*2 - 1)*3.7 + gauss()*spray*0.45;
   let aimY = 0.35 + Math.random()*1.55 + Math.pow(1-q, 1.4)*Math.random()*2.6;
@@ -550,11 +567,7 @@ function shoot(){
 
 function gauss(){ return (Math.random()+Math.random()+Math.random()-1.5)/0.75; }
 
-function toFree(){
-  const t = ball.t;
-  ball.mode = "free";
-  ball.vx = ball.vx; ball.vz = ball.vz; ball.vy = ball.vy - G*t;
-}
+function toFree(){ ball.mode = "free"; }
 
 function resolveShot(aimX, aimY, q){
   const ax = Math.abs(aimX);
@@ -587,7 +600,7 @@ function resolveShot(aimX, aimY, q){
   let hitU = 1;
   if (outcome === "saved") hitU = (sz - KEEPER_Z)/(sz - tz);
   ball = {mode:"shot", sx, sy, sz, tx, ty, tz, t:0, dur, hitU, arc: 0.25 + (1-q)*0.4,
-          x:sx, y:sy, z:sz, spin:ball.spin, spinRate: 25*(aimX > 0 ? 1 : -1), trail:[], outcome, q};
+          x:sx, y:sy, z:sz, spin:ball.spin, spinRate: 25*(aimX > 0 ? 1 : -1), trail:[], outcome, q, onFull: ball.onFull};
   game.mode = "shot";
   game.timeScale = 1;
   audio.kick(0.4 + q*0.6);
@@ -627,10 +640,12 @@ function onShotArrive(){
       const ax = Math.abs(b.tx), topBins = b.ty > 1.6 && ax > 1.9;
       const place = Math.round(60*clamp((ax - 1)/1.8, 0, 1));
       const clean = Math.round(40*b.q);
-      const pts = 100 + place + clean;
+      const pts = 100 + place + clean + (b.onFull ? FULL_BONUS : 0);
       game.goals++; game.score += pts;
       game.floaters.push({text:`+${pts}`, x:P(b.tx, b.ty, 0).x, y:P(b.tx, b.ty, 0).y, t:0});
-      endAttempt("goal", "GOAL!", topBins ? pick(["Top bins! What a strike!","Right in the postage stamp!"])
+      if (b.onFull) game.floaters.push({text:`ON THE FULL +${FULL_BONUS}`, x:CX, y:420, t:0});
+      endAttempt("goal", "GOAL!", !b.onFull ? pick(["Lovely half-volley! Buried it.","Let it bounce and leathered it!","Half-volley, bottom corner!"])
+        : topBins ? pick(["Top bins! What a strike!","Right in the postage stamp!"])
         : ax > 2.2 ? pick(["Rifled into the corner!","Tucked right in off the inside of the jumper!"])
         : pick(["Smashed in! The keeper never moved.","Buried it first time!"]));
       audio.cheer();
@@ -683,9 +698,9 @@ function canvasPoint(e){
   return {x:(e.clientX - r.left)*W/r.width, y:(e.clientY - r.top)*H/r.height};
 }
 function aimPlayerAt(pt){
-  const g = groundFromScreen(pt.x, pt.y);
-  player.tx = clamp(g.x, -6.5, 6.5);
-  player.tz = clamp(g.z + 0.35, 6.5, 16.5);   // put the kicking foot roughly under the pointer
+  // side to side only: map the pointer's x onto the player's running line
+  const fp = P(0, 0, PLAYER_Z);
+  player.tx = clamp((pt.x - CX)/fp.s - 0.2, -6.5, 6.5);   // kicking foot under the pointer
 }
 let isTouch = false;
 cv.addEventListener("pointermove", e => { if (game.mode !== "idle" && game.mode !== "done") aimPlayerAt(canvasPoint(e)); });
@@ -713,22 +728,24 @@ window.addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
 function update(realDt){
   // slow motion while the ball is in the strike zone
   let wantScale = 1;
-  if (game.mode === "cross" && ball && ball.mode === "cross" && ball.t >= ball.t1 - 0.12 && !game.swung) wantScale = 0.42;
+  if (game.mode === "cross" && ball && ball.mode === "cross" && !game.swung){
+    const r = ballRel();
+    if (r.along > -REACH - 1.6 && r.along < REACH && Math.abs(r.dz) < REACH_Z + 0.4 && r.y < STRIKE_TOP + 0.4) wantScale = 0.4;
+  }
   game.timeScale = lerp(game.timeScale, wantScale, 1 - Math.exp(-realDt*14));
   const dt = realDt * game.timeScale;
   game.t += realDt;
 
   // keyboard movement
   const kx = (keys["arrowright"]||keys["d"] ? 1 : 0) - (keys["arrowleft"]||keys["a"] ? 1 : 0);
-  const kz = (keys["arrowdown"]||keys["s"] ? 1 : 0) - (keys["arrowup"]||keys["w"] ? 1 : 0);
-  if (kx || kz){ player.tx = clamp(player.x + kx*1.2, -6.5, 6.5); player.tz = clamp(player.z + kz*1.2, 6.5, 16.5); }
+  if (kx) player.tx = clamp(player.x + kx*1.2, -6.5, 6.5);
 
   // player movement
   if (game.mode !== "idle" && game.mode !== "done"){
-    const dx = player.tx - player.x, dz = player.tz - player.z, d = Math.hypot(dx, dz);
-    const maxStep = 6.2*dt;
+    const dx = player.tx - player.x, d = Math.abs(dx);
+    const maxStep = 6.8*dt;
     if (player.kick >= 0 && player.kick < 0.5) { /* planted while striking */ }
-    else if (d > 0.02){ const st = Math.min(d, maxStep); player.x += dx/d*st; player.z += dz/d*st; }
+    else if (d > 0.02) player.x += Math.sign(dx)*Math.min(d, maxStep);
     player.speed = d > 0.05 ? Math.min(1, d*2) : 0;
     player.run += dt * 11 * player.speed;
   }
@@ -749,12 +766,18 @@ function update(realDt){
     ball.spin += ball.spinRate*dt;
     if (ball.mode === "cross"){
       ball.t += dt;
-      ball.x = ball.x0 + ball.vx*ball.t;
-      ball.z = ball.z0 + ball.vz*ball.t;
-      ball.y = ball.y0 + ball.vy*ball.t - 0.5*G*ball.t*ball.t;
-      if (ball.t >= ball.T){
-        ball.y = BALL_R; toFree(); ball.vy = Math.abs(ball.vy)*0.5; audio.bounce();
-        if (!game.swung){ game.swung = true; endAttempt("miss", "TOO LATE!", "Let it bounce... the chance has gone."); audio.groan(); }
+      ball.vy -= G*dt;
+      ball.x += ball.vx*dt; ball.y += ball.vy*dt; ball.z += ball.vz*dt;
+      if (ball.y < BALL_R){
+        ball.y = BALL_R; ball.bounces++;
+        ball.vy = Math.abs(ball.vy)*0.58; ball.vx *= 0.86; ball.vz *= 0.7;
+        if (ball.vy > 0.8) audio.bounce();
+        if (ball.bounces === 1 && !game.swung) game.commentary = "...it bounces! Half-volley?";
+      }
+      // run past you and away: chance gone
+      if (!game.swung && (ball.x*-game.side > 9.5 || ball.t > 5)){
+        game.swung = true; toFree();
+        endAttempt("miss", "MISSED IT!", "Let it run across you... the chance has gone."); audio.groan();
       }
     } else if (ball.mode === "shot"){
       ball.t += dt;
@@ -984,16 +1007,15 @@ function drawKeeper(){
 function drawReachRing(){
   if (!(game.mode === "cross" || game.mode === "intro") || game.swung) return;
   const f = footPos(), p = P(f.x, 0, f.z);
-  let inReach = false;
-  if (ball && ball.mode === "cross"){ inReach = Math.hypot(ball.x - f.x, ball.z - f.z) <= REACH && ball.t >= ball.t1 - 0.1; }
-  const ry = REACH*p.s*CAMH/(DC - f.z);
+  const inReach = crossWindowP() !== null;
+  const ry = REACH_Z*p.s*CAMH/(DC - f.z);
   ctx.save();
   ctx.setLineDash([6, 5]); ctx.lineWidth = 2;
   ctx.strokeStyle = inReach ? "rgba(247,194,27,.9)" : "rgba(255,255,255,.35)";
   ctx.beginPath(); ctx.ellipse(p.x, p.y, REACH*p.s, ry, 0, 0, Math.PI*2); ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle = inReach ? "rgba(247,194,27,.18)" : "rgba(255,255,255,.06)";
-  ctx.beginPath(); ctx.ellipse(p.x, p.y, SWEET*p.s, SWEET*ry/REACH, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(p.x, p.y, REACH*p.s, SWEET*ry/REACH_Z, 0, 0, Math.PI*2); ctx.fill();
   ctx.restore();
 }
 
@@ -1030,7 +1052,10 @@ function drawMeter(){
   ctx.font = "800 12px Nunito, Arial, sans-serif"; ctx.fillStyle = "#ddd";
   ctx.textAlign = "left"; ctx.fillText(game.side < 0 ? "EARLY" : "LATE", mx, my - 7);
   ctx.textAlign = "right"; ctx.fillText(game.side < 0 ? "LATE" : "EARLY", mx + mw, my - 7);
-  ctx.textAlign = "center"; ctx.fillText("STRIKE TIMING", CX, my - 7);
+  ctx.textAlign = "center";
+  const bounced = ball && ball.mode === "cross" && ball.bounces > 0;
+  ctx.fillStyle = bounced ? "#ddd" : "#f7c21b";
+  ctx.fillText(ball && ball.mode === "cross" ? (bounced ? "HALF-VOLLEY" : "ON THE FULL +" + FULL_BONUS) : "STRIKE TIMING", CX, my - 7);
   // needle
   const p = game.meterP;
   const active = p !== null && ball && ball.mode === "cross" && !game.swung;
@@ -1053,8 +1078,8 @@ function drawHUD(){
   if (game.mode !== "idle"){
     ctx.save();
     const lines = isTouch
-      ? ["Instructions", "Drag to move under the ball.", "Tap SHOOT as it drops. Timing picks the corner."]
-      : ["Instructions", "Use the mouse to position your man.", "Click as the ball drops. Timing picks the corner."];
+      ? ["Instructions", "Drag left/right to line up the ball.", "Tap SHOOT to strike. Timing picks the corner."]
+      : ["Instructions", "Move the mouse left/right to line up the ball.", "Click to strike. Timing picks the corner."];
     lines.forEach((l, i) => outlinedText(l, 230, 624 + i*18, i === 0 ? 17 : 15, "#fff", "center", 4));
     outlinedText(`Attempts: ${Math.max(0, ATTEMPTS - game.attempt + (game.mode === "intro" || game.mode === "cross" ? 1 : 0))}`, 560, 630, 21, "#fff", "center", 5);
     outlinedText(`Score: ${game.score}`, 560, 656, 21, "#fff", "center", 5);
