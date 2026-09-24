@@ -403,9 +403,21 @@ const playHoleWithChoice = (attrs, hole, choice, wxAdj) => {
 };
 const wxAdjFor = (wx, skill) => (wx.wind * .9 + wx.rain * .55 + wx.cold * .35) / 18 -
     (wx.wind * (skill[0] - 78) * .021 + wx.rain * (skill[1] - 78) * .016 + wx.cold * (skill[2] - 78) * .014) / 18;
+// CHIP-INS: a hole heading for a scrambled par or a bogey is sometimes holed from off the green (or from the sand).
+// Rare, and driven by the short game: ~1 every 6-7 rounds for a 75 chipper, ~1 every 2-3 rounds for a 95
+const chipInChance = (a) => clampN(0.012 + ((a.chipping || 75) - 75) * 0.0009 + ((a.bunker || 75) - 75) * 0.0003, 0.004, 0.035);
+const withChipIn = (a, hole, score) => score >= Math.max(2, hole[0]) && score <= hole[0] + 1 && Math.random() < chipInChance(a)
+    ? { score: score - 1, chip: Math.random() < 0.25 + ((a.bunker || 75) - 75) * 0.008 ? "bunker" : "chip" } : { score, chip: null };
+const chipStory = (hole, score, chip) => chip === "bunker"
+    ? [`${hole[0] === 3 ? "Tee shot" : "Approach"} finds the greenside bunker${score < hole[0] ? "" : " — and it's already a scramble"}.`, `Splash... it's rolling... HOLED FROM THE SAND! ${scoreName(score, hole[0])}. 🎯`]
+    : [`Just misses the green, ${ri(20, 45)}ft from the flag.`, `Chip... tracking... it DROPS! Chip-in ${scoreName(score, hole[0]).toLowerCase()}. 🎯`];
+// sim a round; the result also carries .chips[i] ("chip" / "bunker" / null) so your hole stories can tell it
 const simHoles = (attrs, course, wx, skill, extra = 0, prev = null) => {
     const adj = wxAdjFor(wx, skill) + extra;
-    return course.holes.map((h, i) => playHole(attrs, h, adj, prev && (prev[i] - h[0]) >= 2));
+    const rolls = course.holes.map((h, i) => withChipIn(attrs, h, playHole(attrs, h, adj, prev && (prev[i] - h[0]) >= 2)));
+    const out = rolls.map((r) => r.score);
+    out.chips = rolls.map((r) => r.chip);
+    return out;
 };
 const blendAttrs = (a, b) => {
     const o = {};
@@ -2882,7 +2894,8 @@ function GolfCareerSim() {
             stories = holes[meIdx].map((sc, i) => {
                 if (t.team && fourBall && counted[meIdx][i] === 1)
                     return [`Your partner's ball counts here.`, `${t.scores[meIdx].members[1].name} makes ${scoreName(sc, t.course.holes[i][0]).toLowerCase()}.`];
-                return shotStory(t.course.holes[i], sc, myAttrs);
+                const chip = !t.team && holes[meIdx].chips && holes[meIdx].chips[i];
+                return chip ? chipStory(t.course.holes[i], sc, chip) : shotStory(t.course.holes[i], sc, myAttrs);
             });
         }
         return { wx, holes, stories, counted };
@@ -3025,14 +3038,18 @@ function GolfCareerSim() {
         const hole = tour.course.holes[h];
         const choice = HOLE_CHOICES(hole).find((c) => c.id === choiceId);
         const adj = wxAdjFor(tour.live.wx, me.wx) + (me.extra || 0);
-        const { score, swing } = playHoleWithChoice(effAttrs(g), hole, choice, adj);
+        const played = playHoleWithChoice(effAttrs(g), hole, choice, adj);
+        const { swing } = played;
+        const { score, chip } = withChipIn(effAttrs(g), hole, played.score);
         const commit = (sc, putt) => {
             const newHoles = tour.live.holes.map((row, i) => (i === meIdx ? row.map((v, j) => (j === h ? sc : v)) : row));
-            const newStories = tour.live.stories ? tour.live.stories.map((s, j) => (j === h ? [...shotStory(hole, sc, effAttrs(g)), ...(putt ? [putt] : [])] : s)) : tour.live.stories;
+            const newStories = tour.live.stories ? tour.live.stories.map((s, j) => (j === h ? (chip ? chipStory(hole, sc, chip) : [...shotStory(hole, sc, effAttrs(g)), ...(putt ? [putt] : [])]) : s)) : tour.live.stories;
             setTour({ ...tour, live: { ...tour.live, holes: newHoles, stories: newStories } });
             setLastChoiceResult({ hole: h, swing, score: sc, par: hole[0], label: choice.label, putt });
             advanceHoles(1);
         };
+        if (chip)
+            return commit(score, chip === "bunker" ? "\uD83C\uDFAF HOLED FROM THE BUNKER!" : "\uD83C\uDFAF CHIPPED IN!");
         const stakes = holedFromOffGreen(score, hole[0]) ? null : strokeClutchStakes(tour, h);
         if (!stakes)
             return commit(score);
@@ -8036,12 +8053,14 @@ function GolfCareerSim() {
                 return playHole(blendAttrs(pl(names[0]), pl(names[1])), hole, adj, false, pAdj);
             return playHole(pl(names[0]), hole, adj, false, pAdj);
         };
-        return { my: sideScore(myNames, myAdj, true), opp: sideScore(oppNames, oppAdj, false), par: hole[0], oppLabel: oppNames.map((n) => n.split(" ").slice(-1)[0]).join(" & ") };
+        const myR = withChipIn(pl(myNames[0]), hole, sideScore(myNames, myAdj, true));
+        const oppR = withChipIn(pl(oppNames[0]), hole, sideScore(oppNames, oppAdj, false));
+        return { my: myR.score, myChip: myR.chip, opp: oppR.score, oppChip: oppR.chip, par: hole[0], oppLabel: oppNames.map((n) => n.split(" ").slice(-1)[0]).join(" & ") };
     };
     // log one hole into a match-play state (cup or World Cup); returns the updated copy
-    const logMatchHole = (m0, my, opp, par) => {
+    const logMatchHole = (m0, my, opp, par, chips) => {
         const am = { ...m0, log: [...m0.log] };
-        am.log.push({ h: am.hole + 1, par, my, opp });
+        am.log.push({ h: am.hole + 1, par, my, opp, ...(chips || {}) });
         am.diff += my < opp ? 1 : my > opp ? -1 : 0;
         am.hole += 1;
         if (Math.abs(am.diff) > 18 - am.hole || am.hole === 18)
@@ -8065,11 +8084,12 @@ function GolfCareerSim() {
     const playCupHole = (toFinish) => {
         if (!toFinish && ryder && ryder.activeMatch && !ryder.activeMatch.done) {
             const am0 = ryder.activeMatch;
-            const { my, opp, par, oppLabel } = cupHoleScores(ryder, am0);
+            const { my, opp, par, oppLabel, myChip, oppChip } = cupHoleScores(ryder, am0);
+            const chips = { myChip, oppChip };
             const title = `${ryder.kind === "pres" ? "PRESIDENTS CUP" : ryder.kind === "ei" ? "EURO v INTERNATIONAL" : "RYDER CUP"} \u00B7 HOLE ${am0.hole + 1}`;
-            if (matchClutch(am0, my, opp, par, oppLabel, title, (myFinal) => setRyder((ry) => ({ ...ry, activeMatch: logMatchHole(ry.activeMatch, myFinal, opp, par) }))))
+            if (!myChip && matchClutch(am0, my, opp, par, oppLabel, title, (myFinal) => setRyder((ry) => ({ ...ry, activeMatch: logMatchHole(ry.activeMatch, myFinal, opp, par, chips) }))))
                 return;
-            setRyder((ry) => ({ ...ry, activeMatch: logMatchHole(ry.activeMatch, my, opp, par) }));
+            setRyder((ry) => ({ ...ry, activeMatch: logMatchHole(ry.activeMatch, my, opp, par, chips) }));
             return;
         }
         setRyder((ry) => {
@@ -8098,8 +8118,8 @@ function GolfCareerSim() {
             };
             do {
                 const hole = course.holes[am.hole];
-                const my = sideScore(myNames, myAdj, true);
-                const opp = sideScore(oppNames, oppAdj, false);
+                const my = withChipIn(pl(myNames[0]), hole, sideScore(myNames, myAdj, true)).score;
+                const opp = withChipIn(pl(oppNames[0]), hole, sideScore(oppNames, oppAdj, false)).score;
                 am.log.push({ h: am.hole + 1, par: hole[0], my, opp });
                 am.diff += my < opp ? 1 : my > opp ? -1 : 0;
                 am.hole += 1;
@@ -8201,10 +8221,11 @@ function GolfCareerSim() {
         const playHoles = (toFinish) => {
             if (!toFinish && !wm.done) {
                 const hole = course.holes[wm.hole];
-                const my = playHole(effAttrs(g), hole, 0, false, pressureAdj(effAttrs(g), 0.5 + (wm.hole / 18) * 0.6));
-                const opp = playHole(oppAttrs, hole, 0, false, 0);
-                const apply = (myF) => setWcMatch((m) => logMatchHole(m, myF, opp, hole[0]));
-                if (!matchClutch(wm, my, opp, hole[0], oppName.split(" ").slice(-1)[0], `WORLD CUP \u00B7 HOLE ${wm.hole + 1}`, apply))
+                const myR = withChipIn(effAttrs(g), hole, playHole(effAttrs(g), hole, 0, false, pressureAdj(effAttrs(g), 0.5 + (wm.hole / 18) * 0.6)));
+                const oppR = withChipIn(oppAttrs, hole, playHole(oppAttrs, hole, 0, false, 0));
+                const my = myR.score, opp = oppR.score;
+                const apply = (myF) => setWcMatch((m) => logMatchHole(m, myF, opp, hole[0], { myChip: myR.chip, oppChip: oppR.chip }));
+                if (myR.chip || !matchClutch(wm, my, opp, hole[0], oppName.split(" ").slice(-1)[0], `WORLD CUP \u00B7 HOLE ${wm.hole + 1}`, apply))
                     apply(my);
                 return;
             }
@@ -8213,8 +8234,8 @@ function GolfCareerSim() {
                 do {
                     const hole = course.holes[am.hole];
                     const pAdj = pressureAdj(effAttrs(g), 0.5 + (am.hole / 18) * 0.6);
-                    const my = playHole(effAttrs(g), hole, 0, false, pAdj);
-                    const opp = playHole(oppAttrs, hole, 0, false, 0);
+                    const my = withChipIn(effAttrs(g), hole, playHole(effAttrs(g), hole, 0, false, pAdj)).score;
+                    const opp = withChipIn(oppAttrs, hole, playHole(oppAttrs, hole, 0, false, 0)).score;
                     am.log.push({ h: am.hole + 1, par: hole[0], my, opp });
                     am.diff += my < opp ? 1 : my > opp ? -1 : 0;
                     am.hole += 1;
@@ -8262,10 +8283,12 @@ function GolfCareerSim() {
                         l.par,
                         ")"),
                     React.createElement("span", { style: { color: l.my < l.opp ? C.green : l.my > l.opp ? C.red : C.muted } },
+                        l.myChip ? "\uD83C\uDFAF " : "",
                         "You ",
                         l.my,
                         " \u00B7 Opp ",
-                        l.opp)))),
+                        l.opp,
+                        l.oppChip ? " \uD83C\uDFAF" : "")))),
                 wm.log.length === 0 && React.createElement("p", { className: "text-xs text-center", style: { color: C.muted } }, "First tee. Good luck.")),
             !wm.done ? (React.createElement("div", { className: "grid grid-cols-2 gap-2" },
                 React.createElement(Btn, { small: true, onClick: () => playHoles(false) }, "\u25B8 PLAY HOLE"),
@@ -8285,10 +8308,11 @@ function GolfCareerSim() {
         const playPoHole = (toEnd) => {
             if (!toEnd && po.idx < 3) {
                 const hole = course.holes[po.idx % 18];
-                const my = playHole(effAttrs(g), hole, 0, false, pressureAdj(effAttrs(g), 1.2));
-                const opp = playHole(po.a.isYou ? aiP(po.b.name) : aiP(po.a.name), hole, 0, false, 0);
+                const oppA = po.a.isYou ? aiP(po.b.name) : aiP(po.a.name);
+                const myR = withChipIn(effAttrs(g), hole, playHole(effAttrs(g), hole, 0, false, pressureAdj(effAttrs(g), 1.2)));
+                const my = myR.score, opp = withChipIn(oppA, hole, playHole(oppA, hole, 0, false, 0)).score;
                 const apply = (myF) => setWcPlayoff((p) => ({ ...p, holes: [...p.holes, { par: hole[0], my: myF, opp }], idx: p.idx + 1 }));
-                const pt = matchPutt(my, opp, hole[0]);
+                const pt = myR.chip ? null : matchPutt(my, opp, hole[0]);
                 if (!pt)
                     return apply(my);
                 const run = myTot - oppTot, a = effAttrs(g);
@@ -8487,7 +8511,8 @@ function GolfCareerSim() {
                 ", them ",
                 last.opp,
                 " \u2014 ",
-                last.my < last.opp ? "YOU TAKE THE HOLE" : last.my > last.opp ? "hole lost" : "halved")),
+                last.my < last.opp ? "YOU TAKE THE HOLE" : last.my > last.opp ? "hole lost" : "halved",
+                last.myChip ? ` \u00B7 \uD83C\uDFAF you ${last.myChip === "bunker" ? "holed out from the sand" : "chipped in"}!` : last.oppChip ? ` \u00B7 \uD83C\uDFAF they ${last.oppChip === "bunker" ? "holed out from the sand" : "chipped in"}` : "")),
             youAreDecider && (React.createElement("div", { className: "p-3 rounded-xl mb-2 text-center", style: { background: "rgba(232,195,90,0.15)", border: `2px solid ${C.gold}` } },
                 React.createElement("p", { style: { fontFamily: FONT, fontSize: 16, color: C.gold, letterSpacing: 1 } }, "\u26A1 IT'S ALL ON YOU"),
                 React.createElement("p", { className: "text-xs", style: { color: C.chalk } }, "Every other match is in. The cup comes down to your match \u2014 win it and you're a hero."))),
