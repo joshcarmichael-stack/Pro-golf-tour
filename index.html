@@ -922,7 +922,7 @@ const buildEuroIntl = (standings, pro, proSide, plist = PLAYERS) => {
 };
 const EI_VENUES = { EUR: ["Wentworth, England", "Valderrama, Spain", "The K Club, Ireland"], INTL: ["Kingston Heath, Australia", "Emirates, Dubai", "Fancourt, South Africa"] };
 const CODE_TO_NAME = Object.fromEntries(Object.entries(NATION_CODE).map(([name, code]) => [code, name]));
-const FLAG = { USA: "🇺🇸", ENG: "🏴", SCO: "🏴", WAL: "🏴", NIR: "🇬🇧", IRL: "🇮🇪", AUS: "🇦🇺", ESP: "🇪🇸", FRA: "🇫🇷", GER: "🇩🇪", ITA: "🇮🇹", SWE: "🇸🇪", NOR: "🇳🇴", DEN: "🇩🇰", NED: "🇳🇱", BEL: "🇧🇪", AUT: "🇦🇹", FIN: "🇫🇮", RSA: "🇿🇦", JPN: "🇯🇵", KOR: "🇰🇷", CHN: "🇨🇳", IND: "🇮🇳", CAN: "🇨🇦", MEX: "🇲🇽", ARG: "🇦🇷", COL: "🇨🇴", CHI: "🇨🇱", NZL: "🇳🇿", THA: "🇹🇭", PHI: "🇵🇭", POL: "🇵🇱" };
+const FLAG = { USA: "🇺🇸", ENG: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", SCO: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", WAL: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", NIR: "🇬🇧", IRL: "🇮🇪", AUS: "🇦🇺", ESP: "🇪🇸", FRA: "🇫🇷", GER: "🇩🇪", ITA: "🇮🇹", SWE: "🇸🇪", NOR: "🇳🇴", DEN: "🇩🇰", NED: "🇳🇱", BEL: "🇧🇪", AUT: "🇦🇹", FIN: "🇫🇮", RSA: "🇿🇦", JPN: "🇯🇵", KOR: "🇰🇷", CHN: "🇨🇳", IND: "🇮🇳", CAN: "🇨🇦", MEX: "🇲🇽", ARG: "🇦🇷", COL: "🇨🇴", CHI: "🇨🇱", NZL: "🇳🇿", THA: "🇹🇭", PHI: "🇵🇭", POL: "🇵🇱" };
 // World Cup of Golf qualifying: each nation's TOP TWO players by season points; top 24 nations by their pair's combined points make the field of 48
 const worldCupTable = (combined, pro, plist = PLAYERS) => {
     var _a;
