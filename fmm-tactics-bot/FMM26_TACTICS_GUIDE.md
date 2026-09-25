@@ -64,6 +64,64 @@ The author says Attacking is the best mentality for counter-attacking in this bu
 5. **BBMs in midfield and Inside Forwards out wide** are the most common attacking pattern.
 6. Results vary a lot, even with the same save: team talks and press answers noticeably swing form.
 
+## Player attributes by role: Bundesliga, European places
+
+FMM rates attributes from 1 to 20. The key attributes come from the tactic authors' write-ups,
+mainly Black Hawk's attribute section. The **Min** and **Ideal** numbers are estimates, not
+measured values. Min is the lowest for a regular starter in a Bundesliga squad chasing
+4th–7th. Ideal is star level. ⭐ marks the attribute not to compromise on. A few goalkeeper
+attribute names may differ slightly in your version.
+
+### Goalkeepers
+| Role | Key attributes | Min | Ideal |
+|---|---|---|---|
+| Goalkeeper | ⭐Reflexes, Handling, One on Ones, Aerial Ability, Command of Area, Positioning | 14 | 16+ |
+| Sweeper Keeper | ⭐Reflexes, One on Ones, Rushing Out, **Kicking, Technique** (plus the Goalkeeper ones) | 14 (Technique/Kicking 12) | 16+ |
+
+A sweeper keeper with low Technique gives the ball away. Below about 10 Technique, use a normal Goalkeeper.
+
+### Defenders
+| Role | Key attributes | Min | Ideal |
+|---|---|---|---|
+| Central Defender | ⭐**Pace**, Positioning, Tackling, Aerial, Aggression, Strength | 14 (Pace 14) | 16+ |
+| Ball-Playing Defender | Central Defender attributes plus **Passing, Technique, Decisions** | 14 (Passing/Technique 13) | 16+ |
+| Wing-Back | ⭐**Pace, Movement**, Stamina, Crossing, Dribbling, then Tackling and Positioning | 14 (Stamina 14) | 16+ |
+| Full-Back | Positioning, Tackling, Pace, Crossing, Teamwork | 13–14 | 16 |
+| Inverted Wing-Back | Passing, Technique, Decisions, Movement, Pace, Tackling | 14 | 16 |
+
+Centre-back Pace matters more than anything else. If your centre-backs have under about 13 Pace, drop the defensive line to Balanced.
+
+### Midfielders
+| Role | Key attributes | Min | Ideal |
+|---|---|---|---|
+| Roaming Playmaker (the engine of Black Hawk) | ⭐**Movement**, Passing, Technique, Decisions, Creativity, Stamina, then Shooting and Aggression | 15 | 17+ |
+| Box-to-Box Midfielder | Stamina, Movement, Passing, Technique, Tackling, Aggression, Decisions | 14 (Stamina 15) | 16+ |
+| Advanced Playmaker | ⭐Passing, Creativity, Technique, Decisions, Movement | 15 | 17+ |
+| Central Midfielder | Passing, Decisions, Teamwork, Tackling, Stamina, Positioning | 14 | 16 |
+| Defensive Winger | Stamina, Teamwork, Tackling, Crossing, Passing, Positioning | 13–14 | 16 |
+| Winger | ⭐Pace, Dribbling, Crossing, Technique, Stamina | 14 | 16+ |
+
+In a box-to-box pair, make one more attacking and one more defensive.
+
+### Attackers
+| Role | Key attributes | Min | Ideal |
+|---|---|---|---|
+| Inside Forward | ⭐**Pace, Movement, Shooting**, Dribbling, Technique, Decisions | 15 | 17+ |
+| Trequartista (Miki's star) | ⭐Movement, Technique, Creativity, Shooting, Passing, Dribbling | 15 | 17+ |
+| Pressing Forward | Stamina, Aggression, Movement, Shooting, Teamwork, Pace | 14 | 16+ |
+| Deep-Lying Forward | Passing, Technique, Movement, Decisions, then Shooting | 14 | 16 |
+| Complete Forward | Shooting, Movement, Technique, Strength, Aerial, Passing, Pace | 15 | 17+ |
+
+Play inside forwards on their weaker side (right-footed on the left, left-footed on the right).
+
+### Where to spend first
+1. **Centre-back Pace** (14+), so the high press doesn't get punished.
+2. **Your creator:** the Roaming Playmaker (Black Hawk) or the Trequartista (Miki). They need 15–17 in Movement, Passing and Technique.
+3. **Inside forwards or wingers** with 15+ Pace and Movement.
+4. **Stamina 14+** across midfield and the wing-backs, and keep rotating.
+
+As a rough check, your first XI should average about 14 in each player's key attributes. Two or three players at 16–17 in the ⭐ roles is what lifts a team from mid-table into Europe.
+
 ## Sources
 - FMM Vibe FMM26 forum, via the bot: https://fmmvibe.com/forums/forum/149-football-manager-26-mobile/
 - Ingenuity Fantasy, "The Best Tactics for FM26 Mobile" (Jan 2026; general 3-4-3 / 4-3-3 / 4-2-3-1 advice): https://ingenuityfantasy.com/feature-articles/7550-2/
