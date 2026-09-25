@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1B4D34"/><stop offset="1" stop-color="#0E2A1C"/></linearGradient>
+    <radialGradient id="green" cx="0.5" cy="0.45" r="0.6"><stop offset="0" stop-color="#8FD18F"/><stop offset="1" stop-color="#4E9A5C"/></radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- green, pin and ball sit inside the central safe zone so the icon survives maskable cropping -->
+  <g transform="translate(0,-26)">
+  <ellipse cx="256" cy="330" rx="150" ry="62" fill="url(#green)"/>
+  <ellipse cx="256" cy="330" rx="150" ry="62" fill="none" stroke="#E8C35A" stroke-width="5" opacity=".55"/>
+  <ellipse cx="282" cy="326" rx="15" ry="7" fill="#0E2A1C"/>
+  <rect x="279" y="140" width="6" height="188" rx="3" fill="#F4F7F2"/>
+  <path d="M285 142 L372 170 L285 198 Z" fill="#D96C4F"/>
+  <circle cx="206" cy="336" r="17" fill="#FFFFFF"/>
+  <circle cx="201" cy="331" r="2.4" fill="#C9D3CC"/><circle cx="210" cy="329" r="2.4" fill="#C9D3CC"/><circle cx="206" cy="340" r="2.4" fill="#C9D3CC"/>
+  </g>
+</svg>
