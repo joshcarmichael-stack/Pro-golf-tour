@@ -2909,9 +2909,9 @@ function GolfCareerSim() {
             const scs = alive.map((s) => {
                 if (!t.team) {
                     let pAdj = 0;
-                    if (s.isYou && t.round === 3 && i >= 9) {
-                        // bigger pressure deeper into the back nine and in majors/cups
-                        const base = (i - 8) / 10; // .1 .. 1.0
+                    if (s.isYou) {
+                        // sudden death is as big as it gets: full pressure, more in majors/cups
+                        const base = 1.0;
                         const evMult = (t.ev && (t.ev.type === "major" || t.ev.type === "tc")) ? 1.4 : 1;
                         pAdj = pressureAdj(s.attrs, base * evMult);
                     }
@@ -6833,7 +6833,7 @@ function GolfCareerSim() {
                         " \u00B7 18-hole match play")),
                 React.createElement(Btn, { onClick: wcStartGroupMatch }, "\u26F3 PLAY YOUR GROUP MATCH \u25B8")));
         }
-        const champ = (wcBracketCap == null || wcBracketCap >= doneAll.length) ? wc.champion : null;
+        const champ = (wcBracketCap == null || wcBracketCap >= (wc.rounds || []).length) ? wc.champion : null;
         const nameOf = (n) => n === g.pro.name ? "YOU" : n.split(" ").slice(-1)[0];
         const myGroup = wc.groups.find((grp) => grp.players.some((p) => p.isYou));
         const myGroupIdx = wc.groups.indexOf(myGroup);
