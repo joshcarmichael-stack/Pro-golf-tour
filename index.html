@@ -26,6 +26,9 @@
 @keyframes spBurst{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(.4);opacity:0}}
 @keyframes spRow{0%{transform:translateY(var(--from));box-shadow:0 0 0 1px rgba(232,195,90,.7),0 6px 14px rgba(0,0,0,.35)}75%{box-shadow:0 0 0 1px rgba(232,195,90,.25),0 2px 6px rgba(0,0,0,.2)}100%{transform:translateY(0);box-shadow:none}}
 @keyframes spFlash{0%,100%{opacity:1}25%,75%{opacity:.25}50%{opacity:1;transform:scale(1.35)}}
+@keyframes spEnter{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
+@keyframes spPulse{0%{transform:scale(1)}40%{transform:scale(1.25);color:#9FD98B}100%{transform:scale(1)}}
+@keyframes spDraw{to{stroke-dashoffset:0}}
 @media (prefers-reduced-motion: reduce){.sp-anim,.sp-anim *{animation:none!important}.sp-fx{display:none!important}}
 </style>
 </head>
@@ -1448,11 +1451,35 @@ function InstallApp() {
             React.createElement("b", null, "Add to Home Screen"),
             ". Heads-up: on iPhone the app keeps its own saves, separate from Safari, so it's best to start your careers there."))));
 }
+// numbers that tick up to their value (prize money, points, XP); `fmt` formats the in-between values
+function CountUp({ to, from = 0, ms = 900, delay = 0, fmt = (v) => Math.round(v) }) {
+    const reduce = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const [v, setV] = useState(reduce ? to : from);
+    useEffect(() => {
+        if (reduce)
+            return setV(to);
+        let raf, start = null;
+        const tick = (now) => {
+            if (start === null)
+                start = now + delay;
+            const k = clampN((now - start) / ms, 0, 1);
+            setV(from + (to - from) * (1 - Math.pow(1 - k, 3)));
+            if (k < 1)
+                raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+    }, [to]);
+    return fmt(v);
+}
+// a buzz on phones that support it (Android); silently does nothing elsewhere
+const buzz = (pattern) => { try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { } };
 // ============ CELEBRATIONS ============
 // confetti rain (+ an optional trophy pop) laid over the page; purely decorative, never blocks taps
 const CONFETTI_COLORS = ["#E8C35A", "#F4F7F2", "#9FD98B", "#D96C4F", "#7FB7D9", "#F0CE6A"];
 function Celebration({ size = "big", trophy }) {
     const n = size === "huge" ? 110 : size === "big" ? 70 : 26;
+    useEffect(() => { if (size !== "small") buzz(size === "huge" ? [60, 50, 60, 50, 220] : [60, 50, 160]); }, []);
     const [pieces] = useState(() => Array.from({ length: n }, (_, i) => ({
         left: Math.random() * 100, delay: Math.random() * (size === "small" ? 0.3 : 1.6), dur: 2.4 + Math.random() * 2.2,
         dx: (Math.random() - 0.5) * 160, rot: (Math.random() < 0.5 ? -1 : 1) * (360 + Math.random() * 720),
@@ -1535,8 +1562,10 @@ function ClutchPutt({ putt, onDone }) {
             setRoll(1 - Math.pow(1 - k, 2.2)); // decelerating roll
             if (k < 1)
                 raf = requestAnimationFrame(tick);
-            else
+            else {
+                buzz(made ? [25, 40, 70] : 160);
                 setPhase("done");
+            }
         };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
@@ -1693,7 +1722,8 @@ const makeSponsorOffers = (worldRank, careerMajors, prev, frac = 1) => {
     return offers;
 };
 // ============ STYLES ============
-let ACTIVE_THEME = null; // set each render based on screen; declared before C so getters can read it
+let ACTIVE_THEME = null;
+let SCREEN_KEY = ""; // set each render; Shell keys its content on it so every new screen fades in // set each render based on screen; declared before C so getters can read it
 const C_CONST = { chalk: "#F4F7F2", gold: "#E8C35A", muted: "#9DBBA8", red: "#D96C4F", green: "#9FD98B", blue: "#7FB7D9", bogey: "#E0A060" };
 // C: constants are fixed; bg/panel/card/accent resolve to the ACTIVE area theme so every surface follows the section
 const C = new Proxy(C_CONST, {
@@ -1736,6 +1766,32 @@ function ScoreMark({ sc, par, size = 14 }) {
 const seedRand = (str) => { let s = 2166136261; for (let i = 0; i < str.length; i++)
     s = Math.imul(s ^ str.charCodeAt(i), 16777619); return () => { s = Math.imul(s ^ (s >>> 15), 2246822507); s = Math.imul(s ^ (s >>> 13), 3266489909); return ((s ^= s >>> 16) >>> 0) / 4294967296; }; };
 const HOLE_INK = { rough: "#123524", fairway: "#3F8A57", green: "#7CCB86", fringe: "#5AAA69", sand: "#E4D4A0", water: "#4C8DBF", tee: "#9FD98B", pin: "#F4F7F2", flag: "#D96C4F" };
+// the planned shots drawn tee -> landing zone(s) -> green, with a ball riding the line; replays for each new hole
+function FlightTrace({ d }) {
+    const pathRef = useRef(null);
+    const [pos, setPos] = useState(null);
+    useEffect(() => {
+        const el = pathRef.current;
+        if (!el || !el.getTotalLength || (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches))
+            return;
+        const len = el.getTotalLength();
+        let raf, start = null;
+        const tick = (now) => {
+            if (start === null)
+                start = now + 250;
+            const k = clampN((now - start) / 1300, 0, 1);
+            const pt = el.getPointAtLength(len * (1 - Math.pow(1 - k, 1.6)));
+            setPos([pt.x, pt.y]);
+            if (k < 1)
+                raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+    }, [d]);
+    return (React.createElement("g", { className: "sp-anim" },
+        React.createElement("path", { ref: pathRef, d, fill: "none", stroke: "rgba(244,247,242,0.75)", strokeWidth: 1.1, strokeLinecap: "round", pathLength: 1, strokeDasharray: 1, strokeDashoffset: 1, style: { animation: "spDraw 1.3s .25s cubic-bezier(.3,.6,.4,1) forwards" } }),
+        pos && React.createElement("circle", { cx: pos[0], cy: pos[1], r: 2.6, fill: "#FFFFFF", stroke: "rgba(0,0,0,0.35)", strokeWidth: 0.6 })));
+}
 function HoleMap({ hole, seed }) {
     const [par, yds, hz = 0] = hole;
     const rnd = seedRand(seed);
@@ -1759,6 +1815,12 @@ function HoleMap({ hole, seed }) {
             ? `M ${kx - 34} ${mid + side * 18} q 20 ${side * -6} 44 0 q 10 ${side * 4} 0 ${side * 8} q -26 ${side * 3} -46 0 q -6 ${side * -4} 2 ${side * -8} z` // along the fairway
             : null;
     const apron = par === 3 ? `M ${gx - 34} ${gy} L ${gx - 8} ${gy}` : null; // short run-up in front of a par-3 green
+    // shot arcs: drive to the landing zone (and a lay-up on par 5s), then in to the flag
+    const hop = (x1, y1, x2, y2) => `Q ${(x1 + x2) / 2} ${Math.min(y1, y2) - 10} ${x2} ${y2}`;
+    const layX = kx + (gx - kx) * 0.55, layY = ky + (gy - ky) * 0.55 + (rnd() - 0.5) * 6;
+    const flight = par === 3 ? `M ${tx} ${mid} ${hop(tx, mid, gx + 2, gy)}`
+        : par === 5 ? `M ${tx} ${mid} ${hop(tx, mid, kx, ky)} ${hop(kx, ky, layX, layY)} ${hop(layX, layY, gx + 2, gy)}`
+            : `M ${tx} ${mid} ${hop(tx, mid, kx, ky)} ${hop(kx, ky, gx + 2, gy)}`;
     return (React.createElement("svg", { viewBox: `0 0 292 ${H}`, width: "100%", height: H, className: "mt-2 rounded-lg block", style: { background: HOLE_INK.rough }, role: "img", "aria-label": `Hole layout: par ${par}, ${yds} yards` },
         fairway && React.createElement("path", { d: fairway, fill: "none", stroke: HOLE_INK.fairway, strokeWidth: 15, strokeLinecap: "round", strokeLinejoin: "round" }),
         apron && React.createElement("path", { d: apron, stroke: HOLE_INK.fairway, strokeWidth: 11, strokeLinecap: "round" }),
@@ -1769,6 +1831,7 @@ function HoleMap({ hole, seed }) {
         React.createElement("ellipse", { cx: gx, cy: gy, rx: 11, ry: 7.5, fill: HOLE_INK.green }),
         React.createElement("line", { x1: gx + 2, y1: gy + 1, x2: gx + 2, y2: gy - 15, stroke: HOLE_INK.pin, strokeWidth: 1 }),
         React.createElement("path", { d: `M ${gx + 2} ${gy - 15} l 8 2.5 l -8 2.5 z`, fill: HOLE_INK.flag }),
+        React.createElement(FlightTrace, { key: seed, d: flight }),
         React.createElement("text", { x: 6, y: H - 6, fontSize: 9, fontFamily: MONO, fill: C.muted }, `${yds}y`)));
 }
 const ARCHETYPES = [
@@ -1811,7 +1874,7 @@ function BackTop({ onClick }) {
 const Shell = ({ children, theme }) => {
     const t = theme || ACTIVE_THEME || THEMES.home;
     return (React.createElement("div", { className: "min-h-screen", style: { background: t.bg, transition: "background 0.4s ease" } },
-        React.createElement("div", { className: "max-w-md mx-auto p-4 pb-10" }, children)));
+        React.createElement("div", { key: SCREEN_KEY, className: "max-w-md mx-auto p-4 pb-10 sp-anim", style: { animation: "spEnter .28s ease-out both" } }, children)));
 };
 const ELITE = PLAYERS.filter((p) => p.rank <= 100);
 const OWGR_SEED = Object.fromEntries(PLAYERS.map((p) => [p.name, p.rank <= 100 ? (101 - p.rank) * 20 : Math.max(2, Math.round(12 + (200 - p.rank) * 1.5))]));
@@ -1904,6 +1967,7 @@ function GolfCareerSim() {
                 th = THEMES.major;
         }
         ACTIVE_THEME = th;
+        SCREEN_KEY = screen;
     }
     const [mode, setMode] = useState("standard");
     const [name, setName] = useState("");
@@ -2700,7 +2764,7 @@ function GolfCareerSim() {
         if ((g.xp || 0) < cost || g.pro.attrs[key] >= 96)
             return;
         const attrs = { ...g.pro.attrs, [key]: g.pro.attrs[key] + 1 };
-        const st = { ...g, xp: (g.xp || 0) - cost, earned: { ...(g.earned || {}), [key]: ((g.earned || {})[key] || 0) + 1 }, pro: { ...g.pro, attrs, overall: calcOverall(attrs) } };
+        const st = { ...g, xp: (g.xp || 0) - cost, earned: { ...(g.earned || {}), [key]: ((g.earned || {})[key] || 0) + 1 }, pro: { ...g.pro, attrs, overall: calcOverall(attrs) }, lastTrained: { key, n: ((g.lastTrained || {}).n || 0) + 1 } };
         setG(st);
         await save(st);
     };
@@ -5202,7 +5266,7 @@ function GolfCareerSim() {
                 React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } },
                         "\uD83D\uDCC8 EXPERIENCE \u00B7 +",
-                        g.xpGainLast || 0,
+                        React.createElement(CountUp, { to: g.xpGainLast || 0, ms: 800 }),
                         " XP"),
                     React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
                         g.xp || 0,
@@ -7177,7 +7241,7 @@ function GolfCareerSim() {
                     React.createElement("div", null,
                         React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: C.chalk } }, s.label),
                         React.createElement("div", { className: "text-xs", style: { color: C.muted } },
-                            React.createElement("span", { style: { color: tint(base) } }, base),
+                            React.createElement("span", { key: g.lastTrained && g.lastTrained.key === s.key ? `t${g.lastTrained.n}` : "base", className: "sp-anim", style: { color: tint(base), display: "inline-block", animation: g.lastTrained && g.lastTrained.key === s.key ? "spPulse .6s ease-out" : undefined } }, base),
                             bonus !== 0 ? React.createElement("span", { style: { color: bonus > 0 ? C.green : C.red } },
                                 " (",
                                 bonus > 0 ? "+" : "",
@@ -8086,9 +8150,9 @@ function GolfCareerSim() {
                         ")"),
                     React.createElement("div", { className: "text-xs mt-1", style: { color: C.muted } },
                         "+",
-                        myRes.pts,
+                        React.createElement(CountUp, { to: myRes.pts, ms: 1100, delay: 250 }),
                         " FedEx pts \u00B7 ",
-                        fmtMoney(myRes.money),
+                        React.createElement(CountUp, { to: myRes.money, ms: 1300, delay: 250, fmt: fmtMoney }),
                         tour.team ? " each" : ""),
                     myRes.pos === 1 && results.playoff && React.createElement("div", { className: "mt-1", style: { color: C.bogey, fontFamily: FONT, fontSize: 16 } }, "\u26A1 PLAYOFF WINNER"),
                     myRes.pos === 2 && results.playoff && results.playoff.names.includes(myRes.name) && React.createElement("div", { className: "mt-1", style: { color: C.red, fontFamily: FONT, fontSize: 14 } }, "Heartbreak in the playoff"),
