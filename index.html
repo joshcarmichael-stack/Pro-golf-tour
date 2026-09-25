@@ -6,19 +6,46 @@
 <title>Sunday Pins — Golf Career Sim</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
 <meta name="theme-color" content="#0E2A1C">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Sunday Pins">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<style>html,body{margin:0;padding:0;background:#0E2A1C}</style>
+<style>html,body{margin:0;padding:0;background:#0E2A1C}
+@keyframes spConfetti{0%{transform:translate3d(0,-10vh,0) rotate(0)}100%{transform:translate3d(var(--dx),110vh,0) rotate(var(--rot))}}
+@keyframes spTrophy{0%{transform:scale(.2) translateY(40px);opacity:0}55%{transform:scale(1.15) translateY(-6px);opacity:1}75%{transform:scale(.96)}100%{transform:scale(1);opacity:1}}
+@keyframes spGlow{0%,100%{text-shadow:0 0 0 rgba(232,195,90,0)}50%{text-shadow:0 0 22px rgba(232,195,90,.85)}}
+@keyframes spFade{0%{opacity:1}80%{opacity:1}100%{opacity:0}}
+@keyframes spBurst{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(.4);opacity:0}}
+@keyframes spRow{0%{transform:translateY(var(--from));box-shadow:0 0 0 1px rgba(232,195,90,.7),0 6px 14px rgba(0,0,0,.35)}75%{box-shadow:0 0 0 1px rgba(232,195,90,.25),0 2px 6px rgba(0,0,0,.2)}100%{transform:translateY(0);box-shadow:none}}
+@keyframes spFlash{0%,100%{opacity:1}25%,75%{opacity:.25}50%{opacity:1;transform:scale(1.35)}}
+@keyframes spEnter{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
+@keyframes spPulse{0%{transform:scale(1)}40%{transform:scale(1.25);color:#9FD98B}100%{transform:scale(1)}}
+@keyframes spDraw{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion: reduce){.sp-anim,.sp-anim *{animation:none!important}.sp-fx{display:none!important}}
+</style>
 </head>
 <body>
 <div id="root"></div>
 <script>
 "use strict";
 const { useState, useEffect, useRef } = React;
+// ---------- APP INSTALL (PWA) ----------
+// hold on to the browser's install prompt (Android/desktop Chrome) so a button can trigger it later
+let INSTALL_PROMPT = null;
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); INSTALL_PROMPT = e; window.dispatchEvent(new Event("sp-installable")); });
+window.addEventListener("appinstalled", () => { INSTALL_PROMPT = null; window.dispatchEvent(new Event("sp-installable")); });
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol))
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => { }));
+const isStandalone = () => (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 if (!window.storage) {
     window.storage = {
         async get(k) { const v = localStorage.getItem(k); if (v === null)
@@ -1392,6 +1419,83 @@ const simRyderSessions = (usa, eur, strategy, homeSide, captainCtx) => {
     });
     return { sessions, usaPts, eurPts, youTeam, youSinglesMod: singlesMod };
 };
+// "Install the app" card for the landing screen: one tap on Android/Chrome, Add-to-Home-Screen steps on iPhone
+function InstallApp() {
+    const [can, setCan] = useState(!!INSTALL_PROMPT);
+    const [iosHelp, setIosHelp] = useState(false);
+    useEffect(() => { const f = () => setCan(!!INSTALL_PROMPT); window.addEventListener("sp-installable", f); return () => window.removeEventListener("sp-installable", f); }, []);
+    if (isStandalone())
+        return null;
+    const ios = isIOS();
+    if (!can && !ios)
+        return null;
+    const go = async () => {
+        if (ios)
+            return setIosHelp(!iosHelp);
+        INSTALL_PROMPT.prompt();
+        try { await INSTALL_PROMPT.userChoice; } catch (e) { }
+        INSTALL_PROMPT = null;
+        setCan(false);
+    };
+    return (React.createElement("div", { className: "mx-1 mb-3 p-3 rounded-xl", style: { background: "rgba(232,195,90,0.08)", border: "1px solid rgba(232,195,90,0.35)" } },
+        React.createElement("button", { onClick: go, className: "w-full flex items-center gap-3 text-left" },
+            React.createElement("img", { src: "icons/icon-192.png", alt: "", width: 40, height: 40, style: { borderRadius: 9 } }),
+            React.createElement("span", { className: "flex-1" },
+                React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold, display: "block" } }, "\uD83D\uDCF2 GET THE APP"),
+                React.createElement("span", { className: "text-[11px]", style: { color: C.muted } }, "Home-screen icon, full screen, plays offline. Free.")),
+            React.createElement("span", { style: { color: C.gold, fontSize: 18 } }, ios ? (iosHelp ? "\u25B4" : "\u25BE") : "\u25B8")),
+        ios && iosHelp && (React.createElement("p", { className: "text-xs mt-2", style: { color: C.chalk } },
+            "In Safari: tap the ",
+            React.createElement("b", null, "Share"),
+            " button (the square with the arrow), then ",
+            React.createElement("b", null, "Add to Home Screen"),
+            ". Heads-up: on iPhone the app keeps its own saves, separate from Safari, so it's best to start your careers there."))));
+}
+// numbers that tick up to their value (prize money, points, XP); `fmt` formats the in-between values
+function CountUp({ to, from = 0, ms = 900, delay = 0, fmt = (v) => Math.round(v) }) {
+    const reduce = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const [v, setV] = useState(reduce ? to : from);
+    useEffect(() => {
+        if (reduce)
+            return setV(to);
+        let raf, start = null;
+        const tick = (now) => {
+            if (start === null)
+                start = now + delay;
+            const k = clampN((now - start) / ms, 0, 1);
+            setV(from + (to - from) * (1 - Math.pow(1 - k, 3)));
+            if (k < 1)
+                raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+    }, [to]);
+    return fmt(v);
+}
+// a buzz on phones that support it (Android); silently does nothing elsewhere
+const buzz = (pattern) => { try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { } };
+// ============ CELEBRATIONS ============
+// confetti rain (+ an optional trophy pop) laid over the page; purely decorative, never blocks taps
+const CONFETTI_COLORS = ["#E8C35A", "#F4F7F2", "#9FD98B", "#D96C4F", "#7FB7D9", "#F0CE6A"];
+function Celebration({ size = "big", trophy }) {
+    const n = size === "huge" ? 110 : size === "big" ? 70 : 26;
+    useEffect(() => { if (size !== "small") buzz(size === "huge" ? [60, 50, 60, 50, 220] : [60, 50, 160]); }, []);
+    const [pieces] = useState(() => Array.from({ length: n }, (_, i) => ({
+        left: Math.random() * 100, delay: Math.random() * (size === "small" ? 0.3 : 1.6), dur: 2.4 + Math.random() * 2.2,
+        dx: (Math.random() - 0.5) * 160, rot: (Math.random() < 0.5 ? -1 : 1) * (360 + Math.random() * 720),
+        w: 6 + Math.random() * 6, h: 8 + Math.random() * 8, color: CONFETTI_COLORS[i % CONFETTI_COLORS.length], round: Math.random() < 0.3,
+    })));
+    return (React.createElement("div", { className: "sp-fx fixed inset-0 overflow-hidden", style: { pointerEvents: "none", zIndex: 50, animation: `spFade ${size === "small" ? 3 : 7}s ease-out forwards` }, "aria-hidden": true },
+        pieces.map((c, i) => React.createElement("div", { key: i, style: { position: "absolute", top: 0, left: `${c.left}%`, width: c.w, height: c.round ? c.w : c.h, background: c.color, borderRadius: c.round ? "50%" : 2,
+                "--dx": `${c.dx}px`, "--rot": `${c.rot}deg`, animation: `spConfetti ${c.dur}s ${c.delay}s cubic-bezier(.25,.6,.45,1) both` } })),
+        trophy && React.createElement("div", { className: "absolute left-0 right-0 text-center", style: { top: "14vh", fontSize: size === "huge" ? 96 : 76, animation: "spTrophy 1s cubic-bezier(.2,.9,.3,1.3) both", filter: "drop-shadow(0 8px 18px rgba(0,0,0,.45))" } }, trophy)));
+}
+// a quick gold burst from the middle of the screen (holed clutch putts)
+function Burst() {
+    const [bits] = useState(() => Array.from({ length: 18 }, (_, i) => { const a = (i / 18) * Math.PI * 2; const r = 70 + Math.random() * 60; return { dx: Math.cos(a) * r, dy: Math.sin(a) * r, c: CONFETTI_COLORS[i % CONFETTI_COLORS.length] }; }));
+    return (React.createElement("div", { className: "sp-fx", style: { position: "absolute", left: "50%", top: "50%", width: 0, height: 0, pointerEvents: "none" }, "aria-hidden": true },
+        bits.map((b, i) => React.createElement("div", { key: i, style: { position: "absolute", width: 7, height: 7, borderRadius: "50%", background: b.c, "--dx": `${b.dx}px`, "--dy": `${b.dy}px`, animation: "spBurst .9s ease-out both" } }))));
+}
 // ============ CLUTCH PUTT ============
 // the big moments stop the sim and hand you the putter: time the LINE (allowing for break), then the PACE
 // tour make-rate from a distance: ~70% at 5ft, ~35% at 10ft, ~10% at 20ft, nudged by putting and nerves
@@ -1458,8 +1562,10 @@ function ClutchPutt({ putt, onDone }) {
             setRoll(1 - Math.pow(1 - k, 2.2)); // decelerating roll
             if (k < 1)
                 raf = requestAnimationFrame(tick);
-            else
+            else {
+                buzz(made ? [25, 40, 70] : 160);
                 setPhase("done");
+            }
         };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
@@ -1531,8 +1637,9 @@ function ClutchPutt({ putt, onDone }) {
             phase === "pace" && meter(paceAim, paceHalf, null, ["SOFT", "FIRM"]),
             React.createElement("button", { className: "w-full rounded-md py-4 mt-1 active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 22, letterSpacing: 2 } }, phase === "line" ? "TAP — SET THE LINE" : "TAP — STROKE IT"))),
         phase === "roll" && React.createElement("p", { className: "mt-4", style: { fontFamily: FONT, fontSize: 20, color: C.chalk } }, "…"),
-        phase === "done" && (React.createElement("div", { className: "mt-3" },
-            React.createElement("div", { style: { fontFamily: FONT, fontSize: 30, color: made ? C.gold : C.red } }, verdict),
+        phase === "done" && (React.createElement("div", { className: "mt-3 relative sp-anim" },
+            made && React.createElement(Burst, null),
+            React.createElement("div", { style: { fontFamily: FONT, fontSize: 30, color: made ? C.gold : C.red, animation: made ? "spTrophy .6s cubic-bezier(.2,.9,.3,1.3) both, spGlow 1.6s .4s ease-in-out 2" : undefined } }, verdict),
             React.createElement("p", { className: "text-sm mb-3", style: { color: C.chalk } }, made ? putt.makeTxt : putt.missTxt),
             React.createElement(Btn, { onClick: () => onDone(made) }, "CONTINUE")))));
 }
@@ -1615,7 +1722,8 @@ const makeSponsorOffers = (worldRank, careerMajors, prev, frac = 1) => {
     return offers;
 };
 // ============ STYLES ============
-let ACTIVE_THEME = null; // set each render based on screen; declared before C so getters can read it
+let ACTIVE_THEME = null;
+let SCREEN_KEY = ""; // set each render; Shell keys its content on it so every new screen fades in // set each render based on screen; declared before C so getters can read it
 const C_CONST = { chalk: "#F4F7F2", gold: "#E8C35A", muted: "#9DBBA8", red: "#D96C4F", green: "#9FD98B", blue: "#7FB7D9", bogey: "#E0A060" };
 // C: constants are fixed; bg/panel/card/accent resolve to the ACTIVE area theme so every surface follows the section
 const C = new Proxy(C_CONST, {
@@ -1658,6 +1766,32 @@ function ScoreMark({ sc, par, size = 14 }) {
 const seedRand = (str) => { let s = 2166136261; for (let i = 0; i < str.length; i++)
     s = Math.imul(s ^ str.charCodeAt(i), 16777619); return () => { s = Math.imul(s ^ (s >>> 15), 2246822507); s = Math.imul(s ^ (s >>> 13), 3266489909); return ((s ^= s >>> 16) >>> 0) / 4294967296; }; };
 const HOLE_INK = { rough: "#123524", fairway: "#3F8A57", green: "#7CCB86", fringe: "#5AAA69", sand: "#E4D4A0", water: "#4C8DBF", tee: "#9FD98B", pin: "#F4F7F2", flag: "#D96C4F" };
+// the planned shots drawn tee -> landing zone(s) -> green, with a ball riding the line; replays for each new hole
+function FlightTrace({ d }) {
+    const pathRef = useRef(null);
+    const [pos, setPos] = useState(null);
+    useEffect(() => {
+        const el = pathRef.current;
+        if (!el || !el.getTotalLength || (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches))
+            return;
+        const len = el.getTotalLength();
+        let raf, start = null;
+        const tick = (now) => {
+            if (start === null)
+                start = now + 250;
+            const k = clampN((now - start) / 1300, 0, 1);
+            const pt = el.getPointAtLength(len * (1 - Math.pow(1 - k, 1.6)));
+            setPos([pt.x, pt.y]);
+            if (k < 1)
+                raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+    }, [d]);
+    return (React.createElement("g", { className: "sp-anim" },
+        React.createElement("path", { ref: pathRef, d, fill: "none", stroke: "rgba(244,247,242,0.75)", strokeWidth: 1.1, strokeLinecap: "round", pathLength: 1, strokeDasharray: 1, strokeDashoffset: 1, style: { animation: "spDraw 1.3s .25s cubic-bezier(.3,.6,.4,1) forwards" } }),
+        pos && React.createElement("circle", { cx: pos[0], cy: pos[1], r: 2.6, fill: "#FFFFFF", stroke: "rgba(0,0,0,0.35)", strokeWidth: 0.6 })));
+}
 function HoleMap({ hole, seed }) {
     const [par, yds, hz = 0] = hole;
     const rnd = seedRand(seed);
@@ -1681,6 +1815,12 @@ function HoleMap({ hole, seed }) {
             ? `M ${kx - 34} ${mid + side * 18} q 20 ${side * -6} 44 0 q 10 ${side * 4} 0 ${side * 8} q -26 ${side * 3} -46 0 q -6 ${side * -4} 2 ${side * -8} z` // along the fairway
             : null;
     const apron = par === 3 ? `M ${gx - 34} ${gy} L ${gx - 8} ${gy}` : null; // short run-up in front of a par-3 green
+    // shot arcs: drive to the landing zone (and a lay-up on par 5s), then in to the flag
+    const hop = (x1, y1, x2, y2) => `Q ${(x1 + x2) / 2} ${Math.min(y1, y2) - 10} ${x2} ${y2}`;
+    const layX = kx + (gx - kx) * 0.55, layY = ky + (gy - ky) * 0.55 + (rnd() - 0.5) * 6;
+    const flight = par === 3 ? `M ${tx} ${mid} ${hop(tx, mid, gx + 2, gy)}`
+        : par === 5 ? `M ${tx} ${mid} ${hop(tx, mid, kx, ky)} ${hop(kx, ky, layX, layY)} ${hop(layX, layY, gx + 2, gy)}`
+            : `M ${tx} ${mid} ${hop(tx, mid, kx, ky)} ${hop(kx, ky, gx + 2, gy)}`;
     return (React.createElement("svg", { viewBox: `0 0 292 ${H}`, width: "100%", height: H, className: "mt-2 rounded-lg block", style: { background: HOLE_INK.rough }, role: "img", "aria-label": `Hole layout: par ${par}, ${yds} yards` },
         fairway && React.createElement("path", { d: fairway, fill: "none", stroke: HOLE_INK.fairway, strokeWidth: 15, strokeLinecap: "round", strokeLinejoin: "round" }),
         apron && React.createElement("path", { d: apron, stroke: HOLE_INK.fairway, strokeWidth: 11, strokeLinecap: "round" }),
@@ -1691,6 +1831,7 @@ function HoleMap({ hole, seed }) {
         React.createElement("ellipse", { cx: gx, cy: gy, rx: 11, ry: 7.5, fill: HOLE_INK.green }),
         React.createElement("line", { x1: gx + 2, y1: gy + 1, x2: gx + 2, y2: gy - 15, stroke: HOLE_INK.pin, strokeWidth: 1 }),
         React.createElement("path", { d: `M ${gx + 2} ${gy - 15} l 8 2.5 l -8 2.5 z`, fill: HOLE_INK.flag }),
+        React.createElement(FlightTrace, { key: seed, d: flight }),
         React.createElement("text", { x: 6, y: H - 6, fontSize: 9, fontFamily: MONO, fill: C.muted }, `${yds}y`)));
 }
 const ARCHETYPES = [
@@ -1733,7 +1874,7 @@ function BackTop({ onClick }) {
 const Shell = ({ children, theme }) => {
     const t = theme || ACTIVE_THEME || THEMES.home;
     return (React.createElement("div", { className: "min-h-screen", style: { background: t.bg, transition: "background 0.4s ease" } },
-        React.createElement("div", { className: "max-w-md mx-auto p-4 pb-10" }, children)));
+        React.createElement("div", { key: SCREEN_KEY, className: "max-w-md mx-auto p-4 pb-10 sp-anim", style: { animation: "spEnter .28s ease-out both" } }, children)));
 };
 const ELITE = PLAYERS.filter((p) => p.rank <= 100);
 const OWGR_SEED = Object.fromEntries(PLAYERS.map((p) => [p.name, p.rank <= 100 ? (101 - p.rank) * 20 : Math.max(2, Math.round(12 + (200 - p.rank) * 1.5))]));
@@ -1826,6 +1967,7 @@ function GolfCareerSim() {
                 th = THEMES.major;
         }
         ACTIVE_THEME = th;
+        SCREEN_KEY = screen;
     }
     const [mode, setMode] = useState("standard");
     const [name, setName] = useState("");
@@ -2622,7 +2764,7 @@ function GolfCareerSim() {
         if ((g.xp || 0) < cost || g.pro.attrs[key] >= 96)
             return;
         const attrs = { ...g.pro.attrs, [key]: g.pro.attrs[key] + 1 };
-        const st = { ...g, xp: (g.xp || 0) - cost, earned: { ...(g.earned || {}), [key]: ((g.earned || {})[key] || 0) + 1 }, pro: { ...g.pro, attrs, overall: calcOverall(attrs) } };
+        const st = { ...g, xp: (g.xp || 0) - cost, earned: { ...(g.earned || {}), [key]: ((g.earned || {})[key] || 0) + 1 }, pro: { ...g.pro, attrs, overall: calcOverall(attrs) }, lastTrained: { key, n: ((g.lastTrained || {}).n || 0) + 1 } };
         setG(st);
         await save(st);
     };
@@ -4720,6 +4862,7 @@ function GolfCareerSim() {
                             React.createElement(Btn, { small: true, kind: "red", onClick: async () => { await eraseSlot(md.id); startFresh(md.id); } }, "YES, ERASE"),
                             React.createElement(Btn, { small: true, kind: "panel", onClick: () => setConfirmEraseId(null) }, "CANCEL"))))));
             })),
+            React.createElement(InstallApp, null),
             React.createElement("div", { className: "text-center mt-2" },
                 React.createElement("a", { href: "https://ko-fi.com/sundaypins", target: "_blank", rel: "noopener", className: "text-[11px]", style: { color: C.gold, textDecoration: "none" } }, "\u2615 Enjoying Sunday Pins? Support the game"),
                 React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted, opacity: 0.6 } }, "v3 \u00B7 free & solo-built \u00B7 your progress saves automatically, per mode"))));
@@ -5123,7 +5266,7 @@ function GolfCareerSim() {
                 React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } },
                         "\uD83D\uDCC8 EXPERIENCE \u00B7 +",
-                        g.xpGainLast || 0,
+                        React.createElement(CountUp, { to: g.xpGainLast || 0, ms: 800 }),
                         " XP"),
                     React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
                         g.xp || 0,
@@ -6995,6 +7138,7 @@ function GolfCareerSim() {
                     FLAG[champ.country] || "🌐",
                     " ",
                     champ.nationName),
+                champ && champ.isYou && React.createElement(Celebration, { size: "huge", trophy: "\uD83C\uDF0D" }),
                 champ && champ.isYou && React.createElement("div", { className: "text-sm mt-2", style: { color: C.gold } }, "You've conquered the world. The Global Cup is yours.")),
             wc.youIn && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 1, color: C.gold }, className: "mb-1" }, "YOUR TOURNAMENT"),
@@ -7097,7 +7241,7 @@ function GolfCareerSim() {
                     React.createElement("div", null,
                         React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: C.chalk } }, s.label),
                         React.createElement("div", { className: "text-xs", style: { color: C.muted } },
-                            React.createElement("span", { style: { color: tint(base) } }, base),
+                            React.createElement("span", { key: g.lastTrained && g.lastTrained.key === s.key ? `t${g.lastTrained.n}` : "base", className: "sp-anim", style: { color: tint(base), display: "inline-block", animation: g.lastTrained && g.lastTrained.key === s.key ? "spPulse .6s ease-out" : undefined } }, base),
                             bonus !== 0 ? React.createElement("span", { style: { color: bonus > 0 ? C.green : C.red } },
                                 " (",
                                 bonus > 0 ? "+" : "",
@@ -7876,13 +8020,16 @@ function GolfCareerSim() {
             const LINE = "1px solid rgba(244,247,242,0.12)";
             const row = (s, i) => {
                 const mv = moveOf(i), td = todayOf(s);
-                return (React.createElement("div", { key: s.name, className: "grid items-center text-sm py-1", style: { gridTemplateColumns: "34px 1fr 30px 34px 34px", color: s.isYou ? C.gold : isRv(s.name) ? C.bogey : C.chalk, background: s.isYou ? "rgba(232,195,90,0.12)" : "transparent", borderTop: LINE, margin: "0 -6px", padding: "4px 6px" } },
+                // movers slide in from where they stood before this round (clamped to a few rows), then the arrow flashes
+                const slide = prevPos && mv !== 0 ? { "--from": `${clampN(mv, -4, 4) * 30}px`, animation: "spRow 1s .3s cubic-bezier(.3,.7,.2,1) both", position: "relative", zIndex: 1 + Math.abs(mv),
+                    background: s.isYou ? `linear-gradient(rgba(232,195,90,0.12), rgba(232,195,90,0.12)), ${C.panel}` : C.panel } : {};
+                return (React.createElement("div", { key: s.name, className: "grid items-center text-sm py-1 sp-anim", style: { gridTemplateColumns: "34px 1fr 30px 34px 34px", color: s.isYou ? C.gold : isRv(s.name) ? C.bogey : C.chalk, background: s.isYou ? "rgba(232,195,90,0.12)" : "transparent", borderTop: LINE, margin: "0 -6px", padding: "4px 6px", ...slide } },
                     React.createElement("span", { style: { fontFamily: MONO, fontSize: 12, color: s.isYou ? C.gold : C.muted } }, posLbl[i]),
                     React.createElement("span", { className: "truncate pr-1" },
                         React.createElement("span", { className: "mr-1.5" }, flagOf(s.name)),
                         isRv(s.name) ? RV : "",
                         s.name),
-                    React.createElement("span", { className: "text-right", style: { fontFamily: MONO, fontSize: 10, color: mv > 0 ? C.green : mv < 0 ? C.red : "rgba(244,247,242,0.3)" } }, !prevPos ? "" : mv > 0 ? `▲${mv}` : mv < 0 ? `▼${-mv}` : "–"),
+                    React.createElement("span", { className: "text-right", style: { fontFamily: MONO, fontSize: 10, color: mv > 0 ? C.green : mv < 0 ? C.red : "rgba(244,247,242,0.3)", display: "inline-block", animation: prevPos && mv !== 0 ? "spFlash 1.1s 1.3s ease-in-out 1" : undefined } }, !prevPos ? "" : mv > 0 ? `▲${mv}` : mv < 0 ? `▼${-mv}` : "–"),
                     React.createElement("span", { className: "text-right", style: { fontFamily: MONO, fontSize: 11, color: C.muted } }, td === null ? "" : thruPar(td)),
                     React.createElement("span", { className: "text-right", style: { fontFamily: FONT, fontSize: 16, color: s.isYou ? C.gold : C.chalk } }, toPar(s.total, par, round))));
             };
@@ -7923,8 +8070,8 @@ function GolfCareerSim() {
                     me.cut ? "You MISSED the cut"
                         : round === 2 ? "You made the cut"
                             : cutGap > 0 ? `you're ${cutGap} inside` : cutGap === 0 ? "you're right on the number" : `you're ${-cutGap} outside — work to do`)),
-                React.createElement("div", { className: "px-3 pt-2 pb-1 rounded-xl my-2", style: { background: C.panel } },
-                    React.createElement("div", { className: "grid text-[9px] pb-1", style: { gridTemplateColumns: "34px 1fr 30px 34px 34px", color: C.muted, letterSpacing: 1 } },
+                React.createElement("div", { className: "px-3 pt-2 pb-1 rounded-xl my-2 overflow-hidden", style: { background: C.panel } },
+                    React.createElement("div", { className: "grid text-[9px] pb-1 relative", style: { zIndex: 20, background: C.panel, gridTemplateColumns: "34px 1fr 30px 34px 34px", color: C.muted, letterSpacing: 1 } },
                         React.createElement("span", null, "POS"),
                         React.createElement("span", null, "PLAYER"),
                         React.createElement("span", { className: "text-right" }, prevPos ? "MOVE" : ""),
@@ -7993,8 +8140,9 @@ function GolfCareerSim() {
                         results.playoff.holesPlayed > 1 ? "s" : "",
                         " vs ",
                         results.playoff.names.filter((n) => n !== results.playoff.winner).join(", ")))),
-                myRes ? (React.createElement("div", { className: "p-3 rounded-xl my-3", style: { background: C.card, border: `1.5px solid ${myRes.pos <= 10 ? C.gold : "rgba(244,247,242,0.2)"}` } },
-                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 38, color: myRes.pos === 1 ? C.gold : myRes.pos <= 10 ? C.green : C.chalk, lineHeight: 1 } }, ordinal(myRes.pos)),
+                myRes && myRes.pos === 1 && React.createElement(Celebration, { size: ev.type === "major" || ev.type === "tc" ? "huge" : "big", trophy: "\uD83C\uDFC6" }),
+                myRes ? (React.createElement("div", { className: "p-3 rounded-xl my-3 sp-anim", style: { background: C.card, border: `1.5px solid ${myRes.pos <= 10 ? C.gold : "rgba(244,247,242,0.2)"}` } },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 38, color: myRes.pos === 1 ? C.gold : myRes.pos <= 10 ? C.green : C.chalk, lineHeight: 1, animation: myRes.pos === 1 ? "spTrophy .9s .3s cubic-bezier(.2,.9,.3,1.3) both, spGlow 1.8s 1.2s ease-in-out 3" : undefined } }, ordinal(myRes.pos)),
                     React.createElement("div", { className: "text-sm", style: { color: C.chalk } },
                         toPar(myRes.total, par, 4),
                         " (",
@@ -8002,9 +8150,9 @@ function GolfCareerSim() {
                         ")"),
                     React.createElement("div", { className: "text-xs mt-1", style: { color: C.muted } },
                         "+",
-                        myRes.pts,
+                        React.createElement(CountUp, { to: myRes.pts, ms: 1100, delay: 250 }),
                         " FedEx pts \u00B7 ",
-                        fmtMoney(myRes.money),
+                        React.createElement(CountUp, { to: myRes.money, ms: 1300, delay: 250, fmt: fmtMoney }),
                         tour.team ? " each" : ""),
                     myRes.pos === 1 && results.playoff && React.createElement("div", { className: "mt-1", style: { color: C.bogey, fontFamily: FONT, fontSize: 16 } }, "\u26A1 PLAYOFF WINNER"),
                     myRes.pos === 2 && results.playoff && results.playoff.names.includes(myRes.name) && React.createElement("div", { className: "mt-1", style: { color: C.red, fontFamily: FONT, fontSize: 14 } }, "Heartbreak in the playoff"),
@@ -8757,6 +8905,10 @@ function GolfCareerSim() {
                 const mine = nxt && nxt.matches.some((m) => m.pending);
                 return rev === 0 ? (mine ? "⛳ YOU'RE OUT FIRST — PLAY YOUR MATCH" : "START THE MATCHES") : mine ? `⛳ PLAY YOUR ${nxt.label.includes("SINGLES") ? "SINGLES" : "TEAM"} MATCH` : `NEXT: ${(nxt === null || nxt === void 0 ? void 0 : nxt.label) || ""}`;
             })())) : (React.createElement("div", { className: "text-center" },
+                ryder.youIn && (() => {
+                    const onA = (ryder.usa || []).some((p) => p && (p.isYou || p.name === g.pro.name || p === g.pro.name));
+                    return (onA ? uPts > ePts : ePts > uPts) ? React.createElement(Celebration, { size: "huge", trophy: "\uD83C\uDFC6" }) : null;
+                })(),
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 30, color: C.gold, lineHeight: 1.1 }, className: "mb-2" }, ryder.kind === "pres"
                     ? (uPts > ePts ? "🇺🇸 USA WIN THE PRESIDENTS CUP" : ePts > uPts ? "🌏 THE INTERNATIONALS WIN THE PRESIDENTS CUP" : `15-15 TIE — ${(g.presHolder || "USA") === "USA" ? "USA" : "THE INTERNATIONALS"} RETAIN`)
                     : eiK
@@ -8798,6 +8950,7 @@ function GolfCareerSim() {
                     "SEASON ",
                     g.season,
                     " COMPLETE"),
+                youChamp && React.createElement(Celebration, { size: "huge", trophy: "\uD83C\uDFC6" }),
                 React.createElement("h1", { style: { fontFamily: FONT, fontSize: 34, color: youChamp ? C.gold : C.chalk, lineHeight: 1.1 } }, youChamp ? "YOU ARE THE FEDEX CUP CHAMPION" : `${g.champion || "—"} WINS THE FEDEX CUP`),
                 g.lastRyder && (React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } },
                     g.lastRyder.kind === "pres" ? "Presidents Cup" : "Ryder Cup",
