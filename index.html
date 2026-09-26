@@ -21,6 +21,7 @@
 <style>html,body{margin:0;padding:0;background:#0E2A1C}
 @keyframes spConfetti{0%{transform:translate3d(0,-10vh,0) rotate(0)}100%{transform:translate3d(var(--dx),110vh,0) rotate(var(--rot))}}
 @keyframes spTrophy{0%{transform:scale(.2) translateY(40px);opacity:0}55%{transform:scale(1.15) translateY(-6px);opacity:1}75%{transform:scale(.96)}100%{transform:scale(1);opacity:1}}
+@keyframes spTrophyOut{to{opacity:0;transform:scale(.8) translateY(-30px)}}
 @keyframes spGlow{0%,100%{text-shadow:0 0 0 rgba(232,195,90,0)}50%{text-shadow:0 0 22px rgba(232,195,90,.85)}}
 @keyframes spFade{0%{opacity:1}80%{opacity:1}100%{opacity:0}}
 @keyframes spBurst{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(.4);opacity:0}}
@@ -922,7 +923,7 @@ const buildEuroIntl = (standings, pro, proSide, plist = PLAYERS) => {
 };
 const EI_VENUES = { EUR: ["Wentworth, England", "Valderrama, Spain", "The K Club, Ireland"], INTL: ["Kingston Heath, Australia", "Emirates, Dubai", "Fancourt, South Africa"] };
 const CODE_TO_NAME = Object.fromEntries(Object.entries(NATION_CODE).map(([name, code]) => [code, name]));
-const FLAG = { USA: "🇺🇸", ENG: "🏴", SCO: "🏴", WAL: "🏴", NIR: "🇬🇧", IRL: "🇮🇪", AUS: "🇦🇺", ESP: "🇪🇸", FRA: "🇫🇷", GER: "🇩🇪", ITA: "🇮🇹", SWE: "🇸🇪", NOR: "🇳🇴", DEN: "🇩🇰", NED: "🇳🇱", BEL: "🇧🇪", AUT: "🇦🇹", FIN: "🇫🇮", RSA: "🇿🇦", JPN: "🇯🇵", KOR: "🇰🇷", CHN: "🇨🇳", IND: "🇮🇳", CAN: "🇨🇦", MEX: "🇲🇽", ARG: "🇦🇷", COL: "🇨🇴", CHI: "🇨🇱", NZL: "🇳🇿", THA: "🇹🇭", PHI: "🇵🇭", POL: "🇵🇱" };
+const FLAG = { USA: "🇺🇸", ENG: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", SCO: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", WAL: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", NIR: "🇬🇧", IRL: "🇮🇪", AUS: "🇦🇺", ESP: "🇪🇸", FRA: "🇫🇷", GER: "🇩🇪", ITA: "🇮🇹", SWE: "🇸🇪", NOR: "🇳🇴", DEN: "🇩🇰", NED: "🇳🇱", BEL: "🇧🇪", AUT: "🇦🇹", FIN: "🇫🇮", RSA: "🇿🇦", JPN: "🇯🇵", KOR: "🇰🇷", CHN: "🇨🇳", IND: "🇮🇳", CAN: "🇨🇦", MEX: "🇲🇽", ARG: "🇦🇷", COL: "🇨🇴", CHI: "🇨🇱", NZL: "🇳🇿", THA: "🇹🇭", PHI: "🇵🇭", POL: "🇵🇱" };
 // World Cup of Golf qualifying: each nation's TOP TWO players by season points; top 24 nations by their pair's combined points make the field of 48
 const worldCupTable = (combined, pro, plist = PLAYERS) => {
     var _a;
@@ -1488,7 +1489,7 @@ function Celebration({ size = "big", trophy }) {
     return (React.createElement("div", { className: "sp-fx fixed inset-0 overflow-hidden", style: { pointerEvents: "none", zIndex: 50, animation: `spFade ${size === "small" ? 3 : 7}s ease-out forwards` }, "aria-hidden": true },
         pieces.map((c, i) => React.createElement("div", { key: i, style: { position: "absolute", top: 0, left: `${c.left}%`, width: c.w, height: c.round ? c.w : c.h, background: c.color, borderRadius: c.round ? "50%" : 2,
                 "--dx": `${c.dx}px`, "--rot": `${c.rot}deg`, animation: `spConfetti ${c.dur}s ${c.delay}s cubic-bezier(.25,.6,.45,1) both` } })),
-        trophy && React.createElement("div", { className: "absolute left-0 right-0 text-center", style: { top: "14vh", fontSize: size === "huge" ? 96 : 76, animation: "spTrophy 1s cubic-bezier(.2,.9,.3,1.3) both", filter: "drop-shadow(0 8px 18px rgba(0,0,0,.45))" } }, trophy)));
+        trophy && React.createElement("div", { className: "absolute left-0 right-0 text-center", style: { top: "14vh", fontSize: size === "huge" ? 96 : 76, animation: "spTrophy 1s cubic-bezier(.2,.9,.3,1.3) both, spTrophyOut .6s 2.6s ease-in forwards", filter: "drop-shadow(0 8px 18px rgba(0,0,0,.45))" } }, trophy)));
 }
 // a quick gold burst from the middle of the screen (holed clutch putts)
 function Burst() {
