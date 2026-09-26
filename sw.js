@@ -1,7 +1,7 @@
 // Sunday Pins service worker: the game opens instantly and keeps working offline.
 // The page itself is fetched network-first (so updates arrive as soon as you're online);
 // libraries, fonts and icons are cache-first (they never change for a given URL).
-const CACHE = "sunday-pins-v1";
+const CACHE = "sunday-pins-v2";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
 // the game can't start without these, so fetch them at install time rather than waiting for first use
 const LIBS = [
@@ -27,6 +27,9 @@ self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
+  // only the game's own files and its libraries are cached; anything else (e.g. the visitor counter) goes straight to the network
+  const CACHEABLE = ["cdnjs.cloudflare.com", "cdn.tailwindcss.com", "fonts.googleapis.com", "fonts.gstatic.com"];
+  if (url.origin !== location.origin && !CACHEABLE.includes(url.hostname)) return;
   const isPage = req.mode === "navigate" || (url.origin === location.origin && url.pathname.endsWith(".html"));
   if (isPage) {
     e.respondWith(fetch(req).then((res) => {

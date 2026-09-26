@@ -38,11 +38,36 @@
 <script>
 "use strict";
 const { useState, useEffect, useRef } = React;
+// ---------- ANALYTICS (GoatCounter: cookie-free, no personal data) ----------
+// counts page loads plus a few game moments, so you can see whether people actually play
+const GC_CODE = "sundaypinshq"; // your GoatCounter code: the "xxx" in xxx.goatcounter.com
+const GC_ON = /^[a-z0-9-]+$/.test(GC_CODE) && /^https?:$/.test(location.protocol) && !/^(localhost|127\.)/.test(location.hostname);
+if (GC_ON) {
+    const sc = document.createElement("script");
+    sc.async = true;
+    sc.src = "https://gc.zgo.at/count.js";
+    sc.dataset.goatcounter = "https://" + GC_CODE + ".goatcounter.com/count";
+    sc.onload = () => { (window.__gcq || []).forEach((f) => f()); window.__gcq = []; };
+    document.head.appendChild(sc);
+}
+// track("win/major") -> shows up as an event called win/major in the dashboard; never throws
+const track = (name) => {
+    try {
+        if (!GC_ON)
+            return;
+        const go = () => window.goatcounter.count({ path: String(name), title: String(name), event: true });
+        if (window.goatcounter && window.goatcounter.count)
+            go();
+        else
+            (window.__gcq = window.__gcq || []).push(go);
+    }
+    catch (e) { }
+};
 // ---------- APP INSTALL (PWA) ----------
 // hold on to the browser's install prompt (Android/desktop Chrome) so a button can trigger it later
 let INSTALL_PROMPT = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); INSTALL_PROMPT = e; window.dispatchEvent(new Event("sp-installable")); });
-window.addEventListener("appinstalled", () => { INSTALL_PROMPT = null; window.dispatchEvent(new Event("sp-installable")); });
+window.addEventListener("appinstalled", () => { track("app-installed"); INSTALL_PROMPT = null; window.dispatchEvent(new Event("sp-installable")); });
 if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol))
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => { }));
 const isStandalone = () => (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
@@ -1431,6 +1456,7 @@ function InstallApp() {
     if (!can && !ios)
         return null;
     const go = async () => {
+        track(ios ? "get-app-tap/iphone" : "get-app-tap/android");
         if (ios)
             return setIosHelp(!iosHelp);
         INSTALL_PROMPT.prompt();
@@ -2079,6 +2105,7 @@ function GolfCareerSim() {
                     }
                     setG(s);
                     setMode(s.mode || "standard");
+                    track("career-continue/" + (s.mode || "standard"));
                     await save(s);
                     // RESUME a World Cup in progress rather than dropping back to hub (a crash/reload no longer loses the run)
                     const wr = s.wcResume;
@@ -2610,6 +2637,7 @@ function GolfCareerSim() {
         }
     };
     const beginCareer = async (pro) => {
+        track("career-start/" + (mode || "standard"));
         if (!pro.wx)
             pro.wx = [68 + Math.floor(Math.random() * 23), 68 + Math.floor(Math.random() * 23), 68 + Math.floor(Math.random() * 23)];
         const allTime = mode === "alltime";
@@ -3867,6 +3895,10 @@ function GolfCareerSim() {
         }
         if (tour.results)
             updateRivalAndSponsor(st, tour, myLine);
+        if (tour.inField)
+            track("event-complete");
+        if (myLine && myLine.pos === 1)
+            track("win/" + (ev.type || "event"));
         if (st.evIdx >= SCHEDULE.length) {
             if (st.champion === st.pro.name) {
                 st.myStats.fedexTitles++;
@@ -4011,6 +4043,7 @@ function GolfCareerSim() {
         catch (e) { }
     };
     const startWorldCup = (st) => {
+        track("cup/world-cup");
         const table = worldCupTable(rcCombined(st), st.pro, ROSTER(st));
         const qualifiers = table.flatMap((n) => n.qualifiers.map((q) => ({ ...q, country: n.code, nationName: n.name })));
         const youInWC = qualifiers.some((q) => q.isYou);
@@ -4158,6 +4191,7 @@ function GolfCareerSim() {
         advanceKnockoutWithWinner(winner, "in a putt-off shootout", "puttoff");
     };
     const startEuroIntl = (st) => {
+        track("cup/euro-v-intl");
         const side = eiSide(st.pro.nation);
         const cupNo = st.eiCupNo || 0;
         const homeSide = cupNo % 2 === 0 ? "EUR" : "INTL";
@@ -4175,6 +4209,7 @@ function GolfCareerSim() {
         }
     };
     const startPres = (st) => {
+        track("cup/presidents-cup");
         const side = pcSide(st.pro.nation);
         const cupNo = st.presCupNo || 0;
         const homeSide = cupNo % 2 === 0 ? "USA" : "INTL";
@@ -4197,6 +4232,7 @@ function GolfCareerSim() {
         return out;
     };
     const startRyder = (st) => {
+        track("cup/ryder-cup");
         const side = proSide(st.pro.nation);
         const cupNo = st.ryderCupNo || 0;
         const homeSide = cupNo % 2 === 0 ? "USA" : "EUR";
@@ -4316,6 +4352,7 @@ function GolfCareerSim() {
         setG(st2);
         await save(st2);
         setRyder(null);
+        track("season-complete");
         setScreen("seasonEnd");
     };
     const buildNextSeason = (g) => {
