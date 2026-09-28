@@ -44,12 +44,18 @@
   .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; margin-top: 16px; width: 100%; }
   .gallery img { width: 100%; border-radius: 8px; cursor: pointer; border: 1px solid var(--line); }
   [hidden] { display: none !important; }
+  .cast { display: grid; gap: 8px; }
+  .castItem { display: grid; grid-template-columns: 56px 1fr 36px; gap: 8px; align-items: center; }
+  .castItem img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+  .castItem button { padding: 8px; background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .addphoto { display: inline-block; margin: 8px 0 0; padding: 9px 14px; border: 1px dashed var(--line); border-radius: 10px;
+    font-weight: 800; font-size: 14px; cursor: pointer; }
 </style>
 </head>
 <body>
 <main>
   <h1>Card Artist</h1>
-  <p class="sub">Type a character or a movie. Get bold comic or pop art, framed as a trading card or a poster.</p>
+  <p class="sub">Put yourself, your family, or any character into bold comic or pop art, framed as a trading card or a movie poster.</p>
 
   <div class="grid">
     <section class="panel">
@@ -65,6 +71,11 @@
         <option value="silkscreen">Pop art silkscreen (four-colour grid)</option>
         <option value="screenprint">Retro screen-print poster</option>
       </select>
+
+      <label>Star real people (optional)</label>
+      <div id="cast" class="cast"></div>
+      <label class="addphoto">+ Add photos<input id="castUpload" type="file" accept="image/*" multiple hidden></label>
+      <div class="hint">One clear, front-facing photo per person works best (up to 6). Say who they play, e.g. "Mum as the captain". Photos only leave your device when you press Draw it, and go straight to OpenAI.</div>
 
       <!-- Card fields -->
       <div id="cardFields">
@@ -185,6 +196,19 @@ const STYLES = {
 };
 
 let mode = store.get('cardArtist.mode') || 'card';
+let cast = []; // { url, blob, label }
+
+function castPrompt() {
+  if (!cast.length) return '';
+  const who = cast.map((c, i) => `Photo ${i + 1}: ${c.label.trim() || 'this person'}.`).join(' ');
+  return [
+    `Cast: the ${cast.length === 1 ? 'person' : cast.length + ' people'} in the reference photos star in this artwork.`,
+    who,
+    'Keep every person clearly recognisable: same face shape, eyes, nose, smile, hairstyle and colour, skin tone, age, glasses and facial hair,',
+    'while fully redrawing them in the art style below (not a photo pasted in). Match the costume and role described.',
+    cast.length > 1 ? 'Show all of them together in one composition, each with an expressive, fun pose.' : ''
+  ].filter(Boolean).join(' ');
+}
 
 function buildPrompt() {
   const s = STYLES[$('style').value];
@@ -197,21 +221,23 @@ function buildPrompt() {
       : `the most iconic imagery of the film "${movie || 'an original sci-fi adventure'}"`;
     return [
       `Illustrated pop art movie poster artwork showing ${subject}.`,
+      castPrompt(),
       'Bold central focal image with a strong, instantly readable silhouette and dramatic composition.',
       s.look, s.bg(palette),
       'Vertical 2:3 poster composition. Keep the top fifth and the bottom sixth as simple uncluttered background so a title and credits can be added later.',
-      'No text, no letters, no logos, no real actor likenesses, no border.'
-    ].join(' ');
+      `No text, no letters, no logos, ${cast.length ? 'no faces other than the cast' : 'no real actor likenesses'}, no border.`
+    ].filter(Boolean).join(' ');
   }
-  const character = $('character').value.trim() || 'an original masked superhero';
+  const character = $('character').value.trim() || (cast.length ? 'a heroic version of themselves' : 'an original masked superhero');
   const look = $('look').value.trim();
   const pose = $('pose').value.trim() || 'leaping toward the viewer in a dynamic, playful action pose with a big confident grin';
   return [
-    `Full-body cartoon illustration of ${look ? `${character}, ${look}` : character}, ${pose}.`,
+    `Full-body cartoon illustration of ${cast.length ? 'the cast as ' : ''}${look ? `${character}, ${look}` : character}, ${pose}.`,
+    castPrompt(),
     s.look, s.bg(palette),
     'Vertical trading-card composition: the subject fills the frame and slightly breaks out of it, leaving the bottom fifth mostly background.',
     'No text, no letters, no logos, no border.'
-  ].join(' ');
+  ].filter(Boolean).join(' ');
 }
 
 function refresh() { $('promptView').textContent = buildPrompt(); draw(); }
@@ -246,7 +272,10 @@ $('quality').value = store.get('cardArtist.quality') || 'medium';
 $('quality').addEventListener('change', () => store.set('cardArtist.quality', $('quality').value));
 
 $('copy').onclick = async () => {
-  try { await navigator.clipboard.writeText(buildPrompt()); setStatus('Prompt copied.'); }
+  try {
+    await navigator.clipboard.writeText(buildPrompt());
+    setStatus(cast.length ? 'Prompt copied. Attach the photos in the same order when you paste it into ChatGPT.' : 'Prompt copied.');
+  }
   catch { $('promptView').closest('details').open = true; setStatus('Copy blocked. Select the prompt below instead.'); }
 };
 
@@ -257,6 +286,47 @@ $('upload').onchange = e => {
   r.readAsDataURL(f);
 };
 
+// Shrink photos before upload: faster, cheaper, and plenty for likeness.
+function shrink(file) {
+  return new Promise((ok, fail) => {
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, 1024 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => ok({ url: c.toDataURL('image/jpeg', .85), blob: b }), 'image/jpeg', .9);
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = () => fail(new Error(`Couldn't read ${file.name}. Try a JPG or PNG.`));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function renderCast() {
+  const box = $('cast'); box.innerHTML = '';
+  cast.forEach((c, i) => {
+    const row = document.createElement('div'); row.className = 'castItem';
+    const im = document.createElement('img'); im.src = c.url; im.alt = '';
+    const inp = document.createElement('input');
+    inp.placeholder = `Who & role, e.g. "Dad as the villain"`; inp.value = c.label;
+    inp.oninput = () => { c.label = inp.value; refresh(); };
+    const rm = document.createElement('button'); rm.textContent = '✕'; rm.title = 'Remove';
+    rm.onclick = () => { cast.splice(i, 1); renderCast(); refresh(); };
+    row.append(im, inp, rm); box.append(row);
+  });
+  $('castUpload').parentElement.hidden = cast.length >= 6;
+}
+
+$('castUpload').onchange = async e => {
+  const files = [...e.target.files].slice(0, 6 - cast.length);
+  e.target.value = '';
+  try {
+    for (const f of files) cast.push({ ...(await shrink(f)), label: '' });
+  } catch (err) { setStatus(err.message, true); }
+  renderCast(); refresh();
+};
+
 let artImg = null;
 
 $('go').onclick = async () => {
@@ -264,13 +334,27 @@ $('go').onclick = async () => {
   if (!key) { $('apikey').closest('details').open = true; setStatus('Add your OpenAI API key first, or use Copy prompt.', true); return; }
   store.set('cardArtist.key', key);
   $('go').disabled = true;
-  setStatus('Drawing… this usually takes 20–60 seconds.');
+  setStatus(`Drawing${cast.length ? ' your cast' : ''}… this usually takes 30–90 seconds.`);
   try {
-    const res = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-      body: JSON.stringify({ model: 'gpt-image-1', prompt: buildPrompt(), size: '1024x1536', quality: $('quality').value, n: 1 })
-    });
+    let res;
+    if (cast.length) {
+      const fd = new FormData();
+      fd.append('model', 'gpt-image-1');
+      fd.append('prompt', buildPrompt());
+      fd.append('size', '1024x1536');
+      fd.append('quality', $('quality').value);
+      fd.append('input_fidelity', 'high');
+      cast.forEach((c, i) => fd.append('image[]', c.blob, `person-${i + 1}.jpg`));
+      res = await fetch('https://api.openai.com/v1/images/edits', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + key }, body: fd
+      });
+    } else {
+      res = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+        body: JSON.stringify({ model: 'gpt-image-1', prompt: buildPrompt(), size: '1024x1536', quality: $('quality').value, n: 1 })
+      });
+    }
     const data = await res.json();
     if (!res.ok) {
       const msg = data?.error?.message || res.statusText;
