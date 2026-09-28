@@ -4,27 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Card Artist</title>
-<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Anton&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0d1020; --panel: #171b33; --line: #2c3260; --text: #eef0ff; --muted: #9aa0c8;
-    --accent: #f7a21b; --accent2: #7c4dff; --cost: #2f5bff; --power: #ff7a1a; --err: #ff6b6b;
+    --accent: #f7a21b; --err: #ff6b6b;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 Inter, system-ui, sans-serif; }
   main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
   h1 { font: 44px/1 Bangers, Impact, sans-serif; letter-spacing: 1px; margin: 0 0 4px; color: var(--accent); }
-  .sub { color: var(--muted); margin: 0 0 24px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
   @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
   label { display: block; font-weight: 600; font-size: 14px; margin: 14px 0 6px; }
-  label:first-child { margin-top: 0; }
   input, textarea, select { width: 100%; background: #0f1328; color: var(--text); border: 1px solid var(--line);
     border-radius: 8px; padding: 10px 12px; font: inherit; }
   textarea { min-height: 70px; resize: vertical; }
   .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; background: #0f1328; border: 1px solid var(--line); border-radius: 10px; padding: 4px; gap: 4px; }
+  .seg button { background: transparent; color: var(--muted); padding: 9px; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #1a0f00; }
   .btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
   button { font: 800 15px Inter, sans-serif; border: 0; border-radius: 10px; padding: 12px 16px; cursor: pointer; }
   .primary { background: linear-gradient(135deg, var(--accent), #ff6a00); color: #1a0f00; flex: 1; }
@@ -37,29 +40,69 @@
   .status { min-height: 22px; margin-top: 12px; font-size: 14px; color: var(--muted); }
   .status.err { color: var(--err); }
   .stage { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-  canvas { width: 100%; max-width: 420px; height: auto; border-radius: 14px; background: #0f1328; }
+  canvas { width: 100%; max-width: 420px; height: auto; border-radius: 10px; background: #0f1328; }
   .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; margin-top: 16px; width: 100%; }
   .gallery img { width: 100%; border-radius: 8px; cursor: pointer; border: 1px solid var(--line); }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <main>
   <h1>Card Artist</h1>
-  <p class="sub">Type a character. Get a bold, chunky, retro-comic card illustration with a patterned face background.</p>
+  <p class="sub">Type a character or a movie. Get bold comic or pop art, framed as a trading card or a poster.</p>
 
   <div class="grid">
     <section class="panel">
-      <label for="character">Character</label>
-      <input id="character" placeholder="e.g. Multiple Man, a pirate captain, my dog Biscuit" autocomplete="off">
-      <div class="hint">Some generators refuse trademarked names. If that happens, fill in "Look" below and it'll use that instead.</div>
+      <div class="seg" role="group" aria-label="Mode">
+        <button id="modeCard" aria-pressed="true">Card</button>
+        <button id="modePoster" aria-pressed="false">Poster</button>
+      </div>
 
-      <label for="look">Look (optional)</label>
-      <textarea id="look" placeholder="Costume, colours, hair, props… e.g. green bodysuit with yellow circles, long brown trench coat, fingerless gloves"></textarea>
+      <label for="style">Art style</label>
+      <select id="style">
+        <option value="comic">Retro comic (chunky cartoon)</option>
+        <option value="popdots">Pop art comic (Ben-Day dots)</option>
+        <option value="silkscreen">Pop art silkscreen (four-colour grid)</option>
+        <option value="screenprint">Retro screen-print poster</option>
+      </select>
 
-      <label for="pose">Pose / action (optional)</label>
-      <input id="pose" placeholder="leaping toward the viewer with a big grin">
+      <!-- Card fields -->
+      <div id="cardFields">
+        <label for="character">Character</label>
+        <input id="character" placeholder="e.g. Multiple Man, a pirate captain, my dog Biscuit" autocomplete="off">
+        <div class="hint">Some generators refuse trademarked names. If that happens, describe them in "Look" and use a generic name.</div>
 
-      <label for="palette">Background palette</label>
+        <label for="look">Look (optional)</label>
+        <textarea id="look" placeholder="Costume, colours, hair, props… e.g. green bodysuit with yellow circles, long brown trench coat"></textarea>
+
+        <label for="pose">Pose / action (optional)</label>
+        <input id="pose" placeholder="leaping toward the viewer with a big grin">
+
+        <div class="row">
+          <div><label for="cost">Cost</label><input id="cost" type="number" min="0" max="9" value="2"></div>
+          <div><label for="power">Power</label><input id="power" type="number" min="-9" max="99" value="4"></div>
+          <div><label for="title">Title</label><input id="title" placeholder="auto"></div>
+        </div>
+      </div>
+
+      <!-- Poster fields -->
+      <div id="posterFields" hidden>
+        <label for="movie">Movie</label>
+        <input id="movie" placeholder="e.g. Nosferatu (1922), or your own made-up film" autocomplete="off">
+
+        <label for="scene">Key imagery (recommended)</label>
+        <textarea id="scene" placeholder="What should be on the poster? e.g. a gaunt vampire's shadow climbing a staircase, a ship arriving in a harbour town, rats"></textarea>
+        <div class="hint">Describing the story's iconic images gives better results than the title alone, and avoids name-based refusals.</div>
+
+        <div class="row2">
+          <div><label for="posterTitle">Title on poster</label><input id="posterTitle" placeholder="auto"></div>
+          <div><label for="tagline">Tagline (optional)</label><input id="tagline" placeholder="A symphony of horror"></div>
+        </div>
+        <label for="credits">Bottom line (optional)</label>
+        <input id="credits" placeholder="e.g. year, director, or your shop name">
+      </div>
+
+      <label for="palette">Colour palette</label>
       <select id="palette">
         <option value="golden orange and mustard yellow">Gold / orange</option>
         <option value="hot pink and magenta">Pink / magenta</option>
@@ -67,24 +110,19 @@
         <option value="lime and emerald green">Green</option>
         <option value="violet and purple">Purple</option>
         <option value="crimson and scarlet red">Red</option>
+        <option value="primary red, yellow and blue">Primary (classic pop)</option>
       </select>
-
-      <div class="row">
-        <div><label for="cost">Cost</label><input id="cost" type="number" min="0" max="9" value="2"></div>
-        <div><label for="power">Power</label><input id="power" type="number" min="-9" max="99" value="4"></div>
-        <div><label for="title">Title on card</label><input id="title" placeholder="auto"></div>
-      </div>
 
       <details>
         <summary>Image API settings</summary>
         <label for="apikey">OpenAI API key</label>
         <input id="apikey" type="password" placeholder="sk-…" autocomplete="off">
-        <div class="hint">Stored only in this browser. Calls go straight from your browser to OpenAI; you pay for each image (roughly $0.04–0.25 depending on quality).</div>
+        <div class="hint">Stored only in this browser. Calls go straight from your browser to OpenAI; you pay per image (roughly $0.04–0.25 depending on quality).</div>
         <label for="quality">Quality</label>
         <select id="quality">
           <option value="medium">Medium</option>
-          <option value="high">High</option>
-          <option value="low">Low (cheapest)</option>
+          <option value="high">High (best for posters)</option>
+          <option value="low">Low (cheapest, for testing)</option>
         </select>
       </details>
 
@@ -92,7 +130,7 @@
         <button class="primary" id="go">Draw it</button>
         <button class="ghost" id="copy">Copy prompt</button>
       </div>
-      <div class="hint">No API key? "Copy prompt" and paste it into ChatGPT, Canva, Gemini, or any image generator.</div>
+      <div class="hint">No API key? "Copy prompt" and paste it into ChatGPT, Canva, Gemini, or any image generator, then load the result with "Use my own image".</div>
       <div class="status" id="status"></div>
 
       <details>
@@ -102,10 +140,17 @@
     </section>
 
     <section class="stage">
-      <canvas id="card" width="840" height="1260"></canvas>
-      <div class="btns" style="width:100%;max-width:420px">
-        <button class="ghost" id="dlCard" style="flex:1" disabled>Download card</button>
-        <button class="ghost" id="dlArt" style="flex:1" disabled>Download art only</button>
+      <canvas id="card" width="1024" height="1536"></canvas>
+      <div class="btns" style="width:100%;max-width:420px;margin-top:0">
+        <button class="ghost" id="dlCard" style="flex:1" disabled>Download</button>
+        <button class="ghost" id="dlArt" style="flex:1" disabled>Art only</button>
+        <label class="ghost" style="flex:1;margin:0;text-align:center;border:1px solid var(--line);border-radius:10px;padding:12px;font:800 15px Inter,sans-serif;cursor:pointer">
+          Use my own image<input id="upload" type="file" accept="image/*" hidden>
+        </label>
+      </div>
+      <div class="hint" id="printNote" style="max-width:420px" hidden>
+        Poster downloads are 2048×3072 px, enough for about A4 / 8×12″ at 250 dpi. For bigger physical prints,
+        run the file through an upscaler first (or use a print-on-demand service that upscales).
       </div>
       <div class="gallery" id="gallery"></div>
     </section>
@@ -119,33 +164,79 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch {} }
 };
 
-// The style recipe. Describes the look rather than naming an artist.
-const STYLE = [
-  'Retro-modern indie comic illustration style:',
-  'thick uniform black ink outlines, flat cel-shaded colours with a single crisp shadow tone,',
-  'simplified chunky shapes, slightly oversized head, hands and boots, rubbery exaggerated limbs,',
-  'tiny spot highlights, energetic squash-and-stretch posing, clean vector-like finish, vibrant saturated colours.'
-].join(' ');
+// Style recipes. Each describes the look rather than naming an artist.
+const STYLES = {
+  comic: {
+    look: 'Retro-modern indie comic illustration style: thick uniform black ink outlines, flat cel-shaded colours with a single crisp shadow tone, simplified chunky shapes, slightly oversized head, hands and boots, rubbery exaggerated limbs, tiny spot highlights, energetic squash-and-stretch posing, clean vector-like finish, vibrant saturated colours.',
+    bg: p => `Background: a dense repeating tiled pattern of many small cartoon versions of the subject's own face, drawn as line work in a single monochrome palette of ${p}, like patterned wallpaper, with a soft glow behind the figure.`
+  },
+  popdots: {
+    look: '1960s pop art comic-panel style: heavy bold black outlines, flat areas of bright colour filled with visible Ben-Day halftone dots, dramatic comic-book lighting, glossy highlights drawn as simple white shapes, graphic and poster-like.',
+    bg: p => `Background: large flat fields of ${p} with oversized Ben-Day dot patterns, bold radiating action lines and a comic starburst shape behind the subject.`
+  },
+  silkscreen: {
+    look: '1960s pop art silkscreen print style: high-contrast posterised image, slightly misregistered flat ink layers, bold unnatural colour blocks, visible screen-print texture.',
+    bg: p => `Layout: the same subject repeated in a 2×2 grid of panels, each panel using a different bold colour combination drawn from ${p} plus black, like a gallery silkscreen print.`
+  },
+  screenprint: {
+    look: 'Limited-edition retro screen-printed poster style: three to five flat spot colours, bold simplified shapes, strong silhouettes, subtle paper grain and halftone texture, clever graphic composition with negative space.',
+    bg: p => `Colour scheme: limited palette built from ${p}, off-white paper and deep ink black.`
+  }
+};
+
+let mode = store.get('cardArtist.mode') || 'card';
 
 function buildPrompt() {
+  const s = STYLES[$('style').value];
+  const palette = $('palette').value;
+  if (mode === 'poster') {
+    const movie = $('movie').value.trim();
+    const scene = $('scene').value.trim();
+    const subject = scene
+      ? `${scene}${movie ? `, capturing the feel of the film "${movie}"` : ''}`
+      : `the most iconic imagery of the film "${movie || 'an original sci-fi adventure'}"`;
+    return [
+      `Illustrated pop art movie poster artwork showing ${subject}.`,
+      'Bold central focal image with a strong, instantly readable silhouette and dramatic composition.',
+      s.look, s.bg(palette),
+      'Vertical 2:3 poster composition. Keep the top fifth and the bottom sixth as simple uncluttered background so a title and credits can be added later.',
+      'No text, no letters, no logos, no real actor likenesses, no border.'
+    ].join(' ');
+  }
   const character = $('character').value.trim() || 'an original masked superhero';
   const look = $('look').value.trim();
   const pose = $('pose').value.trim() || 'leaping toward the viewer in a dynamic, playful action pose with a big confident grin';
-  const palette = $('palette').value;
-  const who = look ? `${character}, ${look}` : character;
   return [
-    `Full-body cartoon illustration of ${who}, ${pose}.`,
-    STYLE,
-    `Background: a dense repeating tiled pattern of many small cartoon versions of the character's own face,`,
-    `drawn as line work in a single warm monochrome palette of ${palette}, like patterned wallpaper,`,
-    `with a soft glow behind the figure.`,
-    `Vertical trading-card composition: the character fills the frame and slightly breaks out of it,`,
-    `leaving the bottom fifth mostly background. No text, no letters, no logos, no border.`
+    `Full-body cartoon illustration of ${look ? `${character}, ${look}` : character}, ${pose}.`,
+    s.look, s.bg(palette),
+    'Vertical trading-card composition: the subject fills the frame and slightly breaks out of it, leaving the bottom fifth mostly background.',
+    'No text, no letters, no logos, no border.'
   ].join(' ');
 }
 
-function refreshPrompt() { $('promptView').textContent = buildPrompt(); }
-['character','look','pose','palette'].forEach(id => $(id).addEventListener('input', refreshPrompt));
+function refresh() { $('promptView').textContent = buildPrompt(); draw(); }
+
+function setMode(m) {
+  mode = m; store.set('cardArtist.mode', m);
+  $('modeCard').setAttribute('aria-pressed', m === 'card');
+  $('modePoster').setAttribute('aria-pressed', m === 'poster');
+  $('cardFields').hidden = m !== 'card';
+  $('posterFields').hidden = m !== 'poster';
+  $('printNote').hidden = m !== 'poster';
+  const c = $('card');
+  [c.width, c.height] = m === 'poster' ? [2048, 3072] : [1024, 1536];
+  if (m === 'poster' && store.get('cardArtist.style') == null) $('style').value = 'popdots';
+  refresh();
+}
+$('modeCard').onclick = () => setMode('card');
+$('modePoster').onclick = () => setMode('poster');
+
+document.querySelectorAll('input, textarea, select').forEach(el => {
+  if (['apikey', 'quality', 'upload'].includes(el.id)) return;
+  el.addEventListener('input', refresh);
+});
+$('style').addEventListener('change', () => store.set('cardArtist.style', $('style').value));
+if (store.get('cardArtist.style')) $('style').value = store.get('cardArtist.style');
 
 function setStatus(msg, err) { $('status').textContent = msg; $('status').className = 'status' + (err ? ' err' : ''); }
 
@@ -157,6 +248,13 @@ $('quality').addEventListener('change', () => store.set('cardArtist.quality', $(
 $('copy').onclick = async () => {
   try { await navigator.clipboard.writeText(buildPrompt()); setStatus('Prompt copied.'); }
   catch { $('promptView').closest('details').open = true; setStatus('Copy blocked. Select the prompt below instead.'); }
+};
+
+$('upload').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { loadArt(r.result); addToGallery(r.result); };
+  r.readAsDataURL(f);
 };
 
 let artImg = null;
@@ -177,7 +275,7 @@ $('go').onclick = async () => {
     if (!res.ok) {
       const msg = data?.error?.message || res.statusText;
       const hint = /safety|policy|copyright|trademark/i.test(msg)
-        ? ' Try describing the character in "Look" and using a generic name.' : '';
+        ? ' Try describing the subject instead of naming it.' : '';
       throw new Error(msg + hint);
     }
     const src = 'data:image/png;base64,' + data.data[0].b64_json;
@@ -194,7 +292,7 @@ $('go').onclick = async () => {
 function loadArt(src) {
   return new Promise((ok, fail) => {
     const img = new Image();
-    img.onload = () => { artImg = img; drawCard(); $('dlCard').disabled = $('dlArt').disabled = false; ok(); };
+    img.onload = () => { artImg = img; draw(); $('dlCard').disabled = $('dlArt').disabled = false; ok(); };
     img.onerror = fail;
     img.src = src;
   });
@@ -202,16 +300,64 @@ function loadArt(src) {
 
 function addToGallery(src) {
   const t = document.createElement('img');
-  t.src = src; t.alt = $('character').value;
+  t.src = src; t.alt = '';
   t.onclick = () => loadArt(src);
   $('gallery').prepend(t);
 }
 
-// ---- Card frame -------------------------------------------------------------
+// ---- Drawing helpers --------------------------------------------------------
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const f = c => Math.max(0, Math.min(255, Math.round(c + c * amt)));
+  return '#' + [f(n >> 16), f((n >> 8) & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function coverImage(ctx, x, y, w, h) {
+  if (artImg) {
+    const s = Math.max(w / artImg.width, h / artImg.height);
+    const iw = artImg.width * s, ih = artImg.height * s;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(artImg, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
+  } else {
+    ctx.fillStyle = '#1d2244'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#6b72a8'; ctx.font = `600 ${w / 22}px Inter, sans-serif`; ctx.textAlign = 'center';
+    ctx.fillText('Your art appears here', x + w / 2, y + h / 2);
+  }
+}
+
+function splitTitle(title, maxChars) {
+  const words = title.split(/\s+/);
+  if (words.length < 2 || title.length <= maxChars) return [title];
+  const mid = Math.ceil(words.length / 2);
+  return [words.slice(0, mid).join(' '), words.slice(mid).join(' ')];
+}
+
+function fitFont(ctx, lines, family, start, min, maxW) {
+  let size = start;
+  ctx.font = `${size}px ${family}`;
+  while (size > min && Math.max(...lines.map(l => ctx.measureText(l).width)) > maxW) {
+    size -= 4; ctx.font = `${size}px ${family}`;
+  }
+  return size;
+}
+
+// Chunky outlined gradient lettering, used for both card and poster titles.
+function comicTitle(ctx, lines, cx, baseY, size, lineH, stroke) {
+  lines.forEach((l, i) => {
+    const y = baseY + i * lineH;
+    const g = ctx.createLinearGradient(0, y - size, 0, y);
+    g.addColorStop(0, '#fff6c2'); g.addColorStop(.5, '#ffc93a'); g.addColorStop(1, '#d9820b');
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = stroke * 1.6; ctx.strokeStyle = '#2a1a4a'; ctx.strokeText(l, cx, y + stroke * .6);
+    ctx.lineWidth = stroke; ctx.strokeStyle = '#1b1030'; ctx.strokeText(l, cx, y);
+    ctx.fillStyle = g; ctx.fillText(l, cx, y);
+  });
 }
 
 function drawBadge(ctx, cx, cy, r, sides, fill, text) {
@@ -226,86 +372,105 @@ function drawBadge(ctx, cx, cy, r, sides, fill, text) {
   const g = ctx.createRadialGradient(cx - r * .3, cy - r * .3, r * .1, cx, cy, r);
   g.addColorStop(0, '#fff'); g.addColorStop(.25, fill); g.addColorStop(1, shade(fill, -.45));
   ctx.fillStyle = g; ctx.fill();
-  ctx.lineWidth = 8; ctx.strokeStyle = '#fff'; ctx.stroke();
+  ctx.lineWidth = r * .1; ctx.strokeStyle = '#fff'; ctx.stroke();
   ctx.font = `${r * 1.25}px Bangers, Impact, sans-serif`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.lineWidth = 12; ctx.strokeStyle = '#0b0b1a'; ctx.strokeText(text, cx, cy + r * .08);
+  ctx.lineWidth = r * .15; ctx.strokeStyle = '#0b0b1a'; ctx.strokeText(text, cx, cy + r * .08);
   ctx.fillStyle = '#fff'; ctx.fillText(text, cx, cy + r * .08);
   ctx.restore();
 }
 
-function shade(hex, amt) {
-  const n = parseInt(hex.slice(1), 16);
-  const f = c => Math.max(0, Math.min(255, Math.round(c + c * amt)));
-  return '#' + [f(n >> 16), f((n >> 8) & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join('');
-}
+// ---- Card layout ------------------------------------------------------------
+function drawCard(ctx, W, H) {
+  const k = W / 840, pad = 60 * k, fx = pad, fy = pad + 20 * k, fw = W - pad * 2, fh = H - pad * 2 - 40 * k;
 
-function drawCard() {
-  const c = $('card'), ctx = c.getContext('2d'), W = c.width, H = c.height;
-  ctx.clearRect(0, 0, W, H);
-  const pad = 60, fx = pad, fy = pad + 20, fw = W - pad * 2, fh = H - pad * 2 - 40;
-
-  // silver frame
-  roundRect(ctx, fx - 14, fy - 14, fw + 28, fh + 28, 34);
+  roundRect(ctx, fx - 14 * k, fy - 14 * k, fw + 28 * k, fh + 28 * k, 34 * k);
   const fg = ctx.createLinearGradient(0, fy, 0, fy + fh);
   fg.addColorStop(0, '#f4f6fb'); fg.addColorStop(.5, '#b9bfcf'); fg.addColorStop(1, '#e9ecf4');
   ctx.fillStyle = fg; ctx.fill();
 
-  // art
-  ctx.save();
-  roundRect(ctx, fx, fy, fw, fh, 22); ctx.clip();
-  if (artImg) {
-    const s = Math.max(fw / artImg.width, fh / artImg.height);
-    const iw = artImg.width * s, ih = artImg.height * s;
-    ctx.drawImage(artImg, fx + (fw - iw) / 2, fy + (fh - ih) / 2, iw, ih);
-  } else {
-    ctx.fillStyle = '#1d2244'; ctx.fillRect(fx, fy, fw, fh);
-    ctx.fillStyle = '#6b72a8'; ctx.font = '600 30px Inter, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('Your art appears here', W / 2, fy + fh / 2);
-  }
+  ctx.save(); roundRect(ctx, fx, fy, fw, fh, 22 * k); ctx.clip();
+  coverImage(ctx, fx, fy, fw, fh);
   ctx.restore();
 
-  // title
   const title = ($('title').value.trim() || $('character').value.trim() || 'Hero').toUpperCase();
-  const words = title.split(/\s+/);
-  const lines = words.length > 1 && title.length > 9
-    ? [words.slice(0, Math.ceil(words.length / 2)).join(' '), words.slice(Math.ceil(words.length / 2)).join(' ')]
-    : [title];
-  ctx.save();
-  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-  let size = 150;
-  ctx.font = `${size}px Bangers, Impact, sans-serif`;
-  while (size > 60 && Math.max(...lines.map(l => ctx.measureText(l).width)) > fw - 20) {
-    size -= 6; ctx.font = `${size}px Bangers, Impact, sans-serif`;
-  }
-  const baseY = fy + fh + 30 - (lines.length - 1) * size * .9;
-  lines.forEach((l, i) => {
-    const y = baseY + i * size * .9;
-    const tg = ctx.createLinearGradient(0, y - size, 0, y);
-    tg.addColorStop(0, '#fff6c2'); tg.addColorStop(.5, '#ffc93a'); tg.addColorStop(1, '#d9820b');
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 22; ctx.strokeStyle = '#2a1a4a'; ctx.strokeText(l, W / 2, y + 8);
-    ctx.lineWidth = 14; ctx.strokeStyle = '#1b1030'; ctx.strokeText(l, W / 2, y);
-    ctx.fillStyle = tg; ctx.fillText(l, W / 2, y);
-  });
+  const lines = splitTitle(title, 9);
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  const size = fitFont(ctx, lines, 'Bangers, Impact, sans-serif', 150 * k, 60 * k, fw - 20 * k);
+  comicTitle(ctx, lines, W / 2, fy + fh + 30 * k - (lines.length - 1) * size * .9, size, size * .9, 14 * k);
   ctx.restore();
 
-  // cost & power
-  drawBadge(ctx, fx + 30, fy + 20, 78, 0, '#2f5bff', String($('cost').value || 0));
-  drawBadge(ctx, fx + fw - 30, fy + 20, 82, 6, '#ff7a1a', String($('power').value || 0));
+  drawBadge(ctx, fx + 30 * k, fy + 20 * k, 78 * k, 0, '#2f5bff', String($('cost').value || 0));
+  drawBadge(ctx, fx + fw - 30 * k, fy + 20 * k, 82 * k, 6, '#ff7a1a', String($('power').value || 0));
 }
 
-['title','character','cost','power'].forEach(id => $(id).addEventListener('input', drawCard));
+// ---- Poster layout ----------------------------------------------------------
+function drawPoster(ctx, W, H) {
+  coverImage(ctx, 0, 0, W, H);
+  const m = W * .06;
+  const style = $('style').value;
+  ctx.save();
+  ctx.textAlign = 'center';
+
+  // Title
+  const title = ($('posterTitle').value.trim() || $('movie').value.trim().replace(/\s*\(\d{4}\)\s*$/, '') || 'Untitled').toUpperCase();
+  const lines = splitTitle(title, 12);
+  if (style === 'comic' || style === 'popdots') {
+    const size = fitFont(ctx, lines, 'Bangers, Impact, sans-serif', W * .2, W * .07, W - m * 2);
+    ctx.textBaseline = 'alphabetic';
+    comicTitle(ctx, lines, W / 2, m + size * .95, size, size * .92, size * .09);
+  } else {
+    const size = fitFont(ctx, lines, 'Anton, Impact, sans-serif', W * .16, W * .06, W - m * 2);
+    ctx.textBaseline = 'alphabetic';
+    lines.forEach((l, i) => {
+      const y = m + size + i * size * 1.05;
+      ctx.lineJoin = 'round'; ctx.lineWidth = size * .08; ctx.strokeStyle = '#111';
+      ctx.strokeText(l, W / 2, y);
+      ctx.fillStyle = '#fbf6e9'; ctx.fillText(l, W / 2, y);
+    });
+  }
+
+  // Tagline
+  const tag = $('tagline').value.trim();
+  if (tag) {
+    const ts = W * .032;
+    ctx.font = `800 ${ts}px Inter, sans-serif`;
+    const tw = ctx.measureText(tag.toUpperCase()).width + ts * 1.4;
+    const ty = H * .205 + (lines.length - 1) * W * .1;
+    ctx.fillStyle = '#111'; ctx.fillRect(W / 2 - tw / 2, ty - ts * 1.05, tw, ts * 1.6);
+    ctx.fillStyle = '#ffe14d'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText(tag.toUpperCase(), W / 2, ty + ts * .15);
+  }
+
+  // Bottom credit line
+  const credits = $('credits').value.trim();
+  if (credits) {
+    const cs = W * .026, cy = H - m;
+    const grd = ctx.createLinearGradient(0, H - H * .12, 0, H);
+    grd.addColorStop(0, 'rgba(0,0,0,0)'); grd.addColorStop(1, 'rgba(0,0,0,.7)');
+    ctx.fillStyle = grd; ctx.fillRect(0, H - H * .12, W, H * .12);
+    ctx.font = `600 ${cs}px Inter, sans-serif`; ctx.letterSpacing = `${cs * .25}px`;
+    ctx.fillStyle = '#fff'; ctx.fillText(credits.toUpperCase(), W / 2, cy);
+  }
+  ctx.restore();
+}
+
+function draw() {
+  const c = $('card'), ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  (mode === 'poster' ? drawPoster : drawCard)(ctx, c.width, c.height);
+}
 
 function download(dataUrl, name) {
   const a = document.createElement('a'); a.href = dataUrl; a.download = name; a.click();
 }
-const slug = () => ($('character').value.trim() || 'card').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-$('dlCard').onclick = () => download($('card').toDataURL('image/png'), slug() + '-card.png');
+const slug = () => ((mode === 'poster' ? $('movie').value : $('character').value).trim() || mode)
+  .toLowerCase().replace(/[^a-z0-9]+/g, '-');
+$('dlCard').onclick = () => download($('card').toDataURL('image/png'), `${slug()}-${mode}.png`);
 $('dlArt').onclick = () => artImg && download(artImg.src, slug() + '-art.png');
 
-refreshPrompt();
-(document.fonts ? document.fonts.ready : Promise.resolve()).then(drawCard);
+setMode(mode);
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(draw);
 </script>
 </body>
 </html>
