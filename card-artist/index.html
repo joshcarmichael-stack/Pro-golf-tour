@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card Artist</title>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1020; --panel: #171b33; --line: #2c3260; --text: #eef0ff; --muted: #9aa0c8;
+    --accent: #f7a21b; --accent2: #7c4dff; --cost: #2f5bff; --power: #ff7a1a; --err: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 Inter, system-ui, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font: 44px/1 Bangers, Impact, sans-serif; letter-spacing: 1px; margin: 0 0 4px; color: var(--accent); }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  label { display: block; font-weight: 600; font-size: 14px; margin: 14px 0 6px; }
+  label:first-child { margin-top: 0; }
+  input, textarea, select { width: 100%; background: #0f1328; color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px; font: inherit; }
+  textarea { min-height: 70px; resize: vertical; }
+  .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  button { font: 800 15px Inter, sans-serif; border: 0; border-radius: 10px; padding: 12px 16px; cursor: pointer; }
+  .primary { background: linear-gradient(135deg, var(--accent), #ff6a00); color: #1a0f00; flex: 1; }
+  .ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: wait; }
+  details { margin-top: 16px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  pre { white-space: pre-wrap; word-break: break-word; background: #0f1328; border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px; font-size: 12px; color: var(--muted); }
+  .status { min-height: 22px; margin-top: 12px; font-size: 14px; color: var(--muted); }
+  .status.err { color: var(--err); }
+  .stage { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  canvas { width: 100%; max-width: 420px; height: auto; border-radius: 14px; background: #0f1328; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; margin-top: 16px; width: 100%; }
+  .gallery img { width: 100%; border-radius: 8px; cursor: pointer; border: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Card Artist</h1>
+  <p class="sub">Type a character. Get a bold, chunky, retro-comic card illustration with a patterned face background.</p>
+
+  <div class="grid">
+    <section class="panel">
+      <label for="character">Character</label>
+      <input id="character" placeholder="e.g. Multiple Man, a pirate captain, my dog Biscuit" autocomplete="off">
+      <div class="hint">Some generators refuse trademarked names. If that happens, fill in "Look" below and it'll use that instead.</div>
+
+      <label for="look">Look (optional)</label>
+      <textarea id="look" placeholder="Costume, colours, hair, props… e.g. green bodysuit with yellow circles, long brown trench coat, fingerless gloves"></textarea>
+
+      <label for="pose">Pose / action (optional)</label>
+      <input id="pose" placeholder="leaping toward the viewer with a big grin">
+
+      <label for="palette">Background palette</label>
+      <select id="palette">
+        <option value="golden orange and mustard yellow">Gold / orange</option>
+        <option value="hot pink and magenta">Pink / magenta</option>
+        <option value="teal and cyan">Teal / cyan</option>
+        <option value="lime and emerald green">Green</option>
+        <option value="violet and purple">Purple</option>
+        <option value="crimson and scarlet red">Red</option>
+      </select>
+
+      <div class="row">
+        <div><label for="cost">Cost</label><input id="cost" type="number" min="0" max="9" value="2"></div>
+        <div><label for="power">Power</label><input id="power" type="number" min="-9" max="99" value="4"></div>
+        <div><label for="title">Title on card</label><input id="title" placeholder="auto"></div>
+      </div>
+
+      <details>
+        <summary>Image API settings</summary>
+        <label for="apikey">OpenAI API key</label>
+        <input id="apikey" type="password" placeholder="sk-…" autocomplete="off">
+        <div class="hint">Stored only in this browser. Calls go straight from your browser to OpenAI; you pay for each image (roughly $0.04–0.25 depending on quality).</div>
+        <label for="quality">Quality</label>
+        <select id="quality">
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="low">Low (cheapest)</option>
+        </select>
+      </details>
+
+      <div class="btns">
+        <button class="primary" id="go">Draw it</button>
+        <button class="ghost" id="copy">Copy prompt</button>
+      </div>
+      <div class="hint">No API key? "Copy prompt" and paste it into ChatGPT, Canva, Gemini, or any image generator.</div>
+      <div class="status" id="status"></div>
+
+      <details>
+        <summary>Show prompt</summary>
+        <pre id="promptView"></pre>
+      </details>
+    </section>
+
+    <section class="stage">
+      <canvas id="card" width="840" height="1260"></canvas>
+      <div class="btns" style="width:100%;max-width:420px">
+        <button class="ghost" id="dlCard" style="flex:1" disabled>Download card</button>
+        <button class="ghost" id="dlArt" style="flex:1" disabled>Download art only</button>
+      </div>
+      <div class="gallery" id="gallery"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} }
+};
+
+// The style recipe. Describes the look rather than naming an artist.
+const STYLE = [
+  'Retro-modern indie comic illustration style:',
+  'thick uniform black ink outlines, flat cel-shaded colours with a single crisp shadow tone,',
+  'simplified chunky shapes, slightly oversized head, hands and boots, rubbery exaggerated limbs,',
+  'tiny spot highlights, energetic squash-and-stretch posing, clean vector-like finish, vibrant saturated colours.'
+].join(' ');
+
+function buildPrompt() {
+  const character = $('character').value.trim() || 'an original masked superhero';
+  const look = $('look').value.trim();
+  const pose = $('pose').value.trim() || 'leaping toward the viewer in a dynamic, playful action pose with a big confident grin';
+  const palette = $('palette').value;
+  const who = look ? `${character}, ${look}` : character;
+  return [
+    `Full-body cartoon illustration of ${who}, ${pose}.`,
+    STYLE,
+    `Background: a dense repeating tiled pattern of many small cartoon versions of the character's own face,`,
+    `drawn as line work in a single warm monochrome palette of ${palette}, like patterned wallpaper,`,
+    `with a soft glow behind the figure.`,
+    `Vertical trading-card composition: the character fills the frame and slightly breaks out of it,`,
+    `leaving the bottom fifth mostly background. No text, no letters, no logos, no border.`
+  ].join(' ');
+}
+
+function refreshPrompt() { $('promptView').textContent = buildPrompt(); }
+['character','look','pose','palette'].forEach(id => $(id).addEventListener('input', refreshPrompt));
+
+function setStatus(msg, err) { $('status').textContent = msg; $('status').className = 'status' + (err ? ' err' : ''); }
+
+$('apikey').value = store.get('cardArtist.key') || '';
+$('apikey').addEventListener('change', () => store.set('cardArtist.key', $('apikey').value.trim()));
+$('quality').value = store.get('cardArtist.quality') || 'medium';
+$('quality').addEventListener('change', () => store.set('cardArtist.quality', $('quality').value));
+
+$('copy').onclick = async () => {
+  try { await navigator.clipboard.writeText(buildPrompt()); setStatus('Prompt copied.'); }
+  catch { $('promptView').closest('details').open = true; setStatus('Copy blocked. Select the prompt below instead.'); }
+};
+
+let artImg = null;
+
+$('go').onclick = async () => {
+  const key = $('apikey').value.trim();
+  if (!key) { $('apikey').closest('details').open = true; setStatus('Add your OpenAI API key first, or use Copy prompt.', true); return; }
+  store.set('cardArtist.key', key);
+  $('go').disabled = true;
+  setStatus('Drawing… this usually takes 20–60 seconds.');
+  try {
+    const res = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+      body: JSON.stringify({ model: 'gpt-image-1', prompt: buildPrompt(), size: '1024x1536', quality: $('quality').value, n: 1 })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const msg = data?.error?.message || res.statusText;
+      const hint = /safety|policy|copyright|trademark/i.test(msg)
+        ? ' Try describing the character in "Look" and using a generic name.' : '';
+      throw new Error(msg + hint);
+    }
+    const src = 'data:image/png;base64,' + data.data[0].b64_json;
+    await loadArt(src);
+    addToGallery(src);
+    setStatus('Done.');
+  } catch (e) {
+    setStatus(e.message, true);
+  } finally {
+    $('go').disabled = false;
+  }
+};
+
+function loadArt(src) {
+  return new Promise((ok, fail) => {
+    const img = new Image();
+    img.onload = () => { artImg = img; drawCard(); $('dlCard').disabled = $('dlArt').disabled = false; ok(); };
+    img.onerror = fail;
+    img.src = src;
+  });
+}
+
+function addToGallery(src) {
+  const t = document.createElement('img');
+  t.src = src; t.alt = $('character').value;
+  t.onclick = () => loadArt(src);
+  $('gallery').prepend(t);
+}
+
+// ---- Card frame -------------------------------------------------------------
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function drawBadge(ctx, cx, cy, r, sides, fill, text) {
+  ctx.save();
+  ctx.beginPath();
+  if (sides === 0) ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  else for (let i = 0; i < sides; i++) {
+    const a = Math.PI / 2 + i * 2 * Math.PI / sides;
+    ctx[i ? 'lineTo' : 'moveTo'](cx + r * Math.cos(a), cy + r * Math.sin(a));
+  }
+  ctx.closePath();
+  const g = ctx.createRadialGradient(cx - r * .3, cy - r * .3, r * .1, cx, cy, r);
+  g.addColorStop(0, '#fff'); g.addColorStop(.25, fill); g.addColorStop(1, shade(fill, -.45));
+  ctx.fillStyle = g; ctx.fill();
+  ctx.lineWidth = 8; ctx.strokeStyle = '#fff'; ctx.stroke();
+  ctx.font = `${r * 1.25}px Bangers, Impact, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 12; ctx.strokeStyle = '#0b0b1a'; ctx.strokeText(text, cx, cy + r * .08);
+  ctx.fillStyle = '#fff'; ctx.fillText(text, cx, cy + r * .08);
+  ctx.restore();
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const f = c => Math.max(0, Math.min(255, Math.round(c + c * amt)));
+  return '#' + [f(n >> 16), f((n >> 8) & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function drawCard() {
+  const c = $('card'), ctx = c.getContext('2d'), W = c.width, H = c.height;
+  ctx.clearRect(0, 0, W, H);
+  const pad = 60, fx = pad, fy = pad + 20, fw = W - pad * 2, fh = H - pad * 2 - 40;
+
+  // silver frame
+  roundRect(ctx, fx - 14, fy - 14, fw + 28, fh + 28, 34);
+  const fg = ctx.createLinearGradient(0, fy, 0, fy + fh);
+  fg.addColorStop(0, '#f4f6fb'); fg.addColorStop(.5, '#b9bfcf'); fg.addColorStop(1, '#e9ecf4');
+  ctx.fillStyle = fg; ctx.fill();
+
+  // art
+  ctx.save();
+  roundRect(ctx, fx, fy, fw, fh, 22); ctx.clip();
+  if (artImg) {
+    const s = Math.max(fw / artImg.width, fh / artImg.height);
+    const iw = artImg.width * s, ih = artImg.height * s;
+    ctx.drawImage(artImg, fx + (fw - iw) / 2, fy + (fh - ih) / 2, iw, ih);
+  } else {
+    ctx.fillStyle = '#1d2244'; ctx.fillRect(fx, fy, fw, fh);
+    ctx.fillStyle = '#6b72a8'; ctx.font = '600 30px Inter, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Your art appears here', W / 2, fy + fh / 2);
+  }
+  ctx.restore();
+
+  // title
+  const title = ($('title').value.trim() || $('character').value.trim() || 'Hero').toUpperCase();
+  const words = title.split(/\s+/);
+  const lines = words.length > 1 && title.length > 9
+    ? [words.slice(0, Math.ceil(words.length / 2)).join(' '), words.slice(Math.ceil(words.length / 2)).join(' ')]
+    : [title];
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  let size = 150;
+  ctx.font = `${size}px Bangers, Impact, sans-serif`;
+  while (size > 60 && Math.max(...lines.map(l => ctx.measureText(l).width)) > fw - 20) {
+    size -= 6; ctx.font = `${size}px Bangers, Impact, sans-serif`;
+  }
+  const baseY = fy + fh + 30 - (lines.length - 1) * size * .9;
+  lines.forEach((l, i) => {
+    const y = baseY + i * size * .9;
+    const tg = ctx.createLinearGradient(0, y - size, 0, y);
+    tg.addColorStop(0, '#fff6c2'); tg.addColorStop(.5, '#ffc93a'); tg.addColorStop(1, '#d9820b');
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 22; ctx.strokeStyle = '#2a1a4a'; ctx.strokeText(l, W / 2, y + 8);
+    ctx.lineWidth = 14; ctx.strokeStyle = '#1b1030'; ctx.strokeText(l, W / 2, y);
+    ctx.fillStyle = tg; ctx.fillText(l, W / 2, y);
+  });
+  ctx.restore();
+
+  // cost & power
+  drawBadge(ctx, fx + 30, fy + 20, 78, 0, '#2f5bff', String($('cost').value || 0));
+  drawBadge(ctx, fx + fw - 30, fy + 20, 82, 6, '#ff7a1a', String($('power').value || 0));
+}
+
+['title','character','cost','power'].forEach(id => $(id).addEventListener('input', drawCard));
+
+function download(dataUrl, name) {
+  const a = document.createElement('a'); a.href = dataUrl; a.download = name; a.click();
+}
+const slug = () => ($('character').value.trim() || 'card').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+$('dlCard').onclick = () => download($('card').toDataURL('image/png'), slug() + '-card.png');
+$('dlArt').onclick = () => artImg && download(artImg.src, slug() + '-art.png');
+
+refreshPrompt();
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(drawCard);
+</script>
+</body>
+</html>
