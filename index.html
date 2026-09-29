@@ -4,6 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Sunday Pins — Golf Career Sim</title>
+<meta name="description" content="A free golf career sim you play in your browser. Start at 17 outside the world top 200, win majors, make the Ryder Cup and hole the clutch putts yourself. No ads, no download.">
+<link rel="canonical" href="https://sunday-pins.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Sunday Pins">
+<meta property="og:url" content="https://sunday-pins.com/">
+<meta property="og:title" content="Sunday Pins — a whole golf career, hole by hole">
+<meta property="og:description" content="Free golf career sim in your browser. Win majors, make the Ryder Cup, hole the clutch putts yourself. No ads.">
+<meta property="og:image" content="https://sunday-pins.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Sunday Pins: a clutch putt screen and a tournament win screen on two phones">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Sunday Pins — a whole golf career, hole by hole">
+<meta name="twitter:description" content="Free golf career sim in your browser. Win majors, make the Ryder Cup, hole the clutch putts yourself. No ads.">
+<meta name="twitter:image" content="https://sunday-pins.com/og-image.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
 <meta name="theme-color" content="#0E2A1C">
 <link rel="manifest" href="manifest.webmanifest">
@@ -2031,6 +2046,66 @@ function Tip({ id, title, children }) {
             React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: "#8EC5F0" } }, "\uD83D\uDCA1 ", title),
             React.createElement("button", { onClick: dismiss, className: "text-[11px] px-2 py-0.5 rounded", style: { color: C.bg, background: "#8EC5F0", fontFamily: FONT, letterSpacing: 1 } }, "GOT IT")),
         React.createElement("div", { className: "text-xs", style: { color: C.chalk, lineHeight: 1.45 } }, children)));
+}
+// ---------- SHARE A RESULT: draws a 1080x1350 card and hands it to the phone's share sheet ----------
+const SITE_URL = "https://sunday-pins.com";
+const fmtPts = (x) => { const w = Math.floor(x); return (x - w >= 0.5 ? (w ? w + "½" : "½") : String(w)); };
+const drawShareCard = async ({ kicker, headline, sub, name }) => {
+    try { await Promise.all([document.fonts.load("700 96px Fraunces"), document.fonts.load("500 40px Fraunces")]); } catch (e) { }
+    const W = 1080, H = 1350, cv = document.createElement("canvas");
+    cv.width = W; cv.height = H;
+    const x = cv.getContext("2d");
+    const bg = x.createRadialGradient(W / 2, 0, 60, W / 2, 0, H * 1.1);
+    bg.addColorStop(0, "#1F5A3C"); bg.addColorStop(0.5, "#123524"); bg.addColorStop(1, "#0B2016");
+    x.fillStyle = bg; x.fillRect(0, 0, W, H);
+    x.strokeStyle = "rgba(232,195,90,0.55)"; x.lineWidth = 4; x.strokeRect(40, 40, W - 80, H - 80);
+    // a little green + flag
+    x.fillStyle = "#2E7D4F"; x.beginPath(); x.ellipse(W / 2, 380, 300, 56, 0, 0, Math.PI * 2); x.fill();
+    x.fillStyle = "#0B2016"; x.beginPath(); x.ellipse(W / 2 + 90, 384, 18, 7, 0, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = "#F4F7F2"; x.lineWidth = 5; x.beginPath(); x.moveTo(W / 2 + 90, 384); x.lineTo(W / 2 + 90, 190); x.stroke();
+    x.fillStyle = "#D8423A"; x.beginPath(); x.moveTo(W / 2 + 90, 190); x.lineTo(W / 2 + 190, 218); x.lineTo(W / 2 + 90, 246); x.closePath(); x.fill();
+    x.textAlign = "center"; x.textBaseline = "alphabetic";
+    const wrap = (text, font, maxW, lineH, y, color) => {
+        x.font = font; x.fillStyle = color;
+        const words = String(text).split(" "); let line = "", lines = [];
+        words.forEach((w) => { const t = line ? line + " " + w : w; if (x.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; });
+        if (line) lines.push(line);
+        lines.forEach((l, i) => x.fillText(l, W / 2, y + i * lineH));
+        return y + lines.length * lineH;
+    };
+    x.font = "700 34px Fraunces, Georgia, serif"; x.fillStyle = "#E8C35A";
+    x.fillText(kicker.split("").join(String.fromCharCode(8202)), W / 2, 560);
+    let y = wrap(headline, "700 92px Fraunces, Georgia, serif", W - 180, 100, 680, "#F4F7F2");
+    if (sub) y = wrap(sub, "500 44px Fraunces, Georgia, serif", W - 200, 58, y + 30, "#B9D2C3");
+    if (name) wrap(name, "500 36px Fraunces, Georgia, serif", W - 200, 46, Math.max(y + 50, 1090), "#E8C35A");
+    x.font = "700 40px Fraunces, Georgia, serif"; x.fillStyle = "#E8C35A"; x.fillText("⛳  SUNDAY PINS", W / 2, H - 150);
+    x.font = "500 32px Fraunces, Georgia, serif"; x.fillStyle = "#F4F7F2"; x.fillText("Play free · sunday-pins.com", W / 2, H - 100);
+    return new Promise((res) => cv.toBlob((b) => res(b), "image/png"));
+};
+function ShareResult({ kicker, headline, sub, name, tag }) {
+    const [note, setNote] = useState("");
+    const text = `🏆 ${headline}${sub ? " · " + sub : ""}${name ? "\n" + name : ""}\n\nPlay Sunday Pins free: ${SITE_URL}`;
+    const go = async () => {
+        track("share/" + (tag || "result"));
+        try {
+            const blob = await drawShareCard({ kicker, headline, sub, name });
+            const file = blob && typeof File !== "undefined" ? new File([blob], "sunday-pins.png", { type: "image/png" }) : null;
+            if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], text });
+                return;
+            }
+            if (navigator.share) { await navigator.share({ text, url: SITE_URL }); return; }
+            if (blob) { // desktop: save the card and copy the words
+                const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "sunday-pins.png"; a.click();
+                setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+            }
+            try { await navigator.clipboard.writeText(text); setNote("Card saved and text copied: paste it anywhere"); } catch (e) { setNote("Card saved"); }
+        }
+        catch (e) { if (!(e && e.name === "AbortError")) setNote("Couldn't open sharing on this device"); }
+    };
+    return (React.createElement("div", { className: "my-3" },
+        React.createElement("button", { onClick: go, className: "w-full py-2.5 rounded-md active:scale-95", style: { background: "transparent", color: C.gold, border: `1.5px solid ${C.gold}`, fontFamily: FONT, fontSize: 16, letterSpacing: 2 } }, "📤 SHARE THIS"),
+        note && React.createElement("p", { className: "text-[11px] mt-1 text-center", style: { color: C.muted } }, note)));
 }
 // three-step "how it plays" strip
 function HowItPlays() {
@@ -7360,7 +7435,9 @@ function GolfCareerSim() {
                     " ",
                     champ.nationName),
                 champ && champ.isYou && React.createElement(Celebration, { size: "huge", trophy: "\uD83C\uDF0D" }),
-                champ && champ.isYou && React.createElement("div", { className: "text-sm mt-2", style: { color: C.gold } }, "You've conquered the world. The Global Cup is yours.")),
+                champ && champ.isYou && React.createElement("div", { className: "text-sm mt-2", style: { color: C.gold } }, "You've conquered the world. The Global Cup is yours."),
+                champ && champ.isYou && React.createElement(ShareResult, { tag: "worldcup", kicker: `WORLD CUP OF GOLF · SEASON ${wc.season}`,
+                    headline: "World champion", sub: `${champ.nationName || g.pro.nation}${wc.venue ? " · " + wc.venue.split(",")[0] : ""}`, name: g.pro.name })),
             wc.youIn && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 1, color: C.gold }, className: "mb-1" }, "YOUR TOURNAMENT"),
                 myGroup && React.createElement("div", { className: "text-xs mb-1", style: { color: myGroup.advance.some((p) => p.isYou) ? C.green : advancedSet.has(g.pro.name) ? C.green : C.red } },
@@ -8387,6 +8464,15 @@ function GolfCareerSim() {
                     React.createElement("div", { className: "text-xs", style: { color: C.muted } },
                         me.rounds.join("-"),
                         " \u00B7 No points, no cheque. Next week."))),
+                myRes && myRes.pos === 1 && (() => {
+                    const second = results.finishers[1];
+                    const by = second && !results.playoff ? second.total - myRes.total : 0;
+                    return React.createElement(ShareResult, { tag: ev.type === "major" ? "major" : "win",
+                        kicker: ev.type === "major" ? "MAJOR CHAMPION" : ev.type === "tc" ? "TOUR CHAMPIONSHIP" : `SEASON ${g.season} \u00B7 EVENT ${g.evIdx + 1}`,
+                        headline: `${ev.e} champion`,
+                        sub: `${toPar(myRes.total, par, 4)}${results.playoff ? " \u00B7 won in a playoff" : by > 0 ? ` \u00B7 by ${by} shot${by === 1 ? "" : "s"}` : ""}`,
+                        name: `${g.pro.name} \u00B7 ${g.pro.nation} \u00B7 age ${g.pro.age != null ? g.pro.age : 22}` });
+                })(),
                 (() => {
                     // this week's head-to-head with your rival, and your sponsor's retainer
                     const rv = !tour.team && g.rival && tour.scores.find((x) => x.name === g.rival.name);
@@ -9163,6 +9249,28 @@ function GolfCareerSim() {
                         " ",
                         (ryder.side === "USA" ? uPts > ePts : ryder.side === "EUR" && eiK ? uPts > ePts : eiK && ryder.side === "INTL" ? ePts > uPts : ePts > uPts) ? `· You're a ${presK ? "PRESIDENTS CUP" : eiK ? "CONTINENTAL CUP" : "RYDER CUP"} WINNER 🏆` : "");
                 })(),
+                ryder.youIn && (() => {
+                    const youWon = ryder.side === "USA" ? uPts > ePts : ryder.side === "EUR" && eiK ? uPts > ePts : eiK && ryder.side === "INTL" ? ePts > uPts : ePts > uPts;
+                    if (!youWon)
+                        return null;
+                    let w = 0, l = 0, hh = 0;
+                    ryder.sessions.forEach((s) => s.matches.forEach((m) => {
+                        if (!m.youIn)
+                            return;
+                        if (m.out === "H")
+                            hh++;
+                        else if ((m.youSideA && m.out === "A") || (!m.youSideA && m.out === "B"))
+                            w++;
+                        else
+                            l++;
+                    }));
+                    const winner = uPts > ePts ? (eiK ? "Europe" : "USA") : (presK || eiK ? "The Internationals" : "Europe");
+                    const cup = presK ? "Presidents Cup" : eiK ? "Continental Cup" : "Ryder Cup";
+                    return React.createElement(ShareResult, { tag: "cup", kicker: cup.toUpperCase(),
+                        headline: `${winner} win the ${cup}`,
+                        sub: `${fmtPts(Math.max(uPts, ePts))}–${fmtPts(Math.min(uPts, ePts))}${ryder.venue ? " at " + ryder.venue.split(",")[0] : ""}`,
+                        name: `${g.pro.name}: ${w}-${l}-${hh} for the week` });
+                })(),
                 React.createElement(Btn, { onClick: finishRyder }, "CONTINUE TO SEASON REVIEW")))));
     }
     // ---------- season end ----------
@@ -9176,6 +9284,8 @@ function GolfCareerSim() {
                     g.season,
                     " COMPLETE"),
                 youChamp && React.createElement(Celebration, { size: "huge", trophy: "\uD83C\uDFC6" }),
+                youChamp && React.createElement(ShareResult, { tag: "fedex", kicker: `SEASON ${g.season}`, headline: "FedEx Cup champion",
+                    sub: `${g.myStats.wins || 0} win${g.myStats.wins === 1 ? "" : "s"} this season`, name: `${g.pro.name} \u00B7 ${g.pro.nation}` }),
                 React.createElement("h1", { style: { fontFamily: FONT, fontSize: 34, color: youChamp ? C.gold : C.chalk, lineHeight: 1.1 } }, youChamp ? "YOU ARE THE FEDEX CUP CHAMPION" : `${g.champion || "—"} WINS THE FEDEX CUP`),
                 g.lastRyder && (React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } },
                     g.lastRyder.kind === "pres" ? "Presidents Cup" : "Ryder Cup",
