@@ -30,6 +30,8 @@
 @keyframes spEnter{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
 @keyframes spPulse{0%{transform:scale(1)}40%{transform:scale(1.25);color:#9FD98B}100%{transform:scale(1)}}
 @keyframes spDraw{to{stroke-dashoffset:0}}
+@keyframes spWave{0%,100%{transform:scaleX(1) skewY(0)}50%{transform:scaleX(.86) skewY(5deg)}}
+@keyframes spRoll{0%{transform:translateX(0);opacity:0}8%{opacity:1}62%{transform:translateX(88px);opacity:1}70%{transform:translateX(90px) scale(.5);opacity:0}100%{transform:translateX(90px);opacity:0}}
 @media (prefers-reduced-motion: reduce){.sp-anim,.sp-anim *{animation:none!important}.sp-fx{display:none!important}}
 </style>
 </head>
@@ -1964,10 +1966,69 @@ const makeRegen = (slotCountry, taken) => {
 };
 const SAVE_KEY = "golf-career-sim-v4"; // legacy single-slot key, migrated into per-mode slots on first load
 const GAME_MODES = [
-    { id: "standard", emoji: "🏆", name: "TOUR CAREER", desc: "The real modern tour. Start as a 17-year-old nobody ranked outside the world top 200 and grind your way to greatness against today's pros." },
-    { id: "league", emoji: "🏟️", name: "LEAGUE SYSTEM", desc: "Football-style. 40 even teams across 4 divisions, a transfer market driven by team budgets and player values, and promotion to chase. Start as a free agent — three clubs want you. Work your way to the top flight." },
-    { id: "alltime", emoji: "👑", name: "ALL-TIME GREATS", desc: "Fantasy mode. The field is golf's 25 greatest players at their absolute primes — Tiger '00, Jack '72, Hogan '53, Seve '84. Can you beat the legends and top the GOAT board yourself?" },
+    { id: "standard", emoji: "🏆", name: "TOUR CAREER", accent: "#E8C35A", grad: "linear-gradient(160deg, #1D5237 0%, #123524 100%)", starter: true,
+        tagline: "Rookie to legend on the real modern tour.",
+        you: "A 17-year-old nobody, ranked outside the world top 200",
+        goal: "Win majors, the FedEx Cup and a Ryder Cup call-up",
+        features: ["Sponsors", "Rivals", "Majors", "Team cups", "Clutch putts"],
+        tags: ["⭐ Best first mode", "🕒 Play at your pace"],
+        desc: "The real modern tour. Start as a 17-year-old nobody ranked outside the world top 200 and grind your way to greatness against today's pros." },
+    { id: "league", emoji: "🏟️", name: "LEAGUE SYSTEM", accent: "#6FB3A8", grad: "linear-gradient(160deg, #26303B 0%, #161A20 100%)",
+        tagline: "Football-style club golf. Transfers, budgets, promotion.",
+        you: "A free agent, with three clubs wanting to sign you",
+        goal: "Climb four divisions to the top flight",
+        features: ["Transfer market", "Team budgets", "Promotion & relegation", "Clutch putts"],
+        tags: ["🧠 More management", "📈 Long-term build"],
+        desc: "Football-style. 40 even teams across 4 divisions, a transfer market driven by team budgets and player values, and promotion to chase. Start as a free agent — three clubs want you. Work your way to the top flight." },
+    { id: "alltime", emoji: "👑", name: "ALL-TIME GREATS", accent: "#F0CE6A", grad: "linear-gradient(160deg, #2E2810 0%, #17140A 100%)",
+        tagline: "You against golf's 25 greatest, all at their peak.",
+        you: "A new pro, dropped into a field of legends",
+        goal: "Beat Tiger '00, Jack '72 and Seve '84, and top the GOAT board",
+        features: ["25 legends", "GOAT leaderboard", "Majors"],
+        tags: ["🔥 Hardest field", "🎲 Fantasy"],
+        desc: "Fantasy mode. The field is golf's 25 greatest players at their absolute primes — Tiger '00, Jack '72, Hogan '53, Seve '84. Can you beat the legends and top the GOAT board yourself?" },
 ];
+// rotating one-liners under the home-screen title: real moments from the game
+const HOME_MOMENTS = [
+    "Nine feet to win the Sony Open. The sim stops. Your putt.",
+    "The Ryder Cup captain is on the phone…",
+    "Three brands want your logo on their shirt.",
+    "Sunday singles. Three down after four.",
+    "Your rival just shot 63. Your move.",
+    "Three clubs want to sign you. Pick one.",
+    "Tiger '00 is two clear at the turn.",
+];
+// the little animated green at the top of the home screen
+function HomeHero() {
+    const [i, setI] = useState(0);
+    useEffect(() => { const t = setInterval(() => setI((x) => (x + 1) % HOME_MOMENTS.length), 3200); return () => clearInterval(t); }, []);
+    return (React.createElement("div", { className: "pt-8 text-center mb-4 sp-anim" },
+        React.createElement("svg", { viewBox: "0 0 240 92", width: 220, height: 84, style: { display: "block", margin: "0 auto" }, "aria-hidden": true },
+            React.createElement("defs", null,
+                React.createElement("radialGradient", { id: "hhGreen", cx: "50%", cy: "40%", r: "60%" },
+                    React.createElement("stop", { offset: "0%", stopColor: "#3E8E5E" }),
+                    React.createElement("stop", { offset: "100%", stopColor: "#1D5237" }))),
+            React.createElement("ellipse", { cx: 120, cy: 74, rx: 104, ry: 16, fill: "url(#hhGreen)" }),
+            React.createElement("ellipse", { cx: 120, cy: 74, rx: 104, ry: 16, fill: "none", stroke: "rgba(232,195,90,.35)", strokeWidth: 1 }),
+            React.createElement("ellipse", { cx: 150, cy: 75, rx: 6, ry: 2.2, fill: "#0B2016" }),
+            React.createElement("line", { x1: 150, y1: 75, x2: 150, y2: 14, stroke: "#F4F7F2", strokeWidth: 1.6 }),
+            React.createElement("path", { d: "M150 14 L182 22 L150 30 Z", fill: "#D8423A", style: { transformOrigin: "150px 22px", animation: "spWave 2.4s ease-in-out infinite" } }),
+            React.createElement("circle", { cx: 60, cy: 76, r: 3.2, fill: "#FFFFFF", style: { animation: "spRoll 4.8s ease-in-out infinite" } })),
+        React.createElement("div", { className: "mt-2", style: { fontFamily: FONT, fontSize: 15, letterSpacing: 6, color: C.gold } }, "SUNDAY PINS"),
+        React.createElement("h1", { style: { fontFamily: FONT, fontSize: 38, color: C.chalk, lineHeight: 1 }, className: "mt-1" }, "A whole golf career,", React.createElement("br", null), "hole by hole"),
+        React.createElement("div", { className: "mt-3 mx-auto px-3 py-2 rounded-full inline-block", style: { background: "rgba(244,247,242,0.06)", border: "1px solid rgba(232,195,90,0.3)", minHeight: 34 } },
+            React.createElement("span", { key: i, className: "text-xs", style: { color: C.chalk, display: "inline-block", animation: "spEnter .45s ease-out" } }, "⛳ ", HOME_MOMENTS[i]))));
+}
+// three-step "how it plays" strip
+function HowItPlays() {
+    const steps = [["1", "Build your pro", "Pick a player type or spin for stats"], ["2", "Play the season", "Every hole yourself, or sim to the good bits"], ["3", "Hole the big putts", "The sim stops and hands you the putter"]];
+    return (React.createElement("div", { className: "mb-4 px-1" },
+        React.createElement("div", { className: "text-[10px] mb-2 text-center", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "HOW IT PLAYS"),
+        React.createElement("div", { className: "grid grid-cols-3 gap-2" }, steps.map(([n, h, t]) => (React.createElement("div", { key: n, className: "p-2 rounded-lg text-center", style: { background: "rgba(244,247,242,0.05)", border: "1px solid rgba(244,247,242,0.12)" } },
+            React.createElement("div", { className: "mx-auto mb-1 flex items-center justify-center rounded-full", style: { width: 22, height: 22, background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 13 } }, n),
+            React.createElement("div", { style: { color: C.chalk, fontSize: 12, fontWeight: 700, lineHeight: 1.2 } }, h),
+            React.createElement("div", { className: "mt-0.5", style: { color: C.muted, fontSize: 10, lineHeight: 1.3 } }, t)))))));
+}
 const MODE_IDS = GAME_MODES.map((m) => m.id);
 const SLOT_KEY = (m) => SAVE_KEY + "-" + (m || "standard"); // one independent save per game mode
 const freshStats = () => ({ events: 0, cutsMade: 0, top10s: 0, wins: 0, majors: 0, bestFinish: null,
@@ -2072,6 +2133,24 @@ function GolfCareerSim() {
         return s;
     };
     // scan every mode's slot and return light metadata for the home-screen menu
+    // the extra progress line on a home-screen mode card (never allowed to break the menu)
+    const slotSummary = (s) => {
+        const out = {};
+        try {
+            out.overall = s.pro.overall;
+            const m = s.myStats || {};
+            out.wins = m.careerWins || 0;
+            out.majors = m.careerMajors || 0;
+            if (s.mode === "league") {
+                const t = (s.leagues || []).find((x) => x.members.some((mn) => mn.includes("(YOU)")));
+                out.club = t ? t.name : s.isFreeAgent ? "Free agent" : null;
+                out.division = t ? t.division : null;
+            }
+            else if (s.standings) out.rank = worldRankOf(s, s.pro.name);
+        }
+        catch (e) { }
+        return out;
+    };
     const scanSlots = async () => {
         const found = {};
         for (const m of MODE_IDS) {
@@ -2080,7 +2159,7 @@ function GolfCareerSim() {
                 if (r === null || r === void 0 ? void 0 : r.value) {
                     const s = JSON.parse(r.value);
                     if (s === null || s === void 0 ? void 0 : s.pro)
-                        found[m] = { name: s.pro.name, season: s.season, retired: !!s.retired, savedAt: s.savedAt || 0 };
+                        found[m] = { name: s.pro.name, season: s.season, retired: !!s.retired, savedAt: s.savedAt || 0, ...slotSummary(s) };
                 }
             }
             catch (e) { }
@@ -4861,27 +4940,38 @@ function GolfCareerSim() {
         const modeLabel = (id) => id === "alltime" ? "All-Time Greats" : id === "team" ? "Team Tour" : id === "league" ? "League System" : "Tour Career";
         const startFresh = (id) => { setConfirmEraseId(null); setMode(id); setAttrs({}); setPair(null); setName(""); setNation(""); setLastTake(null); setScreen("identity"); };
         return (React.createElement(Shell, null,
-            React.createElement("div", { className: "pt-10 text-center mb-2" },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, letterSpacing: 6, color: C.gold } }, "\u26F3 SUNDAY PINS"),
-                React.createElement("h1", { style: { fontFamily: FONT, fontSize: 44, color: C.chalk, lineHeight: 0.95 }, className: "mt-1" }, "CHOOSE YOUR WORLD"),
-                React.createElement("p", { className: "text-xs mt-2 mb-1", style: { color: C.gold, letterSpacing: 2 } }, "A WHOLE CAREER, HOLE BY HOLE"),
-                React.createElement("p", { className: "text-xs mb-5 px-2", style: { color: C.muted } }, "Every mode keeps its own save \u2014 jump between careers whenever you like.")),
+            React.createElement(HomeHero, null),
+            React.createElement(HowItPlays, null),
+            React.createElement("div", { className: "text-[10px] mb-2 text-center", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "CHOOSE YOUR WORLD"),
             React.createElement("div", { className: "px-1" }, GAME_MODES.map((md) => {
                 const isActive = g && g.pro && g.mode === md.id;
                 // belt-and-braces: if the scan is stale, the mode you're playing still shows its live save
                 const slot = slots[md.id] || (isActive ? { name: g.pro.name, season: g.season, retired: !!g.retired } : null);
                 const confirming = confirmEraseId === md.id;
-                return (React.createElement("div", { key: md.id, className: "w-full mb-3 p-4 rounded-xl text-left", style: { background: md.id === "alltime" ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card, border: isActive ? `1.5px solid ${C.gold}` : md.id === "alltime" ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.2)" } },
-                    React.createElement("div", { className: "flex justify-between items-start" },
-                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: md.id === "alltime" ? C.gold : C.chalk } },
+                const anySave = Object.keys(slots).length > 0;
+                const progress = slot ? [slot.retired ? "Retired" : `Season ${slot.season}`,
+                    slot.overall ? `${slot.overall} OVR` : null,
+                    md.id === "league" ? (slot.division != null ? divName(slot.division) : slot.club) : slot.rank ? `World #${slot.rank}` : null,
+                    slot.wins ? `${slot.wins} win${slot.wins === 1 ? "" : "s"}` : null,
+                    slot.majors ? `${slot.majors} major${slot.majors === 1 ? "" : "s"}` : null].filter(Boolean) : null;
+                return (React.createElement("div", { key: md.id, className: "w-full mb-3 p-4 rounded-xl text-left relative overflow-hidden", style: { background: md.grad, border: isActive ? `1.5px solid ${C.gold}` : `1px solid ${md.accent}55`, boxShadow: "0 8px 22px rgba(0,0,0,.25)" } },
+                    React.createElement("div", { className: "absolute", style: { left: 0, top: 0, bottom: 0, width: 4, background: md.accent } }),
+                    React.createElement("div", { className: "flex justify-between items-start gap-2" },
+                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: md.id === "alltime" ? C.gold : C.chalk, lineHeight: 1.1 } },
                             md.emoji,
                             " ",
                             md.name),
-                        isActive && React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded", style: { background: C.gold, color: C.bg, fontFamily: FONT, letterSpacing: 1 } }, "\u25CF PLAYING")),
-                    slot ? (React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } },
-                        React.createElement("span", { style: { color: C.chalk } }, slot.name),
-                        " \u00B7 ",
-                        slot.retired ? "Retired" : `Season ${slot.season}`)) : (React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, md.desc)),
+                        isActive ? React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded shrink-0", style: { background: C.gold, color: C.bg, fontFamily: FONT, letterSpacing: 1 } }, "\u25CF PLAYING")
+                            : md.starter && !anySave ? React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded shrink-0", style: { background: C.gold, color: C.bg, fontFamily: FONT, letterSpacing: 1, animation: "spPulse 2.4s ease-in-out infinite" } }, "START HERE") : null),
+                    React.createElement("p", { className: "text-sm mt-1", style: { color: md.accent, fontWeight: 600 } }, md.tagline),
+                    slot ? (React.createElement("div", { className: "mt-2 p-2 rounded-lg", style: { background: "rgba(0,0,0,.25)" } },
+                        React.createElement("div", { style: { color: C.chalk, fontSize: 13, fontWeight: 700 } }, slot.name),
+                        React.createElement("div", { className: "text-xs", style: { color: C.muted } }, progress.join(" \u00B7 ")))) : (React.createElement("div", { className: "mt-2" },
+                        [["YOU", md.you], ["GOAL", md.goal]].map(([l, v]) => (React.createElement("div", { key: l, className: "flex gap-2 text-xs mb-1" },
+                            React.createElement("span", { className: "shrink-0", style: { color: md.accent, fontFamily: FONT, letterSpacing: 1, width: 38 } }, l),
+                            React.createElement("span", { style: { color: C.chalk } }, v)))),
+                        React.createElement("div", { className: "flex flex-wrap gap-1 mt-2" }, md.features.map((f) => (React.createElement("span", { key: f, className: "text-[10px] px-1.5 py-0.5 rounded", style: { background: "rgba(244,247,242,0.08)", color: C.chalk, border: "1px solid rgba(244,247,242,0.12)" } }, f)))),
+                        React.createElement("div", { className: "flex flex-wrap gap-2 mt-2" }, md.tags.map((t) => (React.createElement("span", { key: t, className: "text-[10px]", style: { color: C.muted } }, t)))))),
                     !confirming ? (React.createElement("div", { className: "grid gap-2 mt-3", style: { gridTemplateColumns: slot ? "1fr auto" : "1fr" } }, slot ? (React.createElement(React.Fragment, null,
                         React.createElement(Btn, { small: true, onClick: () => { if (isActive)
                                 setScreen(g.retired ? "retired" : "hub");
@@ -4900,6 +4990,7 @@ function GolfCareerSim() {
                             React.createElement(Btn, { small: true, kind: "red", onClick: async () => { await eraseSlot(md.id); startFresh(md.id); } }, "YES, ERASE"),
                             React.createElement(Btn, { small: true, kind: "panel", onClick: () => setConfirmEraseId(null) }, "CANCEL"))))));
             })),
+            React.createElement("p", { className: "text-[10px] text-center mb-3", style: { color: C.muted } }, "Every mode keeps its own save \u2014 jump between careers whenever you like."),
             React.createElement(InstallApp, null),
             React.createElement("div", { className: "text-center mt-2" },
                 React.createElement("a", { href: "https://ko-fi.com/sundaypins", target: "_blank", rel: "noopener", className: "text-[11px]", style: { color: C.gold, textDecoration: "none" } }, "\u2615 Enjoying Sunday Pins? Support the game"),
@@ -4912,17 +5003,29 @@ function GolfCareerSim() {
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, letterSpacing: 5, color: C.gold } }, mode === "alltime" ? "👑 ALL-TIME GREATS" : "⛳ SUNDAY PINS"),
                 React.createElement("h1", { style: { fontFamily: FONT, fontSize: 50, color: C.chalk, lineHeight: 1 } }, "BUILD YOUR PRO"),
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 11, letterSpacing: 3, color: C.muted } }, "SUNDAY PINS \u00B7 A GOLF CAREER"),
-                React.createElement("p", { className: "text-sm mt-2 mb-6", style: { color: C.muted } }, "Eight spins, one random pro each \u2014 take what you can get and grind the rest. Then chase wins, majors, the FedEx Cup, the Ryder Cup, and the all-time records \u2014 hole by hole."),
+                React.createElement("p", { className: "text-sm mt-2 mb-6", style: { color: C.muted } }, "Name your pro, pick a nation, then choose how to build your game. Everyone starts at 17 \u2014 wins, majors and the Ryder Cup are earned from there."),
                 React.createElement("input", { value: name, onChange: (e) => setName(e.target.value), placeholder: "Full name", className: "w-full mb-3 px-4 py-3 rounded-md outline-none text-center", style: { background: C.panel, color: C.chalk, border: "1px solid rgba(244,247,242,0.25)", fontSize: 16 } }),
                 React.createElement("select", { value: nation, onChange: (e) => setNation(e.target.value), className: "w-full mb-2 px-4 py-3 rounded-md outline-none text-center appearance-none", style: { background: C.panel, color: nation ? C.chalk : C.muted, border: "1px solid rgba(244,247,242,0.25)", fontSize: 16 } },
                     React.createElement("option", { value: "" }, "Select nationality..."),
                     NATIONS.map((n) => React.createElement("option", { key: n, value: n }, n))),
                 nation && React.createElement("p", { className: "text-xs mb-3", style: { color: C.muted } }, nation === "USA" ? "🇺🇸 Eligible for Team USA at the Ryder Cup" : EUR_NATIONS.includes(nation) ? "🇪🇺 Eligible for Team Europe at the Ryder Cup" : "🌏 Eligible for the International Team at the Presidents Cup"),
                 React.createElement("p", { className: "text-xs mb-2", style: { color: C.gold, fontFamily: FONT, letterSpacing: 2 } }, "CHOOSE HOW TO BUILD YOUR PRO"),
-                React.createElement(Btn, { onClick: () => name.trim() && nation && setScreen("archetype"), disabled: !name.trim() || !nation }, "\uD83C\uDFAD PICK A PLAYER TYPE"),
-                React.createElement("div", { className: "h-2" }),
-                React.createElement(Btn, { kind: "panel", onClick: () => name.trim() && nation && setScreen("spin"), disabled: !name.trim() || !nation }, "\uD83C\uDFB0 SPIN FOR ATTRIBUTES"),
-                React.createElement("p", { className: "text-[11px] mt-3", style: { color: C.muted } }, "Player type: pick a specialty (long hitter, wedge wizard\u2026) and start as a raw prospect \u2014 strong in your strength, low elsewhere, with everything to earn. Spin: take attributes from eight random pros."))));
+                [{ id: "archetype", icon: "\uD83C\uDFAD", title: "PICK A PLAYER TYPE", badge: "SAFE PICK", kind: "gold",
+                        what: "Choose a specialty: Bomber, Surgeon, Wedge Wizard, Putting Maestro, Scrambler or All-Rounder.",
+                        how: "Your specialty starts strong (80s\u201390) and the rest starts lower. The All-Rounder is even across the board. No luck involved: you know exactly what you're getting.",
+                        best: "Best for: first careers and planning a build" },
+                    { id: "spin", icon: "\uD83C\uDFB0", title: "SPIN FOR ATTRIBUTES", badge: "GAMBLE", kind: "panel",
+                        what: "Eight spins. Each one pulls a random real pro from the world top 200.",
+                        how: "Your scout sees three of his stats and you steal ONE. Land a superstar and you could start far stronger\u2026 or end up with a journeyman's short game.",
+                        best: "Best for: replays and chasing a lucky start" }].map((o) => (React.createElement("div", { key: o.id, className: "mb-3 p-3 rounded-xl text-left", style: { background: C.card, border: o.kind === "gold" ? `1px solid ${C.gold}` : "1px solid rgba(244,247,242,0.2)", opacity: name.trim() && nation ? 1 : 0.75 } },
+                    React.createElement("div", { className: "flex justify-between items-center mb-1" },
+                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 17, color: C.chalk, letterSpacing: 1 } }, o.icon, " ", o.title),
+                        React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded", style: { background: o.kind === "gold" ? C.gold : "rgba(244,247,242,0.12)", color: o.kind === "gold" ? C.bg : C.chalk, fontFamily: FONT, letterSpacing: 1 } }, o.badge)),
+                    React.createElement("p", { className: "text-xs mb-1", style: { color: C.chalk } }, o.what),
+                    React.createElement("p", { className: "text-xs mb-1", style: { color: C.muted } }, o.how),
+                    React.createElement("p", { className: "text-[11px] mb-2", style: { color: C.gold } }, o.best),
+                    React.createElement(Btn, { small: true, kind: o.kind, onClick: () => name.trim() && nation && setScreen(o.id), disabled: !name.trim() || !nation }, o.icon + " " + (o.id === "spin" ? "START SPINNING" : "CHOOSE A TYPE"))))),
+                !(name.trim() && nation) && React.createElement("p", { className: "text-[11px] mt-1", style: { color: C.muted } }, "Enter a name and nationality first."))));
     }
     // ---------- archetype selection ----------
     if (screen === "archetype") {
@@ -4961,6 +5064,7 @@ function GolfCareerSim() {
                 "SPIN ",
                 Math.min(filled.length + 1, 8),
                 " / 8"),
+            filled.length === 0 && !pair && !spinning && React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "Each spin pulls a random real pro from the world top 200. Your scout sees three of his stats \u2014 steal one to fill that slot. Eight spins fills your bag; composure is rolled for you at the end."),
             React.createElement("div", { className: "grid grid-cols-4 gap-1.5 my-3" }, SLOTS.map((s) => {
                 const v = attrs[s.key];
                 return (React.createElement("div", { key: s.key, className: "p-1.5 rounded text-center", style: { background: v ? C.card : "rgba(244,247,242,0.05)", border: v ? `1px solid ${C.gold}` : "1px dashed rgba(244,247,242,0.2)" } },
