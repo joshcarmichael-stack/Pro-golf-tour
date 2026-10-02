@@ -5516,6 +5516,41 @@ function GolfCareerSim() {
                             React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: isComp ? tint(p[s.key]) : (!scouted && !taken ? "rgba(244,247,242,0.3)" : tint(p[s.key])) } }, isComp ? p[s.key] : (!scouted && !taken ? "?" : p[s.key]))));
                     })))))))));
     }
+    // ---------- the Hall of Fame: every career you've finished, in every mode ----------
+    if (screen === "halloffame") {
+        const list = (hofList || []).slice().sort((a, b) => b.score - a.score);
+        const ins = list.filter((x) => x.score >= HOF_LINE), rest = list.filter((x) => x.score < HOF_LINE);
+        const modeName = (id) => id === "alltime" ? "All-Time" : id === "team" ? "Team Tour" : id === "league" ? "League" : "Tour Career";
+        const card = (x, inducted) => (React.createElement("div", { key: x.id, className: "p-3 rounded-xl mb-2", style: { background: inducted ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.panel, border: inducted ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.15)" } },
+            React.createElement("div", { className: "flex justify-between items-baseline" },
+                React.createElement("span", { style: { fontFamily: FONT, fontSize: 18, color: inducted ? C.gold : C.chalk } }, `${FLAG[NATION_CODE[x.nation]] || ""} ${x.name}`),
+                React.createElement("span", { className: "text-[10px]", style: { color: C.muted } }, `${modeName(x.mode)} \u00B7 ${x.seasons} season${x.seasons === 1 ? "" : "s"}`)),
+            React.createElement("div", { className: "grid grid-cols-4 gap-1 mt-1 text-center" }, [["WINS", x.wins], ["MAJORS", x.majors], ["FEDEX", x.fedex], ["PEAK", x.peakOvr || "-"]].map(([l, v]) => (React.createElement("div", { key: l },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: C.chalk, lineHeight: 1 } }, v),
+                React.createElement("div", { className: "text-[9px]", style: { color: C.muted, letterSpacing: 1 } }, l))))),
+            React.createElement("div", { className: "text-[10px] mt-1", style: { color: C.muted } }, `${fmtMoney(x.money)} earned \u00B7 ${x.cups} team-cup win${x.cups === 1 ? "" : "s"} \u00B7 Hall score ${x.score}${inducted ? "" : ` (${HOF_LINE} to be inducted)`}`)));
+        // where your pros sit among the all-time PGA Tour wins leaders
+        const ranked = [...LEGEND_WINS.map(([n, w]) => ({ n, w, you: false })), ...list.filter((x) => x.wins > 0).map((x) => ({ n: x.name, w: x.wins, you: true }))]
+            .sort((a, b) => b.w - a.w || (a.you ? 1 : -1)).map((r, i) => ({ ...r, rank: i + 1 }));
+        // the top 10, plus each of your pros where they really rank
+        const allTime = ranked.filter((r) => r.rank <= 10 || r.you).slice(0, 16);
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen(g && g.pro ? (g.retired ? "retired" : "landing") : "landing") }),
+            React.createElement("div", { className: "text-center mb-3" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, "SUNDAY PINS"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: C.chalk, lineHeight: 1 } }, "\uD83C\uDFDB\uFE0F HALL OF FAME"),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, list.length ? `${ins.length} inducted from ${list.length} finished career${list.length === 1 ? "" : "s"}. Majors count most.` : "Empty, for now. Every career you finish, in any mode, is remembered here. Win enough (majors count most) and you're inducted.")),
+            ins.length > 0 && React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "INDUCTED"),
+            ins.map((x) => card(x, true)),
+            rest.length > 0 && React.createElement("div", { className: "text-[10px] mb-1 mt-3", style: { color: C.muted, letterSpacing: 3, fontFamily: FONT } }, "CAREERS ON RECORD"),
+            rest.map((x) => card(x, false)),
+            list.some((x) => x.wins > 0) && (React.createElement("div", { className: "p-3 rounded-xl mt-3 mb-3", style: { background: C.panel } },
+                React.createElement("div", { className: "text-[10px] mb-2", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "ALL-TIME PGA TOUR WINS"),
+                allTime.map((r, i) => (React.createElement("div", { key: r.n + i, className: "flex justify-between text-xs py-0.5", style: { color: r.you ? C.gold : C.chalk, fontWeight: r.you ? 700 : 400, borderTop: i > 0 && r.rank > allTime[i - 1].rank + 1 ? "1px dashed rgba(244,247,242,0.2)" : "none" } },
+                    React.createElement("span", null, `${r.rank > LEGEND_WINS.length && r.you ? "" : r.rank + ". "}${r.n}${r.you ? " (you)" : ""}`),
+                    React.createElement("span", null, r.w)))))),
+            React.createElement(Btn, { onClick: () => setScreen(g && g.retired ? "retired" : "landing"), kind: "panel" }, "BACK")));
+    }
     if (!g)
         return React.createElement(Shell, null,
             React.createElement("div", null));
@@ -9748,41 +9783,6 @@ function GolfCareerSim() {
                     React.createElement("span", { className: "text-xs", style: { color: C.gold } }, "\u2615 Buy the dev a coffee \u2192 ko-fi.com/sundaypins")),
                 React.createElement(Btn, { onClick: openHof, kind: "panel" }, "\uD83C\uDFDB\uFE0F SEE THE HALL OF FAME"),
                 React.createElement(Btn, { onClick: resetAll, kind: "green" }, "START A NEW CAREER"))));
-    }
-    // ---------- the Hall of Fame: every career you've finished, in every mode ----------
-    if (screen === "halloffame") {
-        const list = (hofList || []).slice().sort((a, b) => b.score - a.score);
-        const ins = list.filter((x) => x.score >= HOF_LINE), rest = list.filter((x) => x.score < HOF_LINE);
-        const modeName = (id) => id === "alltime" ? "All-Time" : id === "team" ? "Team Tour" : id === "league" ? "League" : "Tour Career";
-        const card = (x, inducted) => (React.createElement("div", { key: x.id, className: "p-3 rounded-xl mb-2", style: { background: inducted ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.panel, border: inducted ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.15)" } },
-            React.createElement("div", { className: "flex justify-between items-baseline" },
-                React.createElement("span", { style: { fontFamily: FONT, fontSize: 18, color: inducted ? C.gold : C.chalk } }, `${FLAG[NATION_CODE[x.nation]] || ""} ${x.name}`),
-                React.createElement("span", { className: "text-[10px]", style: { color: C.muted } }, `${modeName(x.mode)} \u00B7 ${x.seasons} season${x.seasons === 1 ? "" : "s"}`)),
-            React.createElement("div", { className: "grid grid-cols-4 gap-1 mt-1 text-center" }, [["WINS", x.wins], ["MAJORS", x.majors], ["FEDEX", x.fedex], ["PEAK", x.peakOvr || "-"]].map(([l, v]) => (React.createElement("div", { key: l },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: C.chalk, lineHeight: 1 } }, v),
-                React.createElement("div", { className: "text-[9px]", style: { color: C.muted, letterSpacing: 1 } }, l))))),
-            React.createElement("div", { className: "text-[10px] mt-1", style: { color: C.muted } }, `${fmtMoney(x.money)} earned \u00B7 ${x.cups} team-cup win${x.cups === 1 ? "" : "s"} \u00B7 Hall score ${x.score}${inducted ? "" : ` (${HOF_LINE} to be inducted)`}`)));
-        // where your pros sit among the all-time PGA Tour wins leaders
-        const ranked = [...LEGEND_WINS.map(([n, w]) => ({ n, w, you: false })), ...list.filter((x) => x.wins > 0).map((x) => ({ n: x.name, w: x.wins, you: true }))]
-            .sort((a, b) => b.w - a.w || (a.you ? 1 : -1)).map((r, i) => ({ ...r, rank: i + 1 }));
-        // the top 10, plus each of your pros where they really rank
-        const allTime = ranked.filter((r) => r.rank <= 10 || r.you).slice(0, 16);
-        return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen(g && g.pro ? (g.retired ? "retired" : "landing") : "landing") }),
-            React.createElement("div", { className: "text-center mb-3" },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, "SUNDAY PINS"),
-                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: C.chalk, lineHeight: 1 } }, "\uD83C\uDFDB\uFE0F HALL OF FAME"),
-                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, list.length ? `${ins.length} inducted from ${list.length} finished career${list.length === 1 ? "" : "s"}. Majors count most.` : "Empty, for now. Every career you finish, in any mode, is remembered here. Win enough (majors count most) and you're inducted.")),
-            ins.length > 0 && React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "INDUCTED"),
-            ins.map((x) => card(x, true)),
-            rest.length > 0 && React.createElement("div", { className: "text-[10px] mb-1 mt-3", style: { color: C.muted, letterSpacing: 3, fontFamily: FONT } }, "CAREERS ON RECORD"),
-            rest.map((x) => card(x, false)),
-            list.some((x) => x.wins > 0) && (React.createElement("div", { className: "p-3 rounded-xl mt-3 mb-3", style: { background: C.panel } },
-                React.createElement("div", { className: "text-[10px] mb-2", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "ALL-TIME PGA TOUR WINS"),
-                allTime.map((r, i) => (React.createElement("div", { key: r.n + i, className: "flex justify-between text-xs py-0.5", style: { color: r.you ? C.gold : C.chalk, fontWeight: r.you ? 700 : 400, borderTop: i > 0 && r.rank > allTime[i - 1].rank + 1 ? "1px dashed rgba(244,247,242,0.2)" : "none" } },
-                    React.createElement("span", null, `${r.rank > LEGEND_WINS.length && r.you ? "" : r.rank + ". "}${r.n}${r.you ? " (you)" : ""}`),
-                    React.createElement("span", null, r.w)))))),
-            React.createElement(Btn, { onClick: () => setScreen(g && g.retired ? "retired" : "landing"), kind: "panel" }, "BACK")));
     }
     return React.createElement(Shell, null,
         React.createElement("div", null));
