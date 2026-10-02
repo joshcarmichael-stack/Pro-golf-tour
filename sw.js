@@ -1,8 +1,8 @@
 // Sunday Pins service worker: the game opens instantly and keeps working offline.
-// The page itself is fetched network-first (so updates arrive as soon as you're online);
+// The page and the game's own data files are fetched network-first (so updates arrive as soon as you're online);
 // libraries, fonts and icons are cache-first (they never change for a given URL).
-const CACHE = "sunday-pins-v2";
-const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
+const CACHE = "sunday-pins-v3";
+const CORE = ["./", "./index.html", "./courses-geo.js", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
 // the game can't start without these, so fetch them at install time rather than waiting for first use
 const LIBS = [
   "https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js",
@@ -30,13 +30,17 @@ self.addEventListener("fetch", (e) => {
   // only the game's own files and its libraries are cached; anything else (e.g. the visitor counter) goes straight to the network
   const CACHEABLE = ["cdnjs.cloudflare.com", "cdn.tailwindcss.com", "fonts.googleapis.com", "fonts.gstatic.com"];
   if (url.origin !== location.origin && !CACHEABLE.includes(url.hostname)) return;
-  const isPage = req.mode === "navigate" || (url.origin === location.origin && url.pathname.endsWith(".html"));
+  const isPage = req.mode === "navigate" || (url.origin === location.origin && /\.(html|js)$/.test(url.pathname));
   if (isPage) {
+    // each page (the game, the beta) and data file is cached under its own address, so one never replaces another
+    const key = url.origin + url.pathname.replace(/\/$/, "/index.html");
     e.respondWith(fetch(req).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE).then((c) => c.put("./index.html", copy));
+      if (res && res.ok) {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(key, copy));
+      }
       return res;
-    }).catch(() => caches.match("./index.html")));
+    }).catch(() => caches.match(key).then((hit) => hit || caches.match("./index.html"))));
     return;
   }
   // React, Tailwind, Google Fonts and our icons: serve from cache, fill it on first use

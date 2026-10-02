@@ -2246,7 +2246,7 @@ const makeRegen = (slotCountry, taken) => {
 };
 const SAVE_KEY = "sunday-pins-beta-v1"; // legacy single-slot key, migrated into per-mode slots on first load
 // HALL OF FAME: every retired career, kept forever across careers and modes (separate from the save slots)
-const HOF_KEY = SAVE_KEY.replace(/-v1$/, "") + "-halloffame";
+const HOF_KEY = SAVE_KEY.includes("beta") ? "sunday-pins-beta-halloffame" : "sunday-pins-halloffame";
 const hofScoreOf = (m) => m.careerWins * 2 + m.careerMajors * 8 + (m.fedexTitles || 0) * 6 + (((m.rc || {}).teamWins || 0) + ((m.pc || {}).teamWins || 0)) * 2 + Math.floor((m.careerMoney || 0) / 2e7);
 const HOF_LINE = 30; // score needed to be inducted
 const loadHof = async () => { try { const r = await window.storage.get(HOF_KEY); const v = JSON.parse(r.value); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
