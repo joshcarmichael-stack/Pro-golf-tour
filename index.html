@@ -1806,8 +1806,8 @@ function ClutchPutt({ putt, onDone }) {
             return;
         t0.current = performance.now();
         let raf;
-        const tick = (now) => {
-            const t = (now - t0.current) / 1000;
+        const tick = () => {
+            const t = Math.max(0, performance.now() - t0.current) / 1000;
             const ph = (t * speed) % 2;
             setNeedle(clampN((ph < 1 ? ph : 2 - ph) + Math.sin(t * 13) * wobble, 0, 1));
             raf = requestAnimationFrame(tick);
@@ -1822,21 +1822,26 @@ function ClutchPutt({ putt, onDone }) {
         if (phase !== "roll")
             return;
         const start = performance.now();
-        let raf;
-        const tick = (now) => {
-            const k = Math.min(1, (now - start) / 1400);
+        let raf, finished = false;
+        const finish = () => { if (finished) return; finished = true; setRoll(1); buzz(made ? [25, 40, 70] : 160); setPhase("done"); };
+        const tick = () => {
+            const k = clampN((performance.now() - start) / 1400, 0, 1);
             setRoll(1 - Math.pow(1 - k, 2.2)); // decelerating roll
             if (k < 1)
                 raf = requestAnimationFrame(tick);
-            else {
-                buzz(made ? [25, 40, 70] : 160);
-                setPhase("done");
-            }
+            else
+                finish();
         };
         raf = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(raf);
+        const safety = setTimeout(finish, 1900); // never leave the ball rolling forever
+        return () => { cancelAnimationFrame(raf); clearTimeout(safety); };
     }, [phase]);
-    const tap = () => {
+    const lastTap = useRef(0);
+    const tap = (e) => {
+        const nowT = performance.now();
+        if (nowT - lastTap.current < 250)
+            return; // the same tap arriving as pointer + touch + click
+        lastTap.current = nowT;
         if (phase === "line") {
             setLineTap(needle);
             setPhase("pace");
@@ -1896,12 +1901,13 @@ function ClutchPutt({ putt, onDone }) {
             React.createElement("p", { className: "text-xs mb-3", style: { color: C.chalk } }, "Tap once to set the LINE (the green zone allows for the break), then again for the PACE."),
             React.createElement(Btn, { onClick: () => setPhase("line") }, "⛳ STEP UP TO IT"),
             React.createElement("button", { onClick: auto, className: "w-full text-xs mt-3", style: { color: C.muted } }, "Let the sim putt it"))),
-        (phase === "line" || phase === "pace") && (React.createElement("div", { className: "mt-2", onPointerDown: tap },
+        (phase === "line" || phase === "pace") && (React.createElement("div", { className: "mt-2", onPointerDown: tap, onTouchStart: tap, onClick: tap },
             React.createElement("div", { className: "text-xs", style: { color: phase === "line" ? C.gold : C.muted, letterSpacing: 2, fontFamily: FONT } }, "1 · LINE"),
             meter(lineAim, lineHalf, lineTap, ["LEFT", "RIGHT"]),
             phase === "pace" && React.createElement("div", { className: "text-xs", style: { color: C.gold, letterSpacing: 2, fontFamily: FONT } }, "2 · PACE"),
             phase === "pace" && meter(paceAim, paceHalf, null, ["SOFT", "FIRM"]),
             React.createElement("button", { className: "w-full rounded-md py-4 mt-1 active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 22, letterSpacing: 2 } }, phase === "line" ? "TAP — SET THE LINE" : "TAP — STROKE IT"))),
+        (phase === "line" || phase === "pace") && React.createElement("button", { onClick: auto, className: "w-full text-xs mt-3", style: { color: C.muted } }, "Meter not moving? Let the sim putt it"),
         phase === "roll" && React.createElement("p", { className: "mt-4", style: { fontFamily: FONT, fontSize: 20, color: C.chalk } }, "…"),
         phase === "done" && (React.createElement("div", { className: "mt-3 relative sp-anim" },
             made && React.createElement(Burst, null),
