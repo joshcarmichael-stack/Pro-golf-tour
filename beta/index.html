@@ -1786,9 +1786,9 @@ const matchPutt = (my, opp, par) => {
     return { target: opp, miss: my, feet: 3 + Math.round(Math.random() * 9), brk: rollBreak(), label: clutchLabel(opp, par), aim: "halve" };
 };
 // the meter for a putt: green-zone half-widths, where to aim, needle speed and shake
-// zones are tighter from distance and nerves, wider for a good putter; `zoneScale` (challenges) grows or shrinks them on top
+// zones are tighter from distance and nerves, wider for a good putter; `zoneScale` and `speedScale` (challenges) adjust them on top
 const puttZones = (putt) => {
-    const { feet, brk, putting = 75, pressure = 0.5, zoneScale = 1 } = putt;
+    const { feet, brk, putting = 75, pressure = 0.5, zoneScale = 1, speedScale = 1 } = putt;
     const comp = putt.composure || 75, pace = putt.pace != null ? putt.pace : putting;
     const nerves = pressure * clampN(1 + (80 - comp) * 0.045, 0.3, 2.2); // how big the moment feels to YOU
     return {
@@ -1796,7 +1796,7 @@ const puttZones = (putt) => {
         paceHalf: clampN(clampN(0.14 - feet * 0.003 + (pace - 75) * 0.002 - nerves * 0.02, 0.04, 0.19) * zoneScale, 0.03, 0.38),
         lineAim: clampN(0.5 - brk * 0.1, 0.15, 0.85), // aim to the high side
         paceAim: 0.35 + clampN(feet / 30, 0, 1) * 0.45,
-        speed: 0.65 + nerves * 0.22 + feet * 0.006, // sweeps per second
+        speed: (0.65 + nerves * 0.22 + feet * 0.006) * speedScale, // sweeps per second
         wobble: clampN(nerves * 0.025 - (comp - 75) * 0.0012, 0, 0.07),
     };
 };
@@ -2317,7 +2317,7 @@ const CHALLENGES = [
         rivals: [{ name: "Costantino Rocca", start: -6, final: -3 }, { name: "Tom Kite", start: -4, final: -6 }],
         goals: [{ t: "Win by 10 or more", k: "margin", v: 10 }, { t: "Finish at -18 or better (his real score)", k: "par", v: -18 }, { t: "Finish at -19 or better", k: "par", v: -19 }],
         real: "Tiger shot 69 to finish at -18 and win by 12 over Tom Kite, the biggest winning margin in Masters history." },
-    { id: "tiger19", diff: 0.22, cat: "comeback", year: 2019, event: "The Masters", course: "Augusta National", from: 1,
+    { id: "tiger19", diff: 0.17, cat: "comeback", year: 2019, event: "The Masters", course: "Augusta National", from: 1,
         title: "The Return", blurb: "Two back of Francesco Molinari with 18 to play. Eleven years since your last major. Go and get a fifth green jacket.",
         you: { name: "Tiger Woods", age: 43, r: [86, 89, 95, 94, 92, 90, 92, 89], comp: 95, start: -11 },
         rivals: [{ name: "Francesco Molinari", start: -13, final: -11 }, { name: "Tony Finau", start: -11, final: -11 }, { name: "Brooks Koepka", start: -10, final: -12 },
@@ -2360,13 +2360,13 @@ const CHALLENGES = [
         rivals: [{ name: "Geoff Ogilvy", start: 5, final: 5, done: true }],
         goals: [{ t: "Win the U.S. Open", k: "win" }, { t: "Win without a playoff", k: "reg" }, { t: "Birdie the 18th", k: "par", v: 3 }],
         real: "Phil hit driver off a hospitality tent, then hit a tree, and made double bogey. Ogilvy won at +5." },
-    { id: "payne99", diff: -0.2, cat: "clutch", year: 1999, event: "U.S. Open", course: "Pinehurst No. 2", from: 17,
+    { id: "payne99", diff: -0.08, cat: "clutch", year: 1999, event: "U.S. Open", course: "Pinehurst No. 2", from: 17,
         title: "The Putt", blurb: "Level with Phil Mickelson with two to play. A par-3, then the 18th. Pinehurst is watching.",
         you: { name: "Payne Stewart", age: 42, r: [89, 86, 91, 91, 91, 92, 88, 88], comp: 90, start: 0 },
         rivals: [{ name: "Phil Mickelson", start: 0, final: 0 }],
         goals: [{ t: "Win the U.S. Open", k: "win" }, { t: "Win without a playoff", k: "reg" }, { t: "Finish at -2", k: "par", v: -2 }],
         real: "Payne birdied 17, then holed a 15-foot par putt on 18 to win by one at -1." },
-    { id: "scott12", diff: 0.45, cat: "history", year: 2012, event: "The Open Championship", course: "Royal Lytham & St Annes", from: 15,
+    { id: "scott12", diff: 0.7, cat: "history", year: 2012, event: "The Open Championship", course: "Royal Lytham & St Annes", from: 15,
         title: "Four to Play", blurb: "Four clear with four holes left. The Claret Jug is almost in your hands. Ernie Els is still out there.",
         you: { name: "Adam Scott", age: 32, r: [88, 94, 94, 90, 86, 85, 88, 86], comp: 80, start: -10 },
         rivals: [{ name: "Ernie Els", start: -6, final: -7, from: 18 }],
@@ -2378,7 +2378,7 @@ const CHALLENGES = [
         rivals: [{ name: "Rocco Mediate", start: -1, final: -1, done: true }],
         goals: [{ t: "Make birdie to force a playoff", k: "par", v: -1 }, { t: "Win the U.S. Open", k: "win" }, { t: "Eagle to win outright", k: "par", v: -2 }],
         real: "Tiger holed a 15-foot birdie putt to tie Rocco at -1, then won on the 91st hole after an 18-hole Monday playoff." },
-    { id: "rory24", diff: -0.05, cat: "history", year: 2024, event: "U.S. Open", course: "Pinehurst No. 2", from: 13,
+    { id: "rory24", diff: 0.25, cat: "history", year: 2024, event: "U.S. Open", course: "Pinehurst No. 2", from: 13,
         title: "Six to Play", blurb: "Two clear of Bryson DeChambeau with six holes left. Ten years since your last major. Bring it home.",
         you: { name: "Rory McIlroy", age: 35, r: [86, 97, 94, 90, 89, 87, 90, 89], comp: 82, start: -8 },
         rivals: [{ name: "Bryson DeChambeau", start: -6, final: -6 }],
@@ -2419,9 +2419,13 @@ const chStart = (sc) => {
     const course = chCourse(sc);
     return { sc, course, you: chA(sc.you.r, sc.you.comp), idx: sc.from - 1, my: [], rivals: sc.rivals.map((r) => chRival(r, sc, course)), alerts: [], phase: "brief", po: null, last: null, pm: { m: 0, a: 0 } };
 };
-// every hole ends on the green. The green zone starts huge on the 1st and shrinks hole by hole: tiny by the 18th, smaller still in a playoff
-const CH_TUNE = { z0: 1.5, z18: 0.6, zPlayoff: 0.55, birdie: 0.3 }; // zone size on the 1st, the 18th and in a playoff; how often a par becomes a birdie chance
-const chZone = (holeIdx, playoff) => playoff ? CH_TUNE.zPlayoff : CH_TUNE.z0 - (CH_TUNE.z0 - CH_TUNE.z18) * clampN(holeIdx / 17, 0, 1);
+// every hole ends on the green. The closer you get to the end of the challenge, the smaller the green zone and the faster the needle:
+// big and steady on your first hole, tiny and quick on your last, worse still in a playoff
+const CH_TUNE = { z0: 1.5, z1: 0.6, zPlayoff: 0.55, s0: 0.85, s1: 1.3, sPlayoff: 1.4, birdie: 0.3 }; // zone size and needle speed at the start, the finish and in a playoff; how often a par becomes a birdie chance
+// how far through the challenge you are: 0 on your first hole, 1 on your last (a one-hole challenge is all finish)
+const chProgress = (ch) => { const total = 19 - ch.sc.from; return total <= 1 ? 1 : clampN(ch.my.length / (total - 1), 0, 1); };
+const chZone = (p, playoff) => playoff ? CH_TUNE.zPlayoff : CH_TUNE.z0 - (CH_TUNE.z0 - CH_TUNE.z1) * p;
+const chSpeed = (p, playoff) => playoff ? CH_TUNE.sPlayoff : CH_TUNE.s0 + (CH_TUNE.s1 - CH_TUNE.s0) * p;
 const chZoneWord = (z) => z >= 1.6 ? "HUGE" : z >= 1.3 ? "BIG" : z >= 1.05 ? "MEDIUM" : z >= 0.85 ? "SMALL" : "TINY";
 // the putt that finishes a hole the sim has played to `score`: null when it went in from off the green.
 // A par can become a birdie chance (hole it to gain a shot); everything else is a putt to keep the score (miss and it costs one)
@@ -2429,9 +2433,9 @@ const chPutt = (ch, holeIdx, score, playoff, close) => {
     const par = ch.course.holes[holeIdx][0];
     if (holedFromOffGreen(score, par)) return null;
     const pt = score === par && Math.random() < CH_TUNE.birdie ? strokePutt(par, par) : strokePutt(score + (score < par ? 0 : 1), par);
-    const late = clampN(holeIdx / 17, 0, 1), zoneScale = chZone(holeIdx, playoff);
-    return { ...pt, zoneScale, putting: ch.you.putting, pace: ch.you.paceControl, composure: ch.you.composure,
-        pressure: playoff ? 1.4 : 0.5 + 0.6 * late + (close && holeIdx >= 15 ? 0.25 : 0) };
+    const p = chProgress(ch);
+    return { ...pt, zoneScale: chZone(p, playoff), speedScale: chSpeed(p, playoff), progress: p, putting: ch.you.putting, pace: ch.you.paceControl, composure: ch.you.composure,
+        pressure: playoff ? 1.4 : 0.5 + 0.6 * p + (close && p >= 0.75 ? 0.25 : 0) };
 };
 // how many of a rival's holes have been posted when you've played `played` of your `total` holes
 const chShown = (r, played, total) => r.done ? 0 : Math.min(r.holes.length, Math.round((played / Math.max(1, total)) * r.holes.length));
@@ -5842,7 +5846,7 @@ function GolfCareerSim() {
             if (!pt) return commit(ci.score);
             setCh({ ...ch, phase: "putt", putt: { ...pt, key: `${holeIdx}-${ch.my.length}-${ch.po ? ch.po.n : 0}`, title: `${sc.year} ${sc.event.toUpperCase()} · HOLE ${holeIdx + 1}`,
                 stakes: ch.phase === "playoff" ? "Sudden death." : best < me.toPar ? `${me.toPar - best} behind the lead.` : best === me.toPar ? "Level with the lead." : `Leading by ${best - me.toPar}.`,
-                zoneNote: `Green zone: ${chZoneWord(pt.zoneScale)}${ch.phase === "playoff" ? " (playoff)" : holeIdx < 17 ? " · it shrinks every hole" : " · the last one"}`,
+                zoneNote: `Green zone: ${chZoneWord(pt.zoneScale)} · ${ch.phase === "playoff" ? "playoff pressure" : pt.progress >= 1 ? "the last one" : pt.progress === 0 ? "first hole, enjoy it" : `${Math.round(pt.progress * 100)}% of the way home`}`,
                 makeTxt: `${scoreName(pt.target, hole[0])} on ${holeIdx + 1}.`, missTxt: `It's a ${scoreName(pt.miss, hole[0]).toLowerCase()} on ${holeIdx + 1}.`,
                 onDone: (made) => { ch.pm = { m: ch.pm.m + (made ? 1 : 0), a: ch.pm.a + 1 }; commit(made ? pt.target : pt.miss, `⛳ ${pt.feet}ft ${pt.label}: ${made ? "HOLED" : "missed"}`); } } });
         };
@@ -5896,7 +5900,7 @@ function GolfCareerSim() {
                     React.createElement("div", { className: "text-[11px] text-center mt-1", style: { color: C.muted } }, "Each medal needs the one before it. Your best: ", rec.stars ? `${CH_MEDAL[rec.stars]} ${CH_MEDAL_NAME[rec.stars].toLowerCase()}` : "none yet")),
                 React.createElement("div", { className: "p-2.5 rounded-xl mb-3", style: { background: C.card } },
                     React.createElement("div", { className: "text-[10px] text-center", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "⛳ IT'S ON YOUR PUTTER"),
-                    React.createElement("p", { className: "text-xs text-center", style: { color: C.chalk } }, `You hole out on every green. The green zone starts ${chZoneWord(chZone(sc.from - 1, false)).toLowerCase()} and shrinks every hole${sc.from < 17 ? ", so the early holes are your chance to build a cushion" : ""}. By the 18th it's tiny. Miss and it costs you a shot.`)),
+                    React.createElement("p", { className: "text-xs text-center", style: { color: C.chalk } }, total <= 1 ? "One putt, all the pressure. The green zone is tiny and the needle is quick. Miss and it costs you a shot." : `You hole out on every green. The green zone starts big and the needle steady. The closer you get to the finish, the smaller the zone and the faster the needle${total > 4 ? ", so the early holes are your chance to build a cushion" : ""}. Miss and it costs you a shot.`)),
                 React.createElement(Btn, { onClick: () => { track("challenge/tee/" + sc.id); setCh({ ...ch, phase: "play" }); } }, "⛳ TEE IT UP")));
         }
         const choices = HOLE_CHOICES(hole);
