@@ -2251,7 +2251,41 @@ const makeRegen = (slotCountry, taken) => {
 };
 const SAVE_KEY = "golf-career-sim-v4"; // legacy single-slot key, migrated into per-mode slots on first load
 // HALL OF FAME: every retired career, kept forever across careers and modes (separate from the save slots)
-const HOF_KEY = SAVE_KEY.includes("beta") ? "sunday-pins-beta-halloffame" : "sunday-pins-halloffame";
+const HOF_KEY = SAVE_KEY === "golf-career-sim-v4" ? "sunday-pins-halloffame" : SAVE_KEY.includes("beta") ? "sunday-pins-beta-halloffame" : SAVE_KEY + "-halloffame";
+// APP EDITION (the store apps): fictional names by default, and players can rename anyone or import a names file.
+// The app page sets window.SP_EDITION = "app" and applies any saved renames to the game before it starts.
+const EDITION = window.SP_EDITION || "web";
+const NAMES_KEY = "sunday-pins-app-names"; // { default name: your name }
+const readNameOverrides = () => { try { return JSON.parse(localStorage.getItem(NAMES_KEY) || "{}") || {}; } catch (e) { return {}; } };
+const cleanName = (s) => String(s || "").replace(/["'`\\<>{}$]/g, "").replace(/\s+/g, " ").trim().slice(0, 40);
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// whole-name replacement in one pass, longest names first (so "Tour Cup" never eats part of "Tour Cup Playoffs")
+const renameText = (text, pairs0) => {
+    const pairs = [...pairs0, ...pairs0.map(([a, b]) => [a.toUpperCase(), b.toUpperCase()])].filter(([a, b]) => a && b && a !== b);
+    if (!pairs.length) return text;
+    const map = new Map(pairs);
+    const keys = [...map.keys()].sort((x, y) => y.length - x.length);
+    const re = new RegExp("(?<![A-Za-z0-9_$])(" + keys.map(escRe).join("|") + ")(?![A-Za-z0-9_$])", "g");
+    return text.replace(re, (m) => map.get(m));
+};
+// every renameable name in the game, grouped for the editor
+const nameGroups = () => {
+    const legends = [...new Set([...ALLTIME_FIELD.map((r) => r[0].replace(/ \(\d{4}\)$/, "")), ...LEGEND_WINS.map((r) => r[0]), ...LEGEND_MAJORS.map((r) => r[0])])];
+    const tour = PLAYERS.map((p) => p.name);
+    return [["Tour & cups", window.SP_TERMS || []], ["Players", tour], ["Legends", legends.filter((n) => !tour.includes(n))],
+        ["Events", [...new Set([...SCHEDULE.map((e) => e.e), ...ALT_EVENTS.map((e) => e.e)])]], ["Courses", [...new Set(COURSES.map((c) => c.name))]]];
+};
+// save new renames: careers and the Hall of Fame follow the new names, then the game restarts with them
+const applyNameChanges = (next) => {
+    const cur = readNameOverrides();
+    const pairs = [];
+    new Set([...Object.keys(cur), ...Object.keys(next)]).forEach((k) => { const a = cur[k] || k, b = next[k] || k; if (a !== b) pairs.push([a, b]); });
+    try {
+        Object.keys(localStorage).filter((k) => k.startsWith(SAVE_KEY)).forEach((k) => localStorage.setItem(k, renameText(localStorage.getItem(k), pairs)));
+        localStorage.setItem(NAMES_KEY, JSON.stringify(Object.fromEntries(Object.entries(next).filter(([k, v]) => v && v !== k))));
+    } catch (e) { window.alert("Couldn't save the names on this device."); return; }
+    location.reload();
+};
 const hofScoreOf = (m) => m.careerWins * 2 + m.careerMajors * 8 + (m.fedexTitles || 0) * 6 + (((m.rc || {}).teamWins || 0) + ((m.pc || {}).teamWins || 0)) * 2 + Math.floor((m.careerMoney || 0) / 2e7);
 const HOF_LINE = 30; // score needed to be inducted
 const loadHof = async () => { try { const r = await window.storage.get(HOF_KEY); const v = JSON.parse(r.value); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
@@ -2466,6 +2500,8 @@ function GolfCareerSim() {
     const [wcPlayoff, setWcPlayoff] = useState(null);
     const [puttoff, setPuttoff] = useState(null);
     const [hofList, setHofList] = useState(null);
+    const [namesQuery, setNamesQuery] = useState("");
+    const [namesEdits, setNamesEdits] = useState({});
     const [wcStage, setWcStage] = useState(0);
     const [wcBracketFrom, setWcBracketFrom] = useState("worldCup"); // screen to return to from the bracket view
     const [wcBracketCap, setWcBracketCap] = useState(null); // limit rounds shown mid-reveal (null = show everything)
@@ -5407,9 +5443,10 @@ function GolfCareerSim() {
             React.createElement("button", { onClick: openHof, className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: C.panel, border: `1px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } }, "\uD83C\uDFDB\uFE0F HALL OF FAME"),
                 React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Every career you finish, in any mode, ranked. Can your next pro beat your last?")),
-            React.createElement(InstallApp, null),
+            EDITION === "app" && React.createElement("button", { onClick: () => setScreen("names"), className: "w-full text-xs mb-3", style: { color: C.muted } }, "\u270F\uFE0F Player names: rename anyone or import a names file"),
+            EDITION !== "app" && React.createElement(InstallApp, null),
             React.createElement("div", { className: "text-center mt-2" },
-                React.createElement("a", { href: "https://ko-fi.com/sundaypins", target: "_blank", rel: "noopener", className: "text-[11px]", style: { color: C.gold, textDecoration: "none" } }, "\u2615 Enjoying Sunday Pins? Support the game"),
+                EDITION !== "app" && React.createElement("a", { href: "https://ko-fi.com/sundaypins", target: "_blank", rel: "noopener", className: "text-[11px]", style: { color: C.gold, textDecoration: "none" } }, "\u2615 Enjoying Sunday Pins? Support the game"),
                 React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted, opacity: 0.6 } }, "v4 \u00B7 free & solo-built \u00B7 your progress saves automatically, per mode"))));
     }
     if (screen === "identity") {
@@ -5519,6 +5556,73 @@ function GolfCareerSim() {
                             React.createElement("span", { style: { color: C.muted, fontSize: 9 } }, s.label),
                             React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: isComp ? tint(p[s.key]) : (!scouted && !taken ? "rgba(244,247,242,0.3)" : tint(p[s.key])) } }, isComp ? p[s.key] : (!scouted && !taken ? "?" : p[s.key]))));
                     })))))))));
+    }
+    // ---------- APP EDITION: player names (edit, import a names file, export) ----------
+    if (screen === "names") {
+        const base = window.SP_NAME_BASE || {}; // current name -> default name, for anything already renamed
+        const defOf = (n) => base[n] || n;
+        const ov = readNameOverrides();
+        const groups = nameGroups();
+        const q = namesQuery.trim().toLowerCase();
+        const known = new Set(groups.flatMap(([, list]) => list.flatMap((n) => [n, defOf(n)])));
+        const saveEdits = () => {
+            const next = { ...ov };
+            Object.entries(namesEdits).forEach(([cur, txt]) => { const d = defOf(cur), v = cleanName(txt); if (!v || v === d) delete next[d]; else next[d] = v; });
+            applyNameChanges(next);
+        };
+        const importFile = (file) => {
+            if (!file) return;
+            const rd = new FileReader();
+            rd.onload = () => {
+                const text = String(rd.result || "");
+                let rows = [];
+                try {
+                    if (text.trim().startsWith("{")) rows = Object.entries(JSON.parse(text));
+                    else rows = text.split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith("#")).map((l) => { const i = l.indexOf(","); return i < 0 ? null : [l.slice(0, i), l.slice(i + 1)].map((x) => x.trim().replace(/^"|"$/g, "")); }).filter(Boolean);
+                } catch (e) { window.alert("That file couldn't be read. Use one line per name: current name,new name"); return; }
+                const next = { ...ov };
+                let n = 0, skipped = 0;
+                rows.forEach(([from, to]) => { if (!known.has(from)) { skipped++; return; } const d = defOf(from), v = cleanName(to); if (!v) { skipped++; return; } if (v === d) delete next[d]; else next[d] = v; n++; });
+                if (!n) { window.alert(`No names matched${skipped ? ` (${skipped} lines skipped)` : ""}. Use one line per name: current name,new name`); return; }
+                window.alert(`${n} name${n === 1 ? "" : "s"} updated${skipped ? `, ${skipped} line${skipped === 1 ? "" : "s"} skipped` : ""}. The game will now restart with the new names.`);
+                applyNameChanges(next);
+            };
+            rd.readAsText(file);
+        };
+        const exportText = () => ["# Sunday Pins names: game name,your name (edit the second column, then import)", ...groups.flatMap(([, list]) => list.map((n) => `${defOf(n)},${n}`))].join("\n");
+        const exportFile = async () => {
+            const text = exportText();
+            try {
+                const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+                const a = document.createElement("a"); a.href = url; a.download = "sunday-pins-names.csv"; document.body.appendChild(a); a.click(); a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 2000);
+            } catch (e) { try { await navigator.clipboard.writeText(text); window.alert("Copied your names list to the clipboard."); } catch (e2) { window.alert("Couldn't export on this device."); } }
+        };
+        const changed = Object.keys(ov).length;
+        const editing = Object.keys(namesEdits).length;
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
+            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\u270F\uFE0F PLAYER NAMES"),
+            React.createElement("p", { className: "text-xs mb-2", style: { color: C.muted } }, "Rename any player, legend, event or course, or import a names file that renames them all at once. Your careers and Hall of Fame follow the new names."),
+            React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2" },
+                React.createElement("label", { className: "rounded-md py-2 text-center text-sm active:scale-95", style: { background: C.card, color: C.chalk, border: `1px solid ${C.gold}`, fontFamily: FONT } }, "\u2B06 IMPORT FILE",
+                    React.createElement("input", { type: "file", accept: ".csv,.txt,.json,text/plain,text/csv,application/json", style: { display: "none" }, onChange: (e) => importFile(e.target.files && e.target.files[0]) })),
+                React.createElement("button", { onClick: exportFile, className: "rounded-md py-2 text-sm active:scale-95", style: { background: C.card, color: C.chalk, border: "1px solid rgba(244,247,242,0.25)", fontFamily: FONT } }, "\u2B07 EXPORT NAMES")),
+            React.createElement("p", { className: "text-[10px] mb-3", style: { color: C.muted } }, "A names file is plain text, one name per line: current name,new name. Export first to get a full list to edit."),
+            React.createElement("input", { value: namesQuery, onChange: (e) => setNamesQuery(e.target.value), placeholder: "Search names", className: "w-full p-2 rounded-md mb-3 text-sm", style: { background: C.panel, color: C.chalk, border: "1px solid rgba(244,247,242,0.2)" } }),
+            groups.map(([label, list]) => {
+                const shown = list.filter((n) => !q || n.toLowerCase().includes(q) || defOf(n).toLowerCase().includes(q));
+                if (!shown.length) return null;
+                return (React.createElement("div", { key: label, className: "mb-3" },
+                    React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, `${label.toUpperCase()} (${shown.length})`),
+                    (q ? shown : shown.slice(0, label === "Players" ? 40 : 60)).map((n) => (React.createElement("div", { key: n, className: "flex items-center gap-2 mb-1" },
+                        React.createElement("input", { value: namesEdits[n] != null ? namesEdits[n] : n, onChange: (e) => setNamesEdits({ ...namesEdits, [n]: e.target.value }), className: "flex-1 p-1.5 rounded text-sm", style: { background: C.card, color: namesEdits[n] != null && namesEdits[n] !== n ? C.gold : C.chalk, border: "1px solid rgba(244,247,242,0.12)" } }),
+                        defOf(n) !== n && React.createElement("span", { className: "text-[9px]", style: { color: C.muted, maxWidth: 90 } }, defOf(n))))),
+                    !q && shown.length > (label === "Players" ? 40 : 60) && React.createElement("p", { className: "text-[10px]", style: { color: C.muted } }, `Search to find the other ${shown.length - (label === "Players" ? 40 : 60)}.`)));
+            }),
+            editing > 0 && React.createElement(Btn, { onClick: saveEdits }, `SAVE ${editing} CHANGE${editing === 1 ? "" : "S"}`),
+            changed > 0 && React.createElement("button", { onClick: () => { if (window.confirm("Put every name back to the default?")) applyNameChanges({}); }, className: "w-full text-xs mt-3", style: { color: C.muted } }, `Reset all ${changed} renamed name${changed === 1 ? "" : "s"} to default`),
+            React.createElement(Btn, { onClick: () => setScreen(g && g.pro ? "hub" : "landing"), kind: "panel" }, "BACK")));
     }
     // ---------- the Hall of Fame: every career you've finished, in every mode ----------
     if (screen === "halloffame") {
@@ -6044,7 +6148,8 @@ function GolfCareerSim() {
                     React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("worldCupQual") }, "\uD83C\uDF0D WORLD CUP")),
                 hubMenu === "setup" && React.createElement(React.Fragment, null,
                     React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("coaches") }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHES"),
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("equipment") }, "\uD83C\uDFCC\uFE0F EQUIPMENT")))),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("equipment") }, "\uD83C\uDFCC\uFE0F EQUIPMENT"),
+                    EDITION === "app" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("names") }, "\u270F\uFE0F PLAYER NAMES")))),
             (() => {
                 const m = g.myStats;
                 const wIdx = owgrList().findIndex((x) => x.name === g.pro.name) + 1;
@@ -9781,7 +9886,7 @@ function GolfCareerSim() {
                         m.careerMajors > 0 ? "A major champion's career — the Hall wanted more, but the trophy doesn't care." :
                             m.careerWins > 0 ? "A winner on the biggest tour in the world. Most never manage one." :
                                 "The grind was real. The cheques cashed. No regrets.")),
-                React.createElement("a", { href: "https://ko-fi.com/sundaypins", target: "_blank", rel: "noopener", className: "block p-3 rounded-xl mb-3 text-center", style: { background: C.panel, border: "1px solid rgba(232,195,90,0.35)", textDecoration: "none" } },
+                EDITION !== "app" && React.createElement("a", { href: "https://ko-fi.com/sundaypins", target: "_blank", rel: "noopener", className: "block p-3 rounded-xl mb-3 text-center", style: { background: C.panel, border: "1px solid rgba(232,195,90,0.35)", textDecoration: "none" } },
                     React.createElement("span", { className: "text-xs", style: { color: C.chalk } }, "Enjoyed the ride? Sunday Pins is free and solo-built."),
                     React.createElement("br", null),
                     React.createElement("span", { className: "text-xs", style: { color: C.gold } }, "\u2615 Buy the dev a coffee \u2192 ko-fi.com/sundaypins")),
