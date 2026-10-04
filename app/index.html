@@ -2081,9 +2081,11 @@ function RealHoleMap({ hole, seed }) {
     // the data runs tee -> green up the y axis; lay it on its side so it plays left to right
     const all = [...c, ...[...(g.f || []), ...(g.g || []), ...(g.t || [])].flatMap(parsePts)];
     const minX = Math.min(...all.map((p) => p[1])) - 4, maxX = Math.max(...all.map((p) => p[1])) + 4;
-    const cy = (Math.min(...all.map((p) => -p[0])) + Math.max(...all.map((p) => -p[0]))) / 2;
-    const k = Math.min((W - 16) / (maxX - minX), 3.2);
-    const X = (p) => 8 + (p[1] - minX) * k, Yy = (p) => H / 2 + (-p[0] - cy) * k;
+    const cy = (Math.min(...all.map((p) => p[0])) + Math.max(...all.map((p) => p[0]))) / 2;
+    const spanY = Math.max(...all.map((p) => p[0])) - Math.min(...all.map((p) => p[0])) + 6;
+    const k = Math.min((W - 16) / (maxX - minX), (H - 24) / spanY, 3.2); // fit both ways, leaving room for the flag
+    const ox = (W - (maxX - minX) * k) / 2;
+    const X = (p) => ox + (p[1] - minX) * k, Yy = (p) => H / 2 + 6 + (p[0] - cy) * k; // playing left to right, the golfer's right is the bottom of the map
     const path = (str) => { const pts = parsePts(str); return "M" + pts.map((p) => `${X(p).toFixed(1)},${Yy(p).toFixed(1)}`).join(" L") + "Z"; };
     const tee = c[0], end = c[c.length - 1];
     const mid = c.length > 2 ? c[Math.floor(c.length / 2)] : [(tee[0] + end[0]) / 2, (tee[1] + end[1]) / 2];
