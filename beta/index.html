@@ -2094,9 +2094,11 @@ function RealHoleMap({ hole, seed }) {
     // the data runs tee -> green up the y axis; lay it on its side so it plays left to right
     const all = [...c, ...[...(g.f || []), ...(g.g || []), ...(g.t || [])].flatMap(parsePts)];
     const minX = Math.min(...all.map((p) => p[1])) - 4, maxX = Math.max(...all.map((p) => p[1])) + 4;
-    const cy = (Math.min(...all.map((p) => -p[0])) + Math.max(...all.map((p) => -p[0]))) / 2;
-    const k = Math.min((W - 16) / (maxX - minX), 3.2);
-    const X = (p) => 8 + (p[1] - minX) * k, Yy = (p) => H / 2 + (-p[0] - cy) * k;
+    const cy = (Math.min(...all.map((p) => p[0])) + Math.max(...all.map((p) => p[0]))) / 2;
+    const spanY = Math.max(...all.map((p) => p[0])) - Math.min(...all.map((p) => p[0])) + 6;
+    const k = Math.min((W - 16) / (maxX - minX), (H - 24) / spanY, 3.2); // fit both ways, leaving room for the flag
+    const ox = (W - (maxX - minX) * k) / 2;
+    const X = (p) => ox + (p[1] - minX) * k, Yy = (p) => H / 2 + 6 + (p[0] - cy) * k; // playing left to right, the golfer's right is the bottom of the map
     const path = (str) => { const pts = parsePts(str); return "M" + pts.map((p) => `${X(p).toFixed(1)},${Yy(p).toFixed(1)}`).join(" L") + "Z"; };
     const tee = c[0], end = c[c.length - 1];
     const mid = c.length > 2 ? c[Math.floor(c.length / 2)] : [(tee[0] + end[0]) / 2, (tee[1] + end[1]) / 2];
@@ -2707,7 +2709,24 @@ const chGoals = (sc, res) => sc.goals.map((gl) => gl.k === "win" ? res.won : gl.
 const chStars = (sc, res) => { const f = chGoals(sc, res), miss = f.findIndex((x) => !x); return f.map((x, i) => miss === -1 || i < miss); };
 const chEmoji = (d) => d <= -2 ? "🟨" : d === -1 ? "🟩" : d === 0 ? "⬜" : d === 1 ? "🟧" : "🟥";
 const CH_MEDAL = ["", "🥉", "🥈", "🥇"];
-const CH_TEST = SAVE_KEY.includes("beta"); // the test mode (pick any challenge, nothing saved) only exists in the beta
+const CH_TEST = SAVE_KEY.includes("beta");
+// a challenge in progress is saved after every shot, so you can leave and carry on later
+const CH_LIVE_KEY = CH_KEY + "-live";
+const chLive = () => { try { const s = JSON.parse(localStorage.getItem(CH_LIVE_KEY) || "null"); const sc = s && CHALLENGES.find((c) => c.id === s.id); return sc ? { ...s, sc, course: chCourse(sc) } : null; } catch (e) { return null; } };
+const chLiveSave = (c) => { try { if (!c || c.phase === "brief") return; if (c.phase === "done") localStorage.removeItem(CH_LIVE_KEY); else localStorage.setItem(CH_LIVE_KEY, JSON.stringify({ ...c, sc: undefined, course: undefined, id: c.sc.id })); } catch (e) { /* storage blocked: the run just can't be resumed */ } };
+function ChResume({ onResume }) {
+    const [, redraw] = useState(0);
+    const live = chLive();
+    if (!live) return null;
+    const sc = live.sc, toPar = sc.you.start + live.my.reduce((t, s, k) => t + s - live.course.holes[sc.from - 1 + k][0], 0);
+    const where = live.phase === "playoff" ? "in a playoff" : `on the ${live.idx + 1}${live.idx === 0 ? "st" : "th"}`;
+    return (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "linear-gradient(160deg, #1B2A36, #12301F)", border: `1.5px solid ${C.green}` } },
+        React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: C.green, letterSpacing: 1 } }, "▶️ CHALLENGE IN PROGRESS"),
+        React.createElement("div", { className: "text-xs mb-2", style: { color: C.chalk } }, `${sc.you.name}, ${sc.year} ${sc.event}: "${sc.title}". You're ${thruPar(toPar)} ${where}.${live.test ? " (test run)" : ""}`),
+        React.createElement("div", { className: "grid grid-cols-3 gap-2" },
+            React.createElement("button", { onClick: () => onResume(live), className: "col-span-2 rounded-md py-2.5 active:scale-95", style: { background: C.green, color: C.bg, fontFamily: FONT, fontSize: 15, letterSpacing: 1 } }, "CONTINUE"),
+            React.createElement("button", { onClick: () => { if (window.confirm("Abandon this challenge? Your progress on it will be lost.")) { try { localStorage.removeItem(CH_LIVE_KEY); } catch (e) { /* ignore */ } redraw((x) => x + 1); } }, className: "rounded-md py-2.5 text-xs active:scale-95", style: { background: C.panel, color: C.muted } }, "Abandon"))));
+} // the test mode (pick any challenge, nothing saved) only exists in the beta
 const CH_MEDAL_NAME = ["", "BRONZE", "SILVER", "GOLD"];
 // who really won: winning one of these matches history, losing it rewrites it
 const CH_REAL_WIN = new Set(["tiger97", "tiger19", "spieth15", "jack86", "payne99", "tiger08", "rahm21", "norman96_flip", "rory11_flip", "spieth16_flip", "scott12_flip", "rory24_flip"]);
@@ -2934,6 +2953,8 @@ function GolfCareerSim() {
     const [namesQuery, setNamesQuery] = useState("");
     const [namesEdits, setNamesEdits] = useState({});
     const [ch, setCh] = useState(null);
+    useEffect(() => { chLiveSave(ch); }, [ch]);
+    const resumeCh = (live) => { setCh(live); setScreen("challenge"); };
     const [wcStage, setWcStage] = useState(0);
     const [wcBracketFrom, setWcBracketFrom] = useState("worldCup"); // screen to return to from the bracket view
     const [wcBracketCap, setWcBracketCap] = useState(null); // limit rounds shown mid-reveal (null = show everything)
@@ -5822,6 +5843,7 @@ function GolfCareerSim() {
         const startFresh = (id) => { setConfirmEraseId(null); setMode(id); setAttrs({}); setPair(null); setName(""); setNation(""); setLastTake(null); setScreen("identity"); };
         return (React.createElement(Shell, null,
             React.createElement(HomeHero, null),
+            React.createElement(ChResume, { onResume: resumeCh }),
             React.createElement("button", { onClick: () => { track("challenges/open"); setScreen("challenges"); }, className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 17, color: C.gold } }, "\uD83C\uDFC6 NEW: CHALLENGES \u00B7 REWRITE HISTORY"),
                 React.createElement("div", { className: "text-[11px]", style: { color: C.chalk } }, `Daily Challenge #${chToday().n}: ${chToday().sc.you.name}, ${chToday().sc.year} ${chToday().sc.event}. "${chToday().sc.title}"`),
@@ -6002,6 +6024,7 @@ function GolfCareerSim() {
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
             React.createElement("div", { className: "text-center mb-3" },
+                React.createElement(ChResume, { onResume: resumeCh }),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.blue, lineHeight: 1 } }, "🧪 CHALLENGE TEST MODE"),
                 React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "Beta only. Tap any challenge to play it, including every other side (no need to unlock them here). Results aren't saved, so play each one as often as you like.")),
             CHALLENGES.map((c) => React.createElement("button", { key: c.id, onClick: () => { setCh({ ...chStart(c), daily: false, test: true }); setScreen("challenge"); }, className: "w-full p-2.5 rounded-xl mb-2 text-left active:scale-[0.99]", style: { background: C.card, border: "1px solid rgba(127,183,217,0.4)" } },
@@ -6047,6 +6070,7 @@ function GolfCareerSim() {
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, "SUNDAY PINS"),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk, lineHeight: 1 } }, "🏆 CHALLENGES"),
                 React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "Golf's greatest final rounds. Step into the legend's shoes from the real position. Repeat history, or rewrite it. Win one to unlock the other side of the story.")),
+            React.createElement(ChResume, { onResume: resumeCh }),
             React.createElement("div", { className: "p-3 rounded-xl mb-3 text-center", style: { background: C.panel } },
                 React.createElement("div", { className: "text-[10px]", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "YOUR HONOURS"),
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk } }, `🥇 ${medals[0]}  🥈 ${medals[1]}  🥉 ${medals[2]}`),
@@ -6066,8 +6090,6 @@ function GolfCareerSim() {
         const board = chBoard(ch);
         const me = board.find((r) => r.you);
         // the putt is yours when it matters
-        if (ch.phase === "putt" && ch.putt)
-            return React.createElement(Shell, null, React.createElement(ClutchPutt, { key: ch.putt.key, putt: ch.putt, onDone: ch.putt.onDone }));
         const finish = (c) => {
             const fin = chBoard(c);
             const my = fin.find((r) => r.you).toPar, best = Math.min(...fin.filter((r) => !r.you).map((r) => r.toPar));
@@ -6091,42 +6113,56 @@ function GolfCareerSim() {
         const playoffNow = ch.phase === "playoff";
         const h = ch.h || { strokes: 0, d: hole ? hole[1] : 0, lie: "tee", log: [] }; // no hole once the round is over
         const adjNow = chAdj(ch, playoffNow);
+        // finish a hole played from `base` (in a playoff when `po`), then pop up what you made
+        const commit = (base, score, note, po) => {
+            const hIdx = po ? course.holes.length - 1 : base.idx, hl = course.holes[hIdx];
+            if (po) {
+                const opp = Math.min(...base.po.tied.map(() => playHole(CH_FIELD, hl, wxAdjFor(chWx, [82, 82, 82]) + 0.01, false, 0)));
+                const log = [...base.po.log, { me: score, opp }], who = base.po.tied.length > 1 ? "Best of the rest" : base.po.tied[0];
+                const nc = { ...base, h: null, phase: "playoff", putt: null, po: { ...base.po, n: base.po.n + 1, log }, last: { score, par: hl[0], note }, alerts: [`Playoff hole ${log.length}: you ${scoreName(score, hl[0]).toLowerCase()}, ${base.po.tied.length > 1 ? "best of the rest" : base.po.tied[0]} ${scoreName(opp, hl[0]).toLowerCase()}`] };
+                const fin = chBoard(base).find((r) => r.you).toPar;
+                if (score !== opp || log.length >= 6) { const won = score < opp || (score === opp && Math.random() < 0.5); setCh(chDone(nc, { won, toPar: fin, margin: won ? 1 : -1, playoff: true, rank: won ? 1 : 2 })); }
+                else setCh({ ...nc, pop: { n: hIdx + 1, par: hl[0], score, note, line: `${who} made ${scoreName(opp, hl[0]).toLowerCase()} too. Still level: back to the ${hIdx + 1}th tee.` } });
+                return;
+            }
+            const before = chBoard(base);
+            let nc = { ...base, h: null, my: [...base.my, score], idx: base.idx + 1, phase: "play", putt: null, last: { score, par: hl[0], note } };
+            nc.alerts = chNews(nc, before, chBoard(nc), nc.my.length, total);
+            if (nc.my.length >= total) nc = finish(nc);
+            else {
+                const b2 = chBoard(nc), me2 = b2.find((r) => r.you), best2 = Math.min(...b2.filter((r) => !r.you).map((r) => r.toPar)), pos = chRank(b2);
+                const tied = b2.filter((r) => !r.you && r.toPar === me2.toPar).length > 0;
+                nc.pop = { n: hIdx + 1, par: hl[0], score, note, toPar: me2.toPar,
+                    line: best2 > me2.toPar ? `You lead by ${best2 - me2.toPar}.` : best2 === me2.toPar ? "You're tied for the lead." : `${tied ? "T" : ""}${pos}${pos === 2 ? "nd" : pos === 3 ? "rd" : "th"}, ${me2.toPar - best2} behind the lead.`,
+                    left: total - nc.my.length };
+            }
+            setCh(nc);
+        };
+        // the putt is yours when it matters
+        if (ch.phase === "putt" && ch.putt) {
+            const pt = ch.putt;
+            return React.createElement(Shell, null, React.createElement(ClutchPutt, { key: pt.key, putt: pt,
+                onDone: (made) => commit({ ...ch, pm: { m: ch.pm.m + (made ? 1 : 0), a: ch.pm.a + 1 } }, made ? pt.target : pt.miss, `${pt.note} ⛳ ${made ? "Holed the putt!" : "Missed the putt."}`, pt.playoff) }));
+        }
         const choose = (choiceId) => {
-            const commit = (score, note) => {
-                if (ch.phase === "playoff") {
-                    const opp = Math.min(...ch.po.tied.map(() => playHole(CH_FIELD, hole, wxAdjFor(chWx, [82, 82, 82]) + 0.01, false, 0)));
-                    const log = [...ch.po.log, { me: score, opp }];
-                    const nc = { ...ch, h: null, phase: "playoff", putt: null, po: { ...ch.po, n: ch.po.n + 1, log }, last: { score, par: hole[0], note }, alerts: [`Playoff hole ${log.length}: you ${scoreName(score, hole[0]).toLowerCase()}, ${ch.po.tied.length > 1 ? "best of the rest" : ch.po.tied[0]} ${scoreName(opp, hole[0]).toLowerCase()}`] };
-                    const fin = chBoard(ch).find((r) => r.you).toPar;
-                    if (score !== opp || log.length >= 6) { const won = score < opp || (score === opp && Math.random() < 0.5); setCh(chDone(nc, { won, toPar: fin, margin: won ? 1 : -1, playoff: true, rank: won ? 1 : 2 })); }
-                    else setCh(nc);
-                    return;
-                }
-                const before = chBoard(ch);
-                let nc = { ...ch, h: null, my: [...ch.my, score], idx: ch.idx + 1, phase: "play", putt: null, last: { score, par: hole[0], note } };
-                nc.alerts = chNews(nc, before, chBoard(nc), nc.my.length, total);
-                if (nc.my.length >= total) nc = finish(nc);
-                setCh(nc);
-            };
             const best = Math.min(...board.filter((r) => !r.you).map((r) => r.toPar));
             // one shot: it either leaves you somewhere new to decide again, finishes the hole, or puts you on the green
             const rs = chShot(ch.you, hole, h, choiceId, adjNow);
             if (rs.h) return setCh({ ...ch, h: rs.h });
             const story = rs.log.join(" → ");
-            if (rs.score != null) return commit(rs.score, story);
+            if (rs.score != null) return commit(ch, rs.score, story, playoffNow);
             const pt = chPuttFor(ch, rs.strokes + 1, rs.putt, playoffNow, Math.abs(me.toPar - best) <= 2);
-            setCh({ ...ch, h: { ...h, log: rs.log }, phase: "putt", putt: { ...pt, story: rs.txt, key: `${holeIdx}-${ch.my.length}-${ch.po ? ch.po.n : 0}`, title: `${sc.year} ${sc.event.toUpperCase()} · HOLE ${holeIdx + 1}`,
+            setCh({ ...ch, h: { ...h, log: rs.log }, phase: "putt", putt: { ...pt, story: rs.txt, note: story, playoff: playoffNow, key: `${holeIdx}-${ch.my.length}-${ch.po ? ch.po.n : 0}`, title: `${sc.year} ${sc.event.toUpperCase()} · HOLE ${holeIdx + 1}`,
                 stakes: ch.phase === "playoff" ? "Sudden death." : best < me.toPar ? `${me.toPar - best} behind the lead.` : best === me.toPar ? "Level with the lead." : `Leading by ${best - me.toPar}.`,
                 zoneNote: `Green zone: ${chZoneWord(pt.zoneBase)} · ${ch.phase === "playoff" ? "playoff pressure" : pt.progress >= 1 ? "the last one" : pt.progress === 0 ? "first hole, enjoy it" : `${Math.round(pt.progress * 100)}% of the way home`}`,
-                makeTxt: `${scoreName(pt.target, hole[0])} on ${holeIdx + 1}.`, missTxt: `It's a ${scoreName(pt.miss, hole[0]).toLowerCase()} on ${holeIdx + 1}.`,
-                onDone: (made) => { ch.pm = { m: ch.pm.m + (made ? 1 : 0), a: ch.pm.a + 1 }; commit(made ? pt.target : pt.miss, `${story} ⛳ ${made ? "Holed the putt!" : "Missed the putt."}`); } } });
+                makeTxt: `${scoreName(pt.target, hole[0])} on ${holeIdx + 1}.`, missTxt: `It's a ${scoreName(pt.miss, hole[0]).toLowerCase()} on ${holeIdx + 1}.` } });
         };
         if (ch.phase === "done") {
             const r = ch.res;
             const flags = chStars(sc, r);
             const row = ch.my.map((s, k) => chEmoji(s - course.holes[sc.from - 1 + k][0])).join("") + (ch.po ? " +" + ch.po.log.map((x) => chEmoji(x.me - course.holes[17][0])).join("") : "");
             const today = chToday();
-            const shareText = `⛳ Sunday Pins ${ch.daily ? `Daily Challenge #${today.n}` : "Challenge"}\n${sc.you.name}, ${sc.year} ${sc.event}: "${sc.title}"\n${chHeadline(sc, r.won).charAt(0) + chHeadline(sc, r.won).slice(1).toLowerCase()} ${r.stars ? CH_MEDAL[r.stars] + " " + CH_MEDAL_NAME[r.stars] : "no medal"} (${thruPar(r.toPar)})\n${row}\n${ch.pm.a ? `🎯 ${ch.pm.m}/${ch.pm.a} putts holed\n` : ""}${SITE_URL}`;
+            const shareText = `⛳ Sunday Pins ${ch.daily ? `Daily Challenge #${today.n}` : "Challenge"}\n${sc.you.name}, ${sc.year} ${sc.event}: "${sc.title}"\n${chHeadline(sc, r.won).charAt(0) + chHeadline(sc, r.won).slice(1).toLowerCase()} ${r.stars ? CH_MEDAL[r.stars] + " " + CH_MEDAL_NAME[r.stars] : "no medal"} (${thruPar(r.toPar)})\n${row}\n${ch.pm.a ? `🎯 ${ch.pm.m}/${ch.pm.a} putts holed\n` : ""}${CH_TEST ? SITE_URL + "/beta/" : SITE_URL}`; // challenges only live in the beta for now
             const share = async () => { track("challenge/share/" + sc.id); try { if (navigator.share) { await navigator.share({ text: shareText }); return; } } catch (e) { return; } try { await navigator.clipboard.writeText(shareText); window.alert("Result copied. Paste it anywhere!"); } catch (e) { window.alert(shareText); } };
             return (React.createElement(Shell, null,
                 React.createElement("div", { className: "pt-6 text-center" },
@@ -6181,6 +6217,21 @@ function GolfCareerSim() {
                     React.createElement("div", { className: "text-[10px] text-center", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "⛳ EVERY SHOT IS YOUR CALL"),
                     React.createElement("p", { className: "text-xs text-center", style: { color: C.chalk } }, `Driver or the safe club, flag or middle of the green, go for it or chip it close: you choose every shot, and a good drive sets up a birdie while the rough, sand and trees make it harder. Then you putt it in yourself. ${total <= 1 ? "On a final hole the green zone is tiny and the needle quick." : "The green zone starts big and the needle steady; the closer you get to the finish, the smaller the zone and the faster the needle."}`)),
                 React.createElement(Btn, { onClick: () => { track("challenge/tee/" + sc.id); setCh({ ...ch, phase: "play" }); } }, "⛳ TEE IT UP")));
+        }
+        if (ch.pop) {
+            const pp = ch.pop, d = pp.score - pp.par, name = scoreName(pp.score, pp.par);
+            return (React.createElement(Shell, null,
+                React.createElement("div", { className: "pt-10 text-center sp-anim" },
+                    d < 0 && React.createElement(Burst, null),
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, `HOLE ${pp.n} · PAR ${pp.par}`),
+                    React.createElement("div", { className: "my-2", style: { fontSize: 46, lineHeight: 1 } }, chEmoji(d)),
+                    React.createElement("h2", { style: { fontFamily: FONT, fontSize: 40, color: scoreColor(pp.score, pp.par), lineHeight: 1.05 } }, name.toUpperCase()),
+                    React.createElement("div", { className: "text-sm", style: { color: C.chalk } }, `You made ${pp.score}${d === 0 ? "" : d < 0 ? ` (${d})` : ` (+${d})`}`),
+                    pp.note && React.createElement("p", { className: "text-xs my-3 p-2.5 rounded-lg text-left", style: { background: C.panel, color: C.muted } }, pp.note),
+                    pp.toPar != null && React.createElement("div", { style: { fontFamily: FONT, fontSize: 26, color: C.chalk } }, `${sc.you.name.split(" ").slice(-1)[0]} ${thruPar(pp.toPar)}`),
+                    React.createElement("div", { className: "text-sm mb-1", style: { color: pp.line.startsWith("You lead") ? C.green : C.gold } }, pp.line),
+                    pp.left != null && React.createElement("div", { className: "text-[11px] mb-4", style: { color: C.muted } }, pp.left === 1 ? "One hole to play." : `${pp.left} holes to play.`),
+                    React.createElement(Btn, { onClick: () => setCh({ ...ch, pop: null }) }, ch.phase === "playoff" ? "⚔️ NEXT PLAYOFF HOLE" : pp.left === 1 ? "⛳ TO THE LAST" : `⛳ ON TO THE ${pp.n + 1}TH`))));
         }
         const choices = chShotChoices(h, hole);
         const nowFlags = chStars(sc, chNow(board)), nowMedal = nowFlags.filter(Boolean).length;
