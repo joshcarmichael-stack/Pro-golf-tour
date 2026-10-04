@@ -6126,7 +6126,7 @@ function GolfCareerSim() {
             const flags = chStars(sc, r);
             const row = ch.my.map((s, k) => chEmoji(s - course.holes[sc.from - 1 + k][0])).join("") + (ch.po ? " +" + ch.po.log.map((x) => chEmoji(x.me - course.holes[17][0])).join("") : "");
             const today = chToday();
-            const shareText = `⛳ Sunday Pins ${ch.daily ? `Daily Challenge #${today.n}` : "Challenge"}\n${sc.you.name}, ${sc.year} ${sc.event}: "${sc.title}"\n${chHeadline(sc, r.won).charAt(0) + chHeadline(sc, r.won).slice(1).toLowerCase()} ${r.stars ? CH_MEDAL[r.stars] + " " + CH_MEDAL_NAME[r.stars] : "no medal"} (${thruPar(r.toPar)})\n${row}\n${ch.pm.a ? `🎯 ${ch.pm.m}/${ch.pm.a} putts holed\n` : ""}${SITE_URL}`;
+            const shareText = `⛳ Sunday Pins ${ch.daily ? `Daily Challenge #${today.n}` : "Challenge"}\n${sc.you.name}, ${sc.year} ${sc.event}: "${sc.title}"\n${chHeadline(sc, r.won).charAt(0) + chHeadline(sc, r.won).slice(1).toLowerCase()} ${r.stars ? CH_MEDAL[r.stars] + " " + CH_MEDAL_NAME[r.stars] : "no medal"} (${thruPar(r.toPar)})\n${row}\n${ch.pm.a ? `🎯 ${ch.pm.m}/${ch.pm.a} putts holed\n` : ""}${CH_TEST ? SITE_URL + "/beta/" : SITE_URL}`; // challenges only live in the beta for now
             const share = async () => { track("challenge/share/" + sc.id); try { if (navigator.share) { await navigator.share({ text: shareText }); return; } } catch (e) { return; } try { await navigator.clipboard.writeText(shareText); window.alert("Result copied. Paste it anywhere!"); } catch (e) { window.alert(shareText); } };
             return (React.createElement(Shell, null,
                 React.createElement("div", { className: "pt-6 text-center" },
