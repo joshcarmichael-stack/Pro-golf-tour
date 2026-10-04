@@ -2287,6 +2287,163 @@ const applyNameChanges = (next) => {
     } catch (e) { window.alert("Couldn't save the names on this device."); return; }
     location.reload();
 };
+// ============ CHALLENGES: relive golf's famous final rounds, and rewrite them ============
+// You play as the legend, from the real starting position. Rivals finish around their REAL final scores
+// (with some randomness), so history pushes back. Stars for each goal; a medal per challenge.
+const CH_KEY = SAVE_KEY === "golf-career-sim-v4" ? "sunday-pins-challenges" : SAVE_KEY + "-challenges";
+const CH_LAUNCH = Date.UTC(2026, 9, 5); // the day of Daily Challenge #1
+const CH_CATS = { history: "💔 Change History", first: "🏆 First Majors", comeback: "🔥 Comebacks", clutch: "🎯 Clutch Moments", dominance: "👑 Dominance" };
+// ratings: [drvAcc, drvDist, longApp, shortApp, chip, putt, recovery, bunker], composure
+const chA = (arr, comp) => withNewAttrs({ drivingAccuracy: arr[0], drivingDistance: arr[1], longApproach: arr[2], shortApproach: arr[3], chipping: arr[4], putting: arr[5], recovery: arr[6], bunker: arr[7], composure: comp }, "");
+// every number here was checked against tournament records: starting positions, and real final scores for the rivals with a `final`.
+// Rivals marked `free` have a checked starting score but play their round out naturally.
+// `diff` is Sunday pressure, tuned with thousands of simulated attempts so each challenge is a real test (most are won 35-60% of the time).
+const CHALLENGES = [
+    { id: "tiger97", cat: "dominance", year: 1997, event: "The Masters", course: "Augusta National", from: 1,
+        title: "The Arrival", blurb: "You're 21 and nine shots clear going into Sunday. Finish the job, and see how far you can push the record.",
+        you: { name: "Tiger Woods", age: 21, r: [84, 96, 94, 95, 92, 92, 93, 88], comp: 92, start: -15 },
+        rivals: [{ name: "Costantino Rocca", start: -6, final: -3 }, { name: "Tom Kite", start: -4, final: -6 }],
+        goals: [{ t: "Win by 10 or more", k: "margin", v: 10 }, { t: "Finish at -18 or better (his real score)", k: "par", v: -18 }, { t: "Finish at -19 or better", k: "par", v: -19 }],
+        real: "Tiger shot 69 to finish at -18 and win by 12 over Tom Kite, the biggest winning margin in Masters history." },
+    { id: "tiger19", diff: 0.05, cat: "comeback", year: 2019, event: "The Masters", course: "Augusta National", from: 1,
+        title: "The Return", blurb: "Two back of Francesco Molinari with 18 to play. Eleven years since your last major. Go and get a fifth green jacket.",
+        you: { name: "Tiger Woods", age: 43, r: [86, 89, 95, 94, 92, 90, 92, 89], comp: 95, start: -11 },
+        rivals: [{ name: "Francesco Molinari", start: -13, final: -11 }, { name: "Tony Finau", start: -11, final: -11 }, { name: "Brooks Koepka", start: -10, final: -12 },
+            { name: "Dustin Johnson", start: -8, final: -12 }, { name: "Xander Schauffele", start: -8, final: -12 }],
+        goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -13 or better (his real score)", k: "par", v: -13 }, { t: "Finish at -15 or better", k: "par", v: -15 }],
+        real: "Tiger shot 70 to win by one at -13, his first major in eleven years. Molinari found the water on 12 and 15." },
+    { id: "norman96", diff: -0.07, cat: "history", year: 1996, event: "The Masters", course: "Augusta National", from: 1,
+        title: "Six Clear", blurb: "You lead Nick Faldo by six shots with one round to play. Nobody blows a six-shot lead at the Masters. Do they?",
+        you: { name: "Greg Norman", age: 41, r: [89, 94, 92, 89, 88, 88, 89, 88], comp: 80, start: -13 },
+        rivals: [{ name: "Nick Faldo", start: -7, final: -12 }],
+        goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -14 or better", k: "par", v: -14 }, { t: "Finish at -16 or better", k: "par", v: -16 }],
+        real: "Norman shot 78 and Faldo 67. Faldo won by five at -12: a six-shot deficit turned into his third green jacket." },
+    { id: "rory11", diff: -0.25, cat: "history", year: 2011, event: "The Masters", course: "Augusta National", from: 1,
+        title: "Sunday at 21", blurb: "Four clear with a round to play, aged 21. The green jacket is yours to lose.",
+        you: { name: "Rory McIlroy", age: 21, r: [86, 95, 92, 88, 86, 86, 87, 85], comp: 78, start: -12 },
+        rivals: [{ name: "Charl Schwartzel", start: -8, final: -14 }, { name: "Jason Day", start: -8, final: -12 }, { name: "Adam Scott", start: -7, final: -12 }, { name: "Tiger Woods", start: -5, final: -10 }],
+        goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -15 or better", k: "par", v: -15 }, { t: "Finish at -17 or better", k: "par", v: -17 }],
+        real: "Rory shot 80. Charl Schwartzel birdied the last four holes to win at -14, two clear of Jason Day and Adam Scott." },
+    { id: "spieth15", diff: 0.13, cat: "first", year: 2015, event: "The Masters", course: "Augusta National", from: 1,
+        title: "Wire to Wire", blurb: "A record -16 after three rounds and four clear of Justin Rose. Aged 21. Close it out for your first major.",
+        you: { name: "Jordan Spieth", age: 21, r: [84, 87, 90, 93, 93, 97, 94, 90], comp: 90, start: -16 },
+        rivals: [{ name: "Justin Rose", start: -12, final: -14 }],
+        goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -18 or better (his real score)", k: "par", v: -18 }, { t: "Finish at -19: a new record", k: "par", v: -19 }],
+        real: "Spieth closed with 70 to finish at -18, tying Tiger's 1997 record, and won by four." },
+    { id: "spieth16", diff: -0.12, cat: "history", year: 2016, event: "The Masters", course: "Augusta National", from: 1,
+        title: "Amen Corner", blurb: "Defending champion and leading by one. A year ago you went wire to wire. Beware the 12th.",
+        you: { name: "Jordan Spieth", age: 22, r: [84, 87, 90, 93, 93, 97, 94, 90], comp: 84, start: -3 },
+        rivals: [{ name: "Smylie Kaufman", start: -2, free: true }, { name: "Bernhard Langer", start: -1, free: true }, { name: "Hideki Matsuyama", start: -1, free: true }, { name: "Danny Willett", start: 0, final: -5 }],
+        goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -6 or better", k: "par", v: -6 }, { t: "Finish at -8 or better", k: "par", v: -8 }],
+        real: "Spieth led by five with nine to play, then went bogey, bogey and a quadruple-bogey 7 on 12. Danny Willett's bogey-free 67 won it at -5." },
+    { id: "jack86", diff: -0.15, cat: "comeback", year: 1986, event: "The Masters", course: "Augusta National", from: 1,
+        title: "The Bear's Last Roar", blurb: "Aged 46, four behind Greg Norman, and written off by everyone. One more Sunday charge?",
+        you: { name: "Jack Nicklaus", age: 46, r: [88, 86, 92, 89, 86, 90, 88, 86], comp: 97, start: -2 },
+        rivals: [{ name: "Greg Norman", start: -6, final: -8 }],
+        goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -9 or better (his real score)", k: "par", v: -9 }, { t: "Finish at -11 or better", k: "par", v: -11 }],
+        real: "Jack shot 65 with a back-nine 30 to win his sixth green jacket at -9, one ahead of Tom Kite and Greg Norman." },
+    { id: "phil06", diff: 0.2, cat: "history", year: 2006, event: "U.S. Open", course: "Winged Foot (West)", from: 18,
+        title: "The 18th Tee", blurb: "One shot clear on the 72nd tee. Par wins the U.S. Open. Bogey means a playoff with Geoff Ogilvy.",
+        you: { name: "Phil Mickelson", age: 35, r: [83, 92, 90, 96, 98, 92, 95, 96], comp: 82, start: 4 },
+        rivals: [{ name: "Geoff Ogilvy", start: 5, final: 5, done: true }],
+        goals: [{ t: "Win the U.S. Open", k: "win" }, { t: "Win without a playoff", k: "reg" }, { t: "Birdie the 18th", k: "par", v: 3 }],
+        real: "Phil hit driver off a hospitality tent, then hit a tree, and made double bogey. Ogilvy won at +5." },
+    { id: "payne99", diff: -0.2, cat: "clutch", year: 1999, event: "U.S. Open", course: "Pinehurst No. 2", from: 17,
+        title: "The Putt", blurb: "Level with Phil Mickelson with two to play. A par-3, then the 18th. Pinehurst is watching.",
+        you: { name: "Payne Stewart", age: 42, r: [89, 86, 91, 91, 91, 92, 88, 88], comp: 90, start: 0 },
+        rivals: [{ name: "Phil Mickelson", start: 0, final: 0 }],
+        goals: [{ t: "Win the U.S. Open", k: "win" }, { t: "Win without a playoff", k: "reg" }, { t: "Finish at -2", k: "par", v: -2 }],
+        real: "Payne birdied 17, then holed a 15-foot par putt on 18 to win by one at -1." },
+    { id: "scott12", diff: 0.6, cat: "history", year: 2012, event: "The Open Championship", course: "Royal Lytham & St Annes", from: 15,
+        title: "Four to Play", blurb: "Four clear with four holes left. The Claret Jug is almost in your hands. Ernie Els is still out there.",
+        you: { name: "Adam Scott", age: 32, r: [88, 94, 94, 90, 86, 85, 88, 86], comp: 80, start: -10 },
+        rivals: [{ name: "Ernie Els", start: -6, final: -7, from: 18 }],
+        goals: [{ t: "Win the Open", k: "win" }, { t: "Win by two or more", k: "margin", v: 2 }, { t: "Finish at -11 or better", k: "par", v: -11 }],
+        real: "Scott bogeyed the last four holes. Els, playing ahead, birdied the 18th and won by one at -7." },
+    { id: "tiger08", diff: -0.3, cat: "clutch", year: 2008, event: "U.S. Open", course: "Torrey Pines (South)", from: 18,
+        title: "On One Leg", blurb: "Rocco Mediate is in at -1. You're level par on the 72nd tee, playing on a broken leg. Birdie to force a playoff.",
+        you: { name: "Tiger Woods", age: 32, r: [85, 93, 95, 95, 93, 95, 95, 90], comp: 97, start: 0 },
+        rivals: [{ name: "Rocco Mediate", start: -1, final: -1, done: true }],
+        goals: [{ t: "Make birdie to force a playoff", k: "par", v: -1 }, { t: "Win the U.S. Open", k: "win" }, { t: "Eagle to win outright", k: "par", v: -2 }],
+        real: "Tiger holed a 15-foot birdie putt to tie Rocco at -1, then won on the 91st hole after an 18-hole Monday playoff." },
+    { id: "rory24", diff: 0.1, cat: "history", year: 2024, event: "U.S. Open", course: "Pinehurst No. 2", from: 13,
+        title: "Six to Play", blurb: "Two clear of Bryson DeChambeau with six holes left. Ten years since your last major. Bring it home.",
+        you: { name: "Rory McIlroy", age: 35, r: [86, 97, 94, 90, 89, 87, 90, 89], comp: 82, start: -8 },
+        rivals: [{ name: "Bryson DeChambeau", start: -6, final: -6 }],
+        goals: [{ t: "Win the U.S. Open", k: "win" }, { t: "Finish at -8 or better", k: "par", v: -8 }, { t: "Finish at -10 or better", k: "par", v: -10 }],
+        real: "Rory bogeyed 15, 16 and 18, missing two par putts inside four feet. Bryson got up and down from the bunker on 18 to win by one at -6." },
+    { id: "rahm21", diff: -0.45, cat: "first", year: 2021, event: "U.S. Open", course: "Torrey Pines (South)", from: 17,
+        title: "Birdie, Birdie", blurb: "One behind Louis Oosthuizen with two to play. Your first major is right there.",
+        you: { name: "Jon Rahm", age: 26, r: [88, 95, 94, 93, 90, 90, 91, 89], comp: 90, start: -4 },
+        rivals: [{ name: "Louis Oosthuizen", start: -5, final: -5 }],
+        goals: [{ t: "Win the U.S. Open", k: "win" }, { t: "Win without a playoff", k: "reg" }, { t: "Finish at -7 or better", k: "par", v: -7 }],
+        real: "Rahm holed birdie putts of 24 and 20 feet on 17 and 18 to win by one at -6, his first major." },
+];
+const CH_FIELD = withNewAttrs({ drivingAccuracy: 87, drivingDistance: 87, longApproach: 87, shortApproach: 87, chipping: 87, putting: 87, recovery: 87, bunker: 87, composure: 84 }, "");
+const chLoad = () => { try { return JSON.parse(localStorage.getItem(CH_KEY) || "{}") || {}; } catch (e) { return {}; } };
+const chStore = (d) => { try { localStorage.setItem(CH_KEY, JSON.stringify(d)); } catch (e) { /* storage blocked: progress just isn't kept */ } };
+const chToday = () => { const n = Math.floor((Date.now() - CH_LAUNCH) / 864e5); const i = ((n % CHALLENGES.length) + CHALLENGES.length) % CHALLENGES.length; return { n: Math.max(1, n + 1), sc: CHALLENGES[i], key: new Date().toISOString().slice(0, 10) }; };
+const chCourse = (sc) => COURSES.find((c) => c.name === sc.course);
+const chWx = { wind: 1, rain: 0, cold: 0 };
+// a rival's remaining holes, nudged so their total lands near their REAL final score
+const chRival = (r, sc, course) => {
+    if (r.done) return { ...r, first: 18, holes: [] };
+    const first = (r.from || sc.from) - 1;
+    const holes = [];
+    for (let j = first; j < 18; j++) holes.push(playHole(CH_FIELD, course.holes[j], wxAdjFor(chWx, [82, 82, 82]), false, 0));
+    if (r.final != null) {
+        const sd = holes.length <= 3 ? 0.55 : holes.length <= 9 ? 0.9 : 1.3;
+        const want = r.final + Math.round(gauss() * sd);
+        let cur = r.start + holes.reduce((t, s, k) => t + s - course.holes[first + k][0], 0);
+        for (let guard = 0; cur !== want && guard < 80; guard++) {
+            const k = Math.floor(Math.random() * holes.length), par = course.holes[first + k][0];
+            if (cur > want && holes[k] > Math.max(2, par - (par === 5 ? 2 : 1))) { holes[k]--; cur--; }
+            else if (cur < want && holes[k] < par + 2) { holes[k]++; cur++; }
+        }
+    }
+    return { ...r, first, holes };
+};
+const chStart = (sc) => {
+    const course = chCourse(sc);
+    return { sc, course, you: chA(sc.you.r, sc.you.comp), idx: sc.from - 1, my: [], rivals: sc.rivals.map((r) => chRival(r, sc, course)), alerts: [], phase: "play", po: null, last: null };
+};
+// how many of a rival's holes have been posted when you've played `played` of your `total` holes
+const chShown = (r, played, total) => r.done ? 0 : Math.min(r.holes.length, Math.round((played / Math.max(1, total)) * r.holes.length));
+const chBoard = (ch) => {
+    const total = 19 - ch.sc.from, played = ch.my.length;
+    const mine = ch.sc.you.start + ch.my.reduce((t, s, k) => t + s - ch.course.holes[ch.sc.from - 1 + k][0], 0);
+    const rows = [{ name: ch.sc.you.name, you: true, toPar: mine, thru: played === total ? "F" : ch.sc.from - 1 + played }];
+    ch.rivals.forEach((r) => {
+        if (r.done) { rows.push({ name: r.name, toPar: r.final, thru: "F" }); return; }
+        const n = chShown(r, played, total);
+        rows.push({ name: r.name, toPar: r.start + r.holes.slice(0, n).reduce((t, s, k) => t + s - ch.course.holes[r.first + k][0], 0), thru: n === r.holes.length ? "F" : r.first + n });
+    });
+    return rows.sort((a, b) => a.toPar - b.toPar || (a.you ? -1 : 1));
+};
+// headlines from what just happened on the course
+const chNews = (ch, before, after, played, total) => {
+    const out = [];
+    const lead0 = before[0], lead1 = after[0];
+    if (lead1.name !== lead0.name && (after.length < 2 || after[1].toPar !== lead1.toPar))
+        out.push(lead1.you ? `🏆 You take the lead at ${thruPar(lead1.toPar)}!` : `📣 ${lead1.name} takes the lead at ${thruPar(lead1.toPar)}`);
+    ch.rivals.forEach((r) => {
+        if (r.done) return;
+        const n0 = chShown(r, played - 1, total), n1 = chShown(r, played, total);
+        for (let k = n0; k < n1; k++) {
+            const d = r.holes[k] - ch.course.holes[r.first + k][0], now = after.find((x) => x.name === r.name);
+            if (d <= -1) out.push(`${d <= -2 ? "🦅" : "🔥"} ${r.name} ${d <= -2 ? "eagles" : "birdies"} ${r.first + k + 1}: ${thruPar(now.toPar)}`);
+            else if (d >= 1 && now.toPar - lead1.toPar <= 3) out.push(`😬 ${r.name} ${d >= 2 ? "doubles" : "bogeys"} ${r.first + k + 1}: ${thruPar(now.toPar)}`);
+            if (n1 === r.holes.length && k === n1 - 1) out.push(`🏁 ${r.name} posts ${thruPar(now.toPar)} in the clubhouse`);
+        }
+    });
+    return out.slice(0, 3);
+};
+const chGoals = (sc, res) => sc.goals.map((gl) => gl.k === "win" ? res.won : gl.k === "reg" ? res.won && !res.playoff : gl.k === "margin" ? res.won && res.margin >= gl.v : res.toPar <= gl.v);
+// stars are cumulative: the second star needs the first goal too, and so on
+const chStars = (sc, res) => { const f = chGoals(sc, res), miss = f.findIndex((x) => !x); return f.map((x, i) => miss === -1 || i < miss); };
+const chEmoji = (d) => d <= -2 ? "🟨" : d === -1 ? "🟩" : d === 0 ? "⬜" : d === 1 ? "🟧" : "🟥";
+const CH_MEDAL = ["", "🥉", "🥈", "🥇"];
+
 const hofScoreOf = (m) => m.careerWins * 2 + m.careerMajors * 8 + (m.fedexTitles || 0) * 6 + (((m.rc || {}).teamWins || 0) + ((m.pc || {}).teamWins || 0)) * 2 + Math.floor((m.careerMoney || 0) / 2e7);
 const HOF_LINE = 30; // score needed to be inducted
 const loadHof = async () => { try { const r = await window.storage.get(HOF_KEY); const v = JSON.parse(r.value); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
@@ -2504,6 +2661,7 @@ function GolfCareerSim() {
     const [hofList, setHofList] = useState(null);
     const [namesQuery, setNamesQuery] = useState("");
     const [namesEdits, setNamesEdits] = useState({});
+    const [ch, setCh] = useState(null);
     const [wcStage, setWcStage] = useState(0);
     const [wcBracketFrom, setWcBracketFrom] = useState("worldCup"); // screen to return to from the bracket view
     const [wcBracketCap, setWcBracketCap] = useState(null); // limit rounds shown mid-reveal (null = show everything)
@@ -5442,6 +5600,10 @@ function GolfCareerSim() {
                             React.createElement(Btn, { small: true, kind: "panel", onClick: () => setConfirmEraseId(null) }, "CANCEL"))))));
             })),
             React.createElement("p", { className: "text-[10px] text-center mb-3", style: { color: C.muted } }, "Every mode keeps its own save \u2014 jump between careers whenever you like."),
+            React.createElement("button", { onClick: () => { track("challenges/open"); setScreen("challenges"); }, className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 17, color: C.gold } }, "\uD83C\uDFC6 CHALLENGES \u00B7 REWRITE HISTORY"),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.chalk } }, `Daily Challenge #${chToday().n}: ${chToday().sc.you.name}, ${chToday().sc.year} ${chToday().sc.event}. "${chToday().sc.title}"`),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Golf's greatest final rounds, from the real position. Can you change how it ended?")),
             React.createElement("button", { onClick: openHof, className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: C.panel, border: `1px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } }, "\uD83C\uDFDB\uFE0F HALL OF FAME"),
                 React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Every career you finish, in any mode, ranked. Can your next pro beat your last?")),
@@ -5558,6 +5720,157 @@ function GolfCareerSim() {
                             React.createElement("span", { style: { color: C.muted, fontSize: 9 } }, s.label),
                             React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: isComp ? tint(p[s.key]) : (!scouted && !taken ? "rgba(244,247,242,0.3)" : tint(p[s.key])) } }, isComp ? p[s.key] : (!scouted && !taken ? "?" : p[s.key]))));
                     })))))))));
+    }
+    // ---------- CHALLENGES: the list, a challenge in play, and the result ----------
+    if (screen === "challenges") {
+        const st = chLoad(), by = st.by || {}, today = chToday();
+        const totalStars = CHALLENGES.reduce((t, c) => t + ((by[c.id] || {}).stars || 0), 0);
+        const medals = [3, 2, 1].map((m) => CHALLENGES.filter((c) => ((by[c.id] || {}).stars || 0) === m).length);
+        const playedToday = (st.daily || {})[today.key];
+        const card = (c, daily) => {
+            const rec = by[c.id] || {};
+            return (React.createElement("button", { key: (daily ? "d-" : "") + c.id, onClick: () => { track("challenge/start/" + c.id); setCh({ ...chStart(c), daily: !!daily }); setScreen("challenge"); },
+                className: "w-full p-3 rounded-xl mb-2 text-left active:scale-[0.99]", style: { background: daily ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card, border: daily ? `1.5px solid ${C.gold}` : "1px solid rgba(244,247,242,0.15)" } },
+                React.createElement("div", { className: "flex justify-between items-baseline" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 17, color: daily ? C.gold : C.chalk } }, `${c.you.name.split(" ").slice(-1)[0]} · ${c.year} ${c.event}`),
+                    React.createElement("span", { style: { fontSize: 16 } }, rec.stars ? CH_MEDAL[rec.stars] : "")),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.gold, fontFamily: FONT, letterSpacing: 1 } }, `"${c.title}" · ${c.course}`),
+                React.createElement("div", { className: "text-xs mt-1", style: { color: C.muted } }, c.blurb),
+                React.createElement("div", { className: "text-[11px] mt-1", style: { color: C.chalk } }, [0, 1, 2].map((i) => (i < (rec.stars || 0) ? "⭐" : "☆")).join(" "), rec.tries ? `  · ${rec.wins || 0}/${rec.tries} won` : "")));
+        };
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
+            React.createElement("div", { className: "text-center mb-3" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, "SUNDAY PINS"),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk, lineHeight: 1 } }, "🏆 CHALLENGES"),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "Golf's greatest final rounds. Step into the legend's shoes from the real position. Repeat history, or rewrite it.")),
+            React.createElement("div", { className: "p-3 rounded-xl mb-3 text-center", style: { background: C.panel } },
+                React.createElement("div", { className: "text-[10px]", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "YOUR HONOURS"),
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk } }, `🥇 ${medals[0]}  🥈 ${medals[1]}  🥉 ${medals[2]}`),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, `${totalStars} of ${CHALLENGES.length * 3} stars`)),
+            React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, `DAILY CHALLENGE #${today.n}${playedToday ? " · PLAYED TODAY " + "⭐".repeat(playedToday.stars) : ""}`),
+            card(today.sc, true),
+            Object.entries(CH_CATS).map(([cat, label]) => {
+                const list = CHALLENGES.filter((c) => c.cat === cat);
+                return list.length ? (React.createElement("div", { key: cat, className: "mt-3" },
+                    React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, label.toUpperCase()),
+                    list.map((c) => card(c, false)))) : null;
+            }),
+            React.createElement(Btn, { onClick: () => setScreen(g && g.pro ? "hub" : "landing"), kind: "panel" }, "BACK")));
+    }
+    if (screen === "challenge" && ch) {
+        const sc = ch.sc, course = ch.course, total = 19 - sc.from;
+        const board = chBoard(ch);
+        const me = board.find((r) => r.you);
+        // the putt is yours when it matters
+        if (ch.phase === "putt" && ch.putt)
+            return React.createElement(Shell, null, React.createElement(ClutchPutt, { key: ch.putt.key, putt: ch.putt, onDone: ch.putt.onDone }));
+        const finish = (c) => {
+            const fin = chBoard(c);
+            const my = fin.find((r) => r.you).toPar, best = Math.min(...fin.filter((r) => !r.you).map((r) => r.toPar));
+            if (my === best) return { ...c, phase: "playoff", po: { n: 0, tied: fin.filter((r) => !r.you && r.toPar === best).map((r) => r.name), log: [] }, alerts: [`⚔️ Tied at ${thruPar(my)}. Sudden-death playoff on the ${course.holes.length}th!`] };
+            return chDone(c, { won: my < best, toPar: my, margin: best - my, playoff: false });
+        };
+        const chDone = (c, res) => {
+            const stars = chStars(sc, res).filter(Boolean).length;
+            const stx = chLoad(), by = { ...(stx.by || {}) }, prev = by[sc.id] || {};
+            by[sc.id] = { stars: Math.max(prev.stars || 0, stars), tries: (prev.tries || 0) + 1, wins: (prev.wins || 0) + (res.won ? 1 : 0), best: Math.min(prev.best != null ? prev.best : 99, res.toPar) };
+            const daily = { ...(stx.daily || {}) }, today = chToday();
+            if (c.daily && !daily[today.key]) daily[today.key] = { id: sc.id, stars, won: res.won };
+            chStore({ ...stx, by, daily });
+            track(`challenge/${res.won ? "won" : "lost"}/${sc.id}`);
+            return { ...c, phase: "done", res: { ...res, stars, newBest: stars > (prev.stars || 0) } };
+        };
+        const holeIdx = ch.phase === "playoff" ? course.holes.length - 1 : ch.idx;
+        const hole = course.holes[holeIdx];
+        const choose = (choiceId) => {
+            const choice = HOLE_CHOICES(hole).find((x) => x.id === choiceId);
+            const played = ch.my.length, progress = ch.phase === "playoff" ? 1 : played / Math.max(1, total - 1);
+            const lastOver = ch.my.length ? ch.my[ch.my.length - 1] - course.holes[ch.idx - 1][0] : 0;
+            const adj = wxAdjFor(chWx, [82, 82, 82]) + (sc.diff || 0) + bounceAdj(ch.you, lastOver) + pressureAdj(ch.you, 0.7 + 0.6 * progress);
+            const pl = playHoleWithChoice(ch.you, hole, choice, adj);
+            const ci = withChipIn(ch.you, hole, pl.score);
+            const commit = (score, note) => {
+                if (ch.phase === "playoff") {
+                    const opp = Math.min(...ch.po.tied.map(() => playHole(CH_FIELD, hole, wxAdjFor(chWx, [82, 82, 82]) + 0.01, false, 0)));
+                    const log = [...ch.po.log, { me: score, opp }];
+                    const nc = { ...ch, phase: "playoff", putt: null, po: { ...ch.po, n: ch.po.n + 1, log }, last: { score, par: hole[0], note }, alerts: [`Playoff hole ${log.length}: you ${scoreName(score, hole[0]).toLowerCase()}, ${ch.po.tied.length > 1 ? "best of the rest" : ch.po.tied[0]} ${scoreName(opp, hole[0]).toLowerCase()}`] };
+                    const fin = chBoard(ch).find((r) => r.you).toPar;
+                    if (score !== opp || log.length >= 6) { const won = score < opp || (score === opp && Math.random() < 0.5); setCh(chDone(nc, { won, toPar: fin, margin: won ? 1 : -1, playoff: true })); }
+                    else setCh(nc);
+                    return;
+                }
+                const before = chBoard(ch);
+                let nc = { ...ch, my: [...ch.my, score], idx: ch.idx + 1, phase: "play", putt: null, last: { score, par: hole[0], note } };
+                nc.alerts = chNews(nc, before, chBoard(nc), nc.my.length, total);
+                if (nc.my.length >= total) nc = finish(nc);
+                setCh(nc);
+            };
+            if (ci.chip) return commit(ci.score, ci.chip === "bunker" ? "🎯 Holed from the bunker!" : "🎯 Chipped in!");
+            const left = total - ch.my.length;
+            const best = Math.min(...board.filter((r) => !r.you).map((r) => r.toPar));
+            const close = Math.abs(me.toPar - best) <= 2;
+            if (!holedFromOffGreen(ci.score, hole[0]) && (ch.phase === "playoff" || (close && (left <= 3 || total <= 4)))) {
+                // the putt is for the score the hole has given you: hole it and that score stands, miss and it costs a shot
+                const pt = strokePutt(ci.score + (ci.score < hole[0] ? 0 : 1), hole[0]);
+                setCh({ ...ch, phase: "putt", putt: { ...pt, key: `${holeIdx}-${ch.my.length}-${ch.po ? ch.po.n : 0}`, title: `${sc.year} ${sc.event.toUpperCase()} · HOLE ${holeIdx + 1}`,
+                    stakes: ch.phase === "playoff" ? "Sudden death." : best < me.toPar ? `${me.toPar - best} behind the lead.` : best === me.toPar ? "Level with the lead." : `Leading by ${best - me.toPar}.`,
+                    putting: ch.you.putting, pace: ch.you.paceControl, composure: ch.you.composure, pressure: ch.phase === "playoff" ? 1.4 : 1.0 + (3 - Math.min(3, left)) * 0.15,
+                    makeTxt: `${scoreName(pt.target, hole[0])} on ${holeIdx + 1}.`, missTxt: `It's a ${scoreName(pt.miss, hole[0]).toLowerCase()} on ${holeIdx + 1}.`,
+                    onDone: (made) => commit(made ? pt.target : pt.miss, `⛳ ${pt.feet}ft ${pt.label}: ${made ? "HOLED" : "missed"}`) } });
+                return;
+            }
+            commit(ci.score);
+        };
+        if (ch.phase === "done") {
+            const r = ch.res;
+            const flags = chStars(sc, r);
+            const row = ch.my.map((s, k) => chEmoji(s - course.holes[sc.from - 1 + k][0])).join("") + (ch.po ? " +" + ch.po.log.map((x) => chEmoji(x.me - course.holes[17][0])).join("") : "");
+            const today = chToday();
+            const shareText = `⛳ Sunday Pins ${ch.daily ? `Daily Challenge #${today.n}` : "Challenge"}\n${sc.you.name}, ${sc.year} ${sc.event}: "${sc.title}"\n${r.won ? "History rewritten" : "History repeated"} ${"⭐".repeat(r.stars)}${"☆".repeat(3 - r.stars)} (${thruPar(r.toPar)})\n${row}\n${SITE_URL}`;
+            const share = async () => { track("challenge/share/" + sc.id); try { if (navigator.share) { await navigator.share({ text: shareText }); return; } } catch (e) { return; } try { await navigator.clipboard.writeText(shareText); window.alert("Result copied. Paste it anywhere!"); } catch (e) { window.alert(shareText); } };
+            return (React.createElement(Shell, null,
+                React.createElement("div", { className: "pt-6 text-center" },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, `${sc.year} ${sc.event.toUpperCase()}`),
+                    React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: r.won ? C.gold : C.chalk, lineHeight: 1.05 } }, r.won ? "HISTORY REWRITTEN" : "HISTORY REPEATS"),
+                    React.createElement("p", { className: "text-sm mt-1", style: { color: C.chalk } }, `${sc.you.name} finishes at ${thruPar(r.toPar)}${r.playoff ? " after a playoff" : ""}. ${r.won ? (r.playoff ? "Won in sudden death." : `Won by ${r.margin}.`) : r.margin === 0 ? "Lost in the playoff." : `${-r.margin} short.`}`),
+                    React.createElement("div", { className: "my-3", style: { fontSize: 40, lineHeight: 1 } }, r.stars ? CH_MEDAL[r.stars] : "🏌️"),
+                    r.newBest && r.stars > 0 && React.createElement("div", { className: "text-xs mb-2", style: { color: C.gold } }, `New badge: ${["", "bronze", "silver", "gold"][r.stars]}!`)),
+                React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
+                    sc.goals.map((gl, i) => React.createElement("div", { key: i, className: "text-sm", style: { color: flags[i] ? C.green : C.muted } }, `${flags[i] ? "⭐" : "☆"} ${gl.t}`))),
+                React.createElement("div", { className: "text-center mb-2", style: { fontSize: 18, letterSpacing: 2 } }, row),
+                React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.card } },
+                    React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "WHAT REALLY HAPPENED"),
+                    React.createElement("p", { className: "text-xs", style: { color: C.chalk } }, sc.real)),
+                React.createElement(Btn, { onClick: share }, "📤 SHARE YOUR RESULT"),
+                React.createElement(Btn, { onClick: () => { track("challenge/retry/" + sc.id); setCh({ ...chStart(sc), daily: false }); }, kind: "panel" }, "🔁 TRY AGAIN"),
+                React.createElement(Btn, { onClick: () => setScreen("challenges"), kind: "panel" }, "ALL CHALLENGES")));
+        }
+        const choices = HOLE_CHOICES(hole);
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen("challenges") }),
+            React.createElement("div", { className: "text-center" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, `★ ${sc.year} ${sc.event.toUpperCase()} ★`),
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: C.chalk } }, `${sc.you.name} · "${sc.title}"`),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, ch.phase === "playoff" ? `Sudden-death playoff · hole ${ch.po.n + 1}` : `Final round · hole ${holeIdx + 1} of 18 · ${course.name}`)),
+            ch.my.length === 0 && ch.phase === "play" && React.createElement("p", { className: "text-xs my-2 p-2 rounded-lg", style: { background: C.panel, color: C.chalk } }, sc.blurb),
+            React.createElement("div", { className: "p-2.5 rounded-xl my-2", style: { background: C.panel } },
+                board.map((r, i) => React.createElement("div", { key: r.name, className: "flex justify-between text-sm py-0.5", style: { color: r.you ? C.gold : C.chalk, fontWeight: r.you ? 700 : 400 } },
+                    React.createElement("span", null, `${i + 1}. ${r.name}${r.you ? " (YOU)" : ""}`),
+                    React.createElement("span", { style: { fontFamily: MONO } }, `${thruPar(r.toPar)} `, React.createElement("span", { className: "text-[10px]", style: { color: C.muted } }, r.thru === "F" ? "F" : r.thru === 0 ? "" : `thru ${r.thru}`))))),
+            ch.alerts && ch.alerts.length > 0 && (React.createElement("div", { className: "p-2.5 rounded-xl mb-2", style: { background: "rgba(10,20,14,0.55)", border: `1px solid ${C.gold}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 11, letterSpacing: 3, color: C.gold } }, "📣 LIVE FROM THE COURSE"),
+                ch.alerts.map((t, i) => React.createElement("div", { key: i, className: "text-xs", style: { color: t.includes("You") ? C.green : C.chalk } }, t)))),
+            ch.last && React.createElement("p", { className: "text-xs text-center mb-1", style: { color: scoreColor(ch.last.score, ch.last.par) } }, `Last hole: ${scoreName(ch.last.score, ch.last.par)}${ch.last.note ? " · " + ch.last.note : ""}`),
+            React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: C.card } },
+                React.createElement("div", { className: "flex justify-between items-baseline" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk } }, `HOLE ${holeIdx + 1}`),
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 18, color: C.gold } }, `PAR ${hole[0]} · ${hole[1]}y`)),
+                React.createElement(HoleMap, { hole, seed: `${sc.id}-${holeIdx}` })),
+            choices.map((c) => React.createElement("button", { key: c.id, onClick: () => choose(c.id), className: "w-full p-3 rounded-xl mb-2 text-left active:scale-[0.99]", style: { background: c.id === "attack" ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card, border: `1px solid ${c.id === "attack" ? C.gold : "rgba(127,183,217,0.5)"}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: c.id === "attack" ? C.gold : C.blue } }, c.label),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, c.desc))),
+            React.createElement("p", { className: "text-[10px] text-center mt-1", style: { color: C.muted } }, `${sc.goals.map((gl, i) => "☆".repeat(i + 1) + " " + gl.t).join("  ·  ")}`)));
     }
     // ---------- APP EDITION: player names (edit, import a names file, export) ----------
     if (screen === "names") {

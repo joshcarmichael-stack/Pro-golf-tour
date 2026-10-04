@@ -99,3 +99,17 @@ COURSES = {
 for _t in ['Craig Ranch', 'Deere Run', 'Harding Park', 'Louisiana', 'River Highlands', 'San Antonio', 'Scottsdale', 'Southwind', 'Toronto', 'Twin Cities']:
     COURSES['TPC ' + _t] = _t + ' Stadium Club'
 COURSES['TPC Sawgrass'] = 'Ponte Vedra'
+# challenge-mode rivals who aren't on the current tour
+PLAYERS.update({
+"Dustin Johnson":"Dustin Johnstone","Charl Schwartzel":"Charl Schwarzel","Costantino Rocca":"Costantino Rocco","Tom Kite":"Tom Kyte",
+"Smylie Kaufman":"Smylie Kaufmann","Bernhard Langer":"Bernhard Langner","Danny Willett":"Danny Willetts","Geoff Ogilvy":"Geoff Ogilvie",
+"Rocco Mediate":"Rocco Mediati","Louis Oosthuizen":"Louis Oosthuysen","Francesco Molinari":"Francesco Molinaro",
+})
+# surnames, nicknames and brand words used on their own in the challenge stories (applied to the challenge text only)
+CHALLENGE_TEXT = {
+"Tiger":"Tyger","Spieth":"Speight","Norman":"Normand","Faldo":"Faldon","Molinari":"Molinaro","Schwartzel":"Schwarzel","Willett":"Willetts",
+"Ogilvy":"Ogilvie","Scott":"Scotts","Els":"Elsen","Rahm":"Rahmer","Oosthuizen":"Oosthuysen","Kite":"Kyte","Day":"Daye","Rose":"Rosen",
+"Mediate":"Mediati","DeChambeau":"DuChamp","McIlroy":"McIlvane","Woods":"Woodes","Nicklaus":"Nicklin","Mickelson":"Mickleson","Stewart":"Steward",
+"Finau":"Finao","Koepka":"Koepke","Schauffele":"Schaufeld","Langer":"Langner","Kaufman":"Kaufmann","Matsuyama":"Matsumoto",
+"the U.S. Open":"the National Open","the Masters":"the Magnolia Masters","the Open":"the Links Championship","Masters":"Magnolia Masters","Magnolia Masters":"Magnolia Masters","Claret Jug":"Links Trophy",
+}

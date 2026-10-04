@@ -1,13 +1,15 @@
 # Builds the app-store edition at /app/ from the website game.
-# Run after every game change:  python3 tools/build_app.py
+# Run after every game change:  python3 tools/build_app.py   (optional: source page and output folder, for test builds)
 #   - every real player, legend, event, course and tour/cup name becomes its store name (tools/store_names.py)
 #   - the app keeps its own saves (separate from the website) and hides the website-only bits
 #   - players can rename anything or import a names file; their renames are applied before the game starts
 import json, os, re
 import store_names as N
 
+import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, 'app')
+SRC = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(ROOT, 'index.html')
+OUT = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else os.path.join(ROOT, 'app')
 
 def pairs():
     p = {}
@@ -33,8 +35,13 @@ def sub1(s, old, new):
 
 def main():
     p = pairs()
-    html = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
+    html = open(SRC, encoding='utf-8').read()
     html = rename(html, p)
+    # the challenge stories also use surnames and nicknames on their own: rename those inside the challenge list only
+    a = html.find('const CHALLENGES = [')
+    if a >= 0:
+        b = html.index('\n];', a)
+        html = html[:a] + rename(html[a:b], dict(N.CHALLENGE_TEXT)) + html[b:]
     # nicknames and references the full-name list can't catch
     for a, b in [("Tiger '00", "Tyger '00"), ("Hogan '53", "Hogarth '53"), ("Hogan's Alley", "The Alley")]:
         html = html.replace(a, b)
@@ -75,7 +82,7 @@ window.SP_TERMS = %s;
     html = html[:start] + '<script type="text/plain" id="sp-game">' + game + '</script>\n' + loader + html[end + len('</script>'):]
     os.makedirs(OUT, exist_ok=True)
     open(os.path.join(OUT, 'index.html'), 'w', encoding='utf-8').write(html)
-    geo = open(os.path.join(ROOT, 'courses-geo.js'), encoding='utf-8').read()
+    geo = open(os.path.join(os.path.dirname(SRC), 'courses-geo.js'), encoding='utf-8').read()
     open(os.path.join(OUT, 'courses-geo.js'), 'w', encoding='utf-8').write(rename(geo, p))
     man = json.load(open(os.path.join(ROOT, 'manifest.webmanifest'), encoding='utf-8'))
     man.update({'id': '/app/', 'start_url': '/app/', 'scope': '/app/'})
