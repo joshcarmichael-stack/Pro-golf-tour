@@ -2600,6 +2600,7 @@ const chGoals = (sc, res) => sc.goals.map((gl) => gl.k === "win" ? res.won : gl.
 const chStars = (sc, res) => { const f = chGoals(sc, res), miss = f.findIndex((x) => !x); return f.map((x, i) => miss === -1 || i < miss); };
 const chEmoji = (d) => d <= -2 ? "🟨" : d === -1 ? "🟩" : d === 0 ? "⬜" : d === 1 ? "🟧" : "🟥";
 const CH_MEDAL = ["", "🥉", "🥈", "🥇"];
+const CH_TEST = SAVE_KEY.includes("beta"); // the test mode (pick any challenge, nothing saved) only exists in the beta
 const CH_MEDAL_NAME = ["", "BRONZE", "SILVER", "GOLD"];
 // the result if the round stopped right now (a tie isn't a win yet)
 const chNow = (board) => { const my = board.find((r) => r.you).toPar, best = Math.min(...board.filter((r) => !r.you).map((r) => r.toPar)); return { won: my < best, toPar: my, margin: best - my, playoff: false }; };
@@ -5764,6 +5765,9 @@ function GolfCareerSim() {
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 17, color: C.gold } }, "\uD83C\uDFC6 CHALLENGES \u00B7 REWRITE HISTORY"),
                 React.createElement("div", { className: "text-[11px]", style: { color: C.chalk } }, `Daily Challenge #${chToday().n}: ${chToday().sc.you.name}, ${chToday().sc.year} ${chToday().sc.event}. "${chToday().sc.title}"`),
                 React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Golf's greatest final rounds, from the real position. Can you change how it ended?")),
+            CH_TEST && React.createElement("button", { onClick: () => setScreen("chtest"), className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: C.panel, border: "1px dashed rgba(127,183,217,0.7)" } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: C.blue } }, "🧪 CHALLENGE TEST MODE (BETA)"),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Pick any challenge and play it. Nothing is saved: no medals, no daily result.")),
             React.createElement("button", { onClick: openHof, className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: C.panel, border: `1px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } }, "\uD83C\uDFDB\uFE0F HALL OF FAME"),
                 React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Every career you finish, in any mode, ranked. Can your next pro beat your last?")),
@@ -5882,6 +5886,22 @@ function GolfCareerSim() {
                     })))))))));
     }
     // ---------- CHALLENGES: the list, a challenge in play, and the result ----------
+    if (screen === "chtest" && CH_TEST) {
+        const by = chLoad().by || {};
+        return (React.createElement(Shell, null,
+            React.createElement(BackTop, { onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
+            React.createElement("div", { className: "text-center mb-3" },
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.blue, lineHeight: 1 } }, "🧪 CHALLENGE TEST MODE"),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "Beta only. Tap any challenge to play it. Results aren't saved, so play each one as often as you like.")),
+            CHALLENGES.map((c) => React.createElement("button", { key: c.id, onClick: () => { setCh({ ...chStart(c), daily: false, test: true }); setScreen("challenge"); }, className: "w-full p-2.5 rounded-xl mb-2 text-left active:scale-[0.99]", style: { background: C.card, border: "1px solid rgba(127,183,217,0.4)" } },
+                React.createElement("div", { className: "flex justify-between items-baseline" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 15, color: C.chalk } }, `${c.you.name} · ${c.year} ${c.event}`),
+                    React.createElement("span", { className: "text-[10px]", style: { color: C.muted, fontFamily: MONO } }, `id ${c.id}`)),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.gold } }, `"${c.title}" · ${19 - c.from === 1 ? "18th hole only" : `holes ${c.from}-18`} · ${CH_CATS[c.cat]}`),
+                React.createElement("div", { className: "text-[10px]", style: { color: C.muted } }, `${c.goals.map((gl, i) => CH_MEDAL[i + 1] + " " + gl.t).join("  ")}${(by[c.id] || {}).stars ? `  · your real best: ${CH_MEDAL[by[c.id].stars]}` : ""}`))),
+            React.createElement(Btn, { onClick: () => { if (window.confirm("Clear all your challenge medals and daily results? (For testing the medal flow.)")) { chStore({}); setScreen("chtest"); window.alert("Challenge progress cleared."); } }, kind: "panel" }, "🗑️ CLEAR MY CHALLENGE MEDALS"),
+            React.createElement(Btn, { onClick: () => setScreen(g && g.pro ? "hub" : "landing"), kind: "panel" }, "BACK")));
+    }
     if (screen === "challenges") {
         const st = chLoad(), by = st.by || {}, today = chToday();
         const totalStars = CHALLENGES.reduce((t, c) => t + ((by[c.id] || {}).stars || 0), 0);
@@ -5919,7 +5939,7 @@ function GolfCareerSim() {
             React.createElement(Btn, { onClick: () => setScreen(g && g.pro ? "hub" : "landing"), kind: "panel" }, "BACK")));
     }
     if (screen === "challenge" && ch) {
-        const sc = ch.sc, course = ch.course, total = 19 - sc.from;
+        const sc = ch.sc, course = ch.course, total = 19 - sc.from, chBack = ch.test ? "chtest" : "challenges";
         const board = chBoard(ch);
         const me = board.find((r) => r.you);
         // the putt is yours when it matters
@@ -5933,6 +5953,7 @@ function GolfCareerSim() {
         };
         const chDone = (c, res) => {
             const stars = chStars(sc, res).filter(Boolean).length;
+            if (c.test) return { ...c, phase: "done", res: { ...res, stars, newBest: false } }; // test mode: nothing saved
             const stx = chLoad(), by = { ...(stx.by || {}) }, prev = by[sc.id] || {};
             by[sc.id] = { stars: Math.max(prev.stars || 0, stars), tries: (prev.tries || 0) + 1, wins: (prev.wins || 0) + (res.won ? 1 : 0), best: Math.min(prev.best != null ? prev.best : 99, res.toPar) };
             const daily = { ...(stx.daily || {}) }, today = chToday();
@@ -5999,18 +6020,19 @@ function GolfCareerSim() {
                     React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "WHAT REALLY HAPPENED"),
                     React.createElement("p", { className: "text-xs", style: { color: C.chalk } }, sc.real)),
                 React.createElement(Btn, { onClick: share }, "📤 SHARE YOUR RESULT"),
-                React.createElement(Btn, { onClick: () => { track("challenge/retry/" + sc.id); setCh({ ...chStart(sc), daily: false }); }, kind: "panel" }, "🔁 TRY AGAIN"),
-                React.createElement(Btn, { onClick: () => setScreen("challenges"), kind: "panel" }, "ALL CHALLENGES")));
+                React.createElement(Btn, { onClick: () => { if (!ch.test) track("challenge/retry/" + sc.id); setCh({ ...chStart(sc), daily: false, test: !!ch.test }); }, kind: "panel" }, "🔁 TRY AGAIN"),
+                React.createElement(Btn, { onClick: () => setScreen(chBack), kind: "panel" }, ch.test ? "🧪 BACK TO TEST MODE" : "ALL CHALLENGES")));
         }
         if (ch.phase === "brief") {
             const rec = (chLoad().by || {})[sc.id] || {};
             const lead = board.filter((r) => !r.you)[0], gap = me.toPar - lead.toPar;
             return (React.createElement(Shell, null,
-                React.createElement(BackTop, { onClick: () => setScreen("challenges") }),
+                React.createElement(BackTop, { onClick: () => setScreen(chBack) }),
                 React.createElement("div", { className: "text-center" },
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, `★ ${sc.year} ${sc.event.toUpperCase()} ★`),
                     React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1.05 } }, `"${sc.title}"`),
-                    React.createElement("div", { className: "text-xs", style: { color: C.muted } }, `You are ${sc.you.name}, age ${sc.you.age} · ${course.name}`)),
+                    React.createElement("div", { className: "text-xs", style: { color: C.muted } }, `You are ${sc.you.name}, age ${sc.you.age} · ${course.name}`),
+                    ch.test && React.createElement("div", { className: "text-[11px] mt-1", style: { color: C.blue } }, "🧪 Test mode: this run won't be saved")),
                 React.createElement("p", { className: "text-xs my-2 p-2.5 rounded-lg", style: { background: C.panel, color: C.chalk } }, sc.blurb),
                 React.createElement("div", { className: "p-2.5 rounded-xl mb-2 text-center", style: { background: C.card } },
                     React.createElement("div", { className: "text-[10px]", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "THE SITUATION"),
@@ -6032,7 +6054,7 @@ function GolfCareerSim() {
         const choices = chShotChoices(h, hole);
         const nowFlags = chStars(sc, chNow(board)), nowMedal = nowFlags.filter(Boolean).length;
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("challenges") }),
+            React.createElement(BackTop, { onClick: () => setScreen(chBack) }),
             React.createElement("div", { className: "text-center" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, `★ ${sc.year} ${sc.event.toUpperCase()} ★`),
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: C.chalk } }, `${sc.you.name} · "${sc.title}"`),
