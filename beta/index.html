@@ -2087,7 +2087,30 @@ function FlightTrace({ d }) {
         pos && React.createElement("circle", { cx: pos[0], cy: pos[1], r: 2.6, fill: "#FFFFFF", stroke: "rgba(0,0,0,0.35)", strokeWidth: 0.6 })));
 }
 const parsePts = (str) => str.split(" ").map((p) => p.split(",").map(Number));
-function RealHoleMap({ hole, seed }) {
+// how a player would plot their way round a hole, from their own stats: where each shot lands (yards from the tee).
+// Long hitters get home in two on par 5s; shorter ones lay up to wedge range and make it a three-shot hole
+const shotPlan = (a, hole, from = 0) => {
+    const [par, yds] = hole, A = a || {};
+    const DD = A.drivingDistance != null ? A.drivingDistance : 82, LA = A.longApproach != null ? A.longApproach : 82;
+    const drive = clampN(Math.round(303 + (DD - 80) * 1.2), 255, 335); // fitted to real PGA Tour driving distance: Rory ~325, Harman ~298
+    const reach = Math.round(245 + (DD - 80) * 1.0 + (LA - 80) * 0.6); // the longest second shot they'd go for a green from
+    const lim = par === 5 ? reach : reach + 40; // on a par 4 you go for it from much further rather than lay up
+    const pts = [];
+    let at = from;
+    if (at === 0 && par > 3) { at = Math.min(drive, yds - 40); pts.push(at); }
+    while (yds - at > lim && pts.length < 3) { at = Math.max(at + 40, yds - 100); pts.push(at); }
+    pts.push(yds);
+    return { pts, drive, reach, shots: pts.length };
+};
+// a point a fraction of the way along a polyline
+const alongLine = (c, f) => {
+    const seg = c.slice(1).map((p, i) => Math.hypot(p[0] - c[i][0], p[1] - c[i][1]));
+    let want = clampN(f, 0, 1) * seg.reduce((t, x) => t + x, 0);
+    for (let i = 0; i < seg.length; i++) { if (want <= seg[i] || i === seg.length - 1) { const k = seg[i] ? want / seg[i] : 0; return [c[i][0] + (c[i + 1][0] - c[i][0]) * k, c[i][1] + (c[i + 1][1] - c[i][1]) * k]; } want -= seg[i]; }
+    return c[c.length - 1];
+};
+const planLabel = (hole, plan, from) => hole[0] === 5 && !from ? (plan.shots === 2 ? "In two for you" : "3-shot hole for you") : null;
+function RealHoleMap({ hole, seed, attrs, from = 0 }) {
     const g = hole[5], yds = hole[1];
     const H = 84, W = 292;
     const c = parsePts(g.c);
@@ -2100,10 +2123,13 @@ function RealHoleMap({ hole, seed }) {
     const ox = (W - (maxX - minX) * k) / 2;
     const X = (p) => ox + (p[1] - minX) * k, Yy = (p) => H / 2 + 6 + (p[0] - cy) * k; // playing left to right, the golfer's right is the bottom of the map
     const path = (str) => { const pts = parsePts(str); return "M" + pts.map((p) => `${X(p).toFixed(1)},${Yy(p).toFixed(1)}`).join(" L") + "Z"; };
-    const tee = c[0], end = c[c.length - 1];
-    const mid = c.length > 2 ? c[Math.floor(c.length / 2)] : [(tee[0] + end[0]) / 2, (tee[1] + end[1]) / 2];
+    const end = c[c.length - 1];
     const hop = (a, b) => `Q ${((X(a) + X(b)) / 2).toFixed(1)} ${(Math.min(Yy(a), Yy(b)) - 10).toFixed(1)} ${X(b).toFixed(1)} ${Yy(b).toFixed(1)}`;
-    const flight = hole[0] === 3 ? `M ${X(tee)} ${Yy(tee)} ${hop(tee, end)}` : `M ${X(tee)} ${Yy(tee)} ${hop(tee, mid)} ${hop(mid, end)}`;
+    // the route this player would take: one hop per shot, from the ball's spot (the tee unless they're mid-hole)
+    const plan = shotPlan(attrs, hole, from), start = alongLine(c, from / yds);
+    const stops = plan.pts.map((y) => alongLine(c, y / yds));
+    const flight = `M ${X(start).toFixed(1)} ${Yy(start).toFixed(1)} ` + stops.map((p, i) => hop(i ? stops[i - 1] : start, p)).join(" ");
+    const label = planLabel(hole, plan, from);
     return (React.createElement("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", height: H, className: "mt-2 rounded-lg block", style: { background: HOLE_INK.rough }, role: "img", "aria-label": `Hole map, ${yds} yards` },
         (g.f || []).map((d, i) => React.createElement("path", { key: "f" + i, d: path(d), fill: HOLE_INK.fairway })),
         (g.w || []).map((d, i) => React.createElement("path", { key: "w" + i, d: path(d), fill: HOLE_INK.water, opacity: 0.9 })),
@@ -2112,13 +2138,16 @@ function RealHoleMap({ hole, seed }) {
         (g.g || []).map((d, i) => React.createElement("path", { key: "g" + i, d: path(d), fill: HOLE_INK.green, stroke: HOLE_INK.fringe, strokeWidth: 1.5 })),
         React.createElement("line", { x1: X(end), y1: Yy(end), x2: X(end), y2: Yy(end) - 14, stroke: HOLE_INK.pin, strokeWidth: 1 }),
         React.createElement("path", { d: `M ${X(end)} ${Yy(end) - 14} l 8 2.5 l -8 2.5 z`, fill: HOLE_INK.flag }),
-        React.createElement(FlightTrace, { key: seed, d: flight }),
+        React.createElement(FlightTrace, { key: seed + "|" + from, d: flight }),
+        stops.slice(0, -1).map((p, i) => React.createElement("circle", { key: "s" + i, cx: X(p), cy: Yy(p), r: 1.8, fill: "#F4F7F2", opacity: 0.8 })),
+        from > 0 && React.createElement("circle", { cx: X(start), cy: Yy(start), r: 3, fill: "#FFFFFF", stroke: "rgba(0,0,0,0.4)", strokeWidth: 0.8 }),
+        label && React.createElement("text", { x: W - 6, y: 11, fontSize: 8, fontFamily: MONO, fill: C.gold, textAnchor: "end" }, label),
         React.createElement("text", { x: 6, y: H - 6, fontSize: 9, fontFamily: MONO, fill: C.muted }, `${yds}y`),
         React.createElement("text", { x: W - 6, y: H - 6, fontSize: 7, fontFamily: MONO, fill: C.muted, textAnchor: "end", opacity: 0.7 }, "map \u00A9 OpenStreetMap")));
 }
-function HoleMap({ hole, seed }) {
+function HoleMap({ hole, seed, attrs, from = 0 }) {
     if (hole[5] && hole[5].c)
-        return React.createElement(RealHoleMap, { hole, seed });
+        return React.createElement(RealHoleMap, { hole, seed, attrs, from });
     const [par, yds, hz = 0] = hole;
     const rnd = seedRand(seed);
     const H = 60, mid = H / 2;
@@ -2143,10 +2172,11 @@ function HoleMap({ hole, seed }) {
     const apron = par === 3 ? `M ${gx - 34} ${gy} L ${gx - 8} ${gy}` : null; // short run-up in front of a par-3 green
     // shot arcs: drive to the landing zone (and a lay-up on par 5s), then in to the flag
     const hop = (x1, y1, x2, y2) => `Q ${(x1 + x2) / 2} ${Math.min(y1, y2) - 10} ${x2} ${y2}`;
-    const layX = kx + (gx - kx) * 0.55, layY = ky + (gy - ky) * 0.55 + (rnd() - 0.5) * 6;
-    const flight = par === 3 ? `M ${tx} ${mid} ${hop(tx, mid, gx + 2, gy)}`
-        : par === 5 ? `M ${tx} ${mid} ${hop(tx, mid, kx, ky)} ${hop(kx, ky, layX, layY)} ${hop(layX, layY, gx + 2, gy)}`
-            : `M ${tx} ${mid} ${hop(tx, mid, kx, ky)} ${hop(kx, ky, gx + 2, gy)}`;
+    // one hop per shot in this player's plan, along the drawn hole
+    const plan = shotPlan(attrs, hole, from), label = planLabel(hole, plan, from);
+    const at = (y) => { const f = y / yds; return [tx + (gx + 2 - tx) * f, mid + (gy - mid) * f + bend * Math.sin(Math.PI * f) * 0.8]; };
+    const start = at(from), stops = plan.pts.map(at);
+    const flight = `M ${start[0]} ${start[1]} ` + stops.map((p, i) => hop(...(i ? stops[i - 1] : start), p[0], p[1])).join(" ");
     return (React.createElement("svg", { viewBox: `0 0 292 ${H}`, width: "100%", height: H, className: "mt-2 rounded-lg block", style: { background: HOLE_INK.rough }, role: "img", "aria-label": `Hole layout: par ${par}, ${yds} yards` },
         fairway && React.createElement("path", { d: fairway, fill: "none", stroke: HOLE_INK.fairway, strokeWidth: 15, strokeLinecap: "round", strokeLinejoin: "round" }),
         apron && React.createElement("path", { d: apron, stroke: HOLE_INK.fairway, strokeWidth: 11, strokeLinecap: "round" }),
@@ -2157,7 +2187,9 @@ function HoleMap({ hole, seed }) {
         React.createElement("ellipse", { cx: gx, cy: gy, rx: 11, ry: 7.5, fill: HOLE_INK.green }),
         React.createElement("line", { x1: gx + 2, y1: gy + 1, x2: gx + 2, y2: gy - 15, stroke: HOLE_INK.pin, strokeWidth: 1 }),
         React.createElement("path", { d: `M ${gx + 2} ${gy - 15} l 8 2.5 l -8 2.5 z`, fill: HOLE_INK.flag }),
-        React.createElement(FlightTrace, { key: seed, d: flight }),
+        React.createElement(FlightTrace, { key: seed + "|" + from, d: flight }),
+        from > 0 && React.createElement("circle", { cx: start[0], cy: start[1], r: 3, fill: "#FFFFFF", stroke: "rgba(0,0,0,0.4)", strokeWidth: 0.8 }),
+        label && React.createElement("text", { x: 286, y: 10, fontSize: 8, fontFamily: MONO, fill: C.gold, textAnchor: "end" }, label),
         React.createElement("text", { x: 6, y: H - 6, fontSize: 9, fontFamily: MONO, fill: C.muted }, `${yds}y`)));
 }
 const ARCHETYPES = [
@@ -6253,7 +6285,7 @@ function GolfCareerSim() {
                 React.createElement("div", { className: "flex justify-between items-baseline" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk } }, `HOLE ${holeIdx + 1}`),
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 18, color: C.gold } }, `PAR ${hole[0]} · ${hole[1]}y`)),
-                React.createElement(HoleMap, { hole, seed: `${sc.id}-${holeIdx}` }),
+                React.createElement(HoleMap, { hole, seed: `${sc.id}-${holeIdx}`, attrs: ch.you, from: Math.max(0, hole[1] - h.d) }),
                 h.log.map((t, i) => React.createElement("div", { key: i, className: "text-xs mt-1", style: { color: C.chalk } }, `Shot ${i + 1}: ${t}`)),
                 React.createElement("div", { className: "flex justify-between items-baseline mt-2 pt-2", style: { borderTop: "1px solid rgba(244,247,242,0.12)" } },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } }, `SHOT ${h.strokes + 1}`),
@@ -9322,7 +9354,7 @@ function GolfCareerSim() {
                             ordinal(rankOf(h)),
                             " hardest on the course",
                             rankOf(h) <= 4 ? " — survive it" : rankOf(h) >= 15 ? " — scoring chance" : ""),
-                        React.createElement(HoleMap, { hole: nextHole, seed: course.name + "#" + h })),
+                        React.createElement(HoleMap, { hole: nextHole, seed: course.name + "#" + h, attrs: effAttrs(g) })),
                     React.createElement("div", { className: "p-2.5 rounded-xl mb-2", style: { background: C.panel } },
                         board.slice(0, 5).map((b, i) => (React.createElement("div", { key: b.name, className: "flex justify-between text-xs mb-0.5", style: { color: b.isYou ? C.gold : isRv(b.name) ? C.bogey : C.chalk } },
                             React.createElement("span", { className: "truncate pr-2" },
@@ -10242,7 +10274,7 @@ function GolfCareerSim() {
                 Math.abs(am.diff) >= 18 - am.hole - 1 && Math.abs(am.diff) <= 18 - am.hole && (React.createElement("p", { className: "text-xs mt-0.5", style: { color: C.bogey } },
                     "\u26A1 ",
                     am.diff < 0 ? "Lose this hole and the match is over." : "Win this hole and you close it out.")),
-                React.createElement(HoleMap, { hole: course.holes[am.hole], seed: course.name + "#" + am.hole }))),
+                React.createElement(HoleMap, { hole: course.holes[am.hole], seed: course.name + "#" + am.hole, attrs: effAttrs(g) }))),
             !am.done ? (React.createElement("div", { className: "grid grid-cols-2 gap-2" },
                 React.createElement(Btn, { small: true, onClick: () => playCupHole(false) },
                     "PLAY HOLE ",
