@@ -2314,12 +2314,14 @@ const chA = (arr, comp) => withNewAttrs({ drivingAccuracy: arr[0], drivingDistan
 const CHALLENGES = [
     { id: "tiger97", diff: 0.06, cat: "dominance", year: 1997, event: "The Masters", course: "Augusta National", from: 10,
         title: "The Arrival", blurb: "Out in level par, aged 21, and still nine clear with nine to play. Finish the job, and see how far you can push the record.",
+        bio: "Tiger turned pro the previous August and won twice in his first few months on tour. This is his first major as a professional. He is hitting wedges into par 4s that the rest of the field reach with long irons, and is about to become the youngest Masters champion and the first golfer of Black heritage to win at Augusta.",
         you: { name: "Tiger Woods", age: 21, r: [84, 96, 94, 95, 92, 92, 93, 88], comp: 92, start: -15 },
         rivals: [{ name: "Costantino Rocca", start: -6, final: -3 }, { name: "Tom Kite", start: -5, final: -6 }],
         goals: [{ t: "Win by 10 or more", k: "margin", v: 10 }, { t: "Finish at -17 or better", k: "par", v: -17 }, { t: "Finish at -18 or better (his real score)", k: "par", v: -18 }],
         real: "Tiger shot 69 to finish at -18 and win by 12 over Tom Kite, the biggest winning margin in Masters history." },
     { id: "tiger19", diff: 0.06, cat: "comeback", year: 2019, event: "The Masters", course: "Augusta National", from: 10,
         title: "The Return", blurb: "One behind Francesco Molinari at the turn, with Amen Corner next. Eleven years since your last major. Go and get a fifth green jacket.",
+        bio: "Spinal fusion surgery in 2017 left Tiger unsure he would ever play again, and his world ranking fell outside the top 1,000. He won the Tour Championship in 2018, but at 43 he hasn't won a major since the 2008 U.S. Open.",
         you: { name: "Tiger Woods", age: 43, r: [86, 89, 95, 94, 92, 90, 92, 89], comp: 95, start: -12 },
         rivals: [{ name: "Francesco Molinari", start: -13, final: -11 }, { name: "Tony Finau", start: -11, final: -11 }, { name: "Brooks Koepka", start: -11, final: -12 },
             { name: "Dustin Johnson", start: -9, final: -12 }, { name: "Xander Schauffele", start: -10, final: -12 }],
@@ -2327,75 +2329,180 @@ const CHALLENGES = [
         real: "Tiger shot 70 to win by one at -13, his first major in eleven years. Molinari found the water on 12 and 15." },
     { id: "norman96", diff: -0.2, cat: "history", year: 1996, event: "The Masters", course: "Augusta National", from: 10,
         title: "Six Clear", blurb: "Your six-shot lead is down to two at the turn, and Nick Faldo won't stop. Nobody blows a six-shot lead at the Masters. Do they?",
+        bio: "The Great White Shark is world No. 1 and opened with a 63 to equal the course record. Augusta has broken his heart before: Larry Mize chipped in to beat him in a playoff in 1987. Nick Faldo, a five-time major champion, is the last man you'd want chasing you.",
         you: { name: "Greg Norman", age: 41, r: [89, 94, 92, 89, 88, 88, 89, 88], comp: 80, start: -11 },
         rivals: [{ name: "Nick Faldo", start: -9, final: -12 }],
         goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -13 or better", k: "par", v: -13 }, { t: "Finish at -14 or better", k: "par", v: -14 }],
         real: "Norman shot 78 and Faldo 67. Faldo won by five at -12: a six-shot deficit turned into his third green jacket." },
     { id: "rory11", diff: -0.94, cat: "history", year: 2011, event: "The Masters", course: "Augusta National", from: 10,
         title: "Sunday at 21", blurb: "Aged 21 and clinging to a one-shot lead at the turn, with Tiger charging. The back nine at Augusta on Sunday is waiting.",
+        bio: "Rory opened with a 65 and led by four after three rounds. He is 21, with no majors yet, and the whole golf world expects him to win his first green jacket today.",
         you: { name: "Rory McIlroy", age: 21, r: [86, 95, 92, 88, 86, 86, 87, 85], comp: 78, start: -11 },
         rivals: [{ name: "Charl Schwartzel", start: -10, final: -14 }, { name: "Jason Day", start: -9, final: -12 }, { name: "Adam Scott", start: -8, final: -12 }, { name: "Tiger Woods", start: -10, final: -10 }],
         goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -15 or better", k: "par", v: -15 }, { t: "Finish at -16 or better", k: "par", v: -16 }],
         real: "Rory shot 80. Charl Schwartzel birdied the last four holes to win at -14, two clear of Jason Day and Adam Scott." },
     { id: "spieth15", diff: 0.43, cat: "first", year: 2015, event: "The Masters", course: "Augusta National", from: 10,
         title: "Wire to Wire", blurb: "Five clear of Justin Rose at the turn, aged 21, with the scoring record in sight. Close it out for your first major.",
+        bio: "Spieth was runner-up on his Masters debut a year earlier. This week he has set the Masters records for 36 holes and 54 holes, and he is trying to become only the second 21-year-old to win at Augusta, after Tiger.",
         you: { name: "Jordan Spieth", age: 21, r: [84, 87, 90, 93, 93, 97, 94, 90], comp: 90, start: -17 },
         rivals: [{ name: "Justin Rose", start: -12, final: -14 }],
         goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -17 or better", k: "par", v: -17 }, { t: "Finish at -18 or better (his real score)", k: "par", v: -18 }],
         real: "Spieth closed with 70 to finish at -18, tying Tiger's 1997 record, and won by four." },
     { id: "spieth16", diff: 0.31, cat: "history", year: 2016, event: "The Masters", course: "Augusta National", from: 10,
         title: "Amen Corner", blurb: "Four straight birdies to the turn and five clear. Defending champion. Nine holes from back-to-back green jackets. Beware the 12th.",
+        bio: "The defending champion has led after seven straight Masters rounds, a record. He goes to the 10th tee five clear after four birdies in a row. Then comes the 12th.",
         you: { name: "Jordan Spieth", age: 22, r: [84, 87, 90, 93, 93, 97, 94, 90], comp: 84, start: -7 },
         rivals: [{ name: "Smylie Kaufman", start: -1, free: true }, { name: "Bernhard Langer", start: -1, free: true }, { name: "Hideki Matsuyama", start: -1, free: true }, { name: "Danny Willett", start: -2, final: -5 }],
         goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -6 or better", k: "par", v: -6 }, { t: "Finish at -8 or better", k: "par", v: -8 }],
         real: "Spieth led by five with nine to play, then went bogey, bogey and a quadruple-bogey 7 on 12. Danny Willett's bogey-free 67 won it at -5." },
     { id: "jack86", diff: -0.98, cat: "comeback", year: 1986, event: "The Masters", course: "Augusta National", from: 10,
         title: "The Bear's Last Roar", blurb: "Aged 46, out in 35 and four behind Greg Norman with nine to play. Everyone has written you off. One more Sunday charge?",
+        bio: "Jack has won 17 professional majors, but none for six years. Before the week an Atlanta newspaper wrote that he was done, and he stuck the article on the fridge of the house he was renting. He is 46.",
         you: { name: "Jack Nicklaus", age: 46, r: [88, 86, 92, 89, 86, 90, 88, 86], comp: 97, start: -3 },
         rivals: [{ name: "Greg Norman", start: -7, final: -8 }],
         goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -9 or better (his real score)", k: "par", v: -9 }, { t: "Finish at -10 or better", k: "par", v: -10 }],
         real: "Jack shot 65 with a back-nine 30 to win his sixth green jacket at -9, one ahead of Tom Kite and Greg Norman." },
     { id: "phil06", diff: 0.48, cat: "history", year: 2006, event: "U.S. Open", course: "Winged Foot (West)", from: 18,
         title: "The 18th Tee", blurb: "One shot clear on the 72nd tee. Par wins the U.S. Open. Bogey means a playoff with Geoff Ogilvy.",
+        bio: "Phil won the 2005 PGA Championship and the 2006 Masters. A win here makes it three majors in a row. He has finished second at the U.S. Open three times already.",
         you: { name: "Phil Mickelson", age: 35, r: [83, 92, 90, 96, 98, 92, 95, 96], comp: 82, start: 4 },
         rivals: [{ name: "Geoff Ogilvy", start: 5, final: 5, done: true }],
         goals: [{ t: "Win the U.S. Open", k: "win" }, { t: "Win without a playoff", k: "reg" }, { t: "Birdie the 18th", k: "par", v: 3 }],
         real: "Phil hit driver off a hospitality tent, then hit a tree, and made double bogey. Ogilvy won at +5." },
     { id: "payne99", diff: 0.01, cat: "clutch", year: 1999, event: "U.S. Open", course: "Pinehurst No. 2", from: 17,
         title: "The Putt", blurb: "Level with Phil Mickelson with two to play. A par-3, then the 18th. Pinehurst is watching.",
+        bio: "Payne lost the 1998 U.S. Open by one shot to Lee Janzen. He is playing in a rain jacket with the sleeves cut off. Phil Mickelson has a pager in his bag: his wife Amy is due any day, and he has promised to walk off the course if it goes off.",
         you: { name: "Payne Stewart", age: 42, r: [89, 86, 91, 91, 91, 92, 88, 88], comp: 90, start: 0 },
         rivals: [{ name: "Phil Mickelson", start: 0, final: 0 }],
         goals: [{ t: "Win the U.S. Open", k: "win" }, { t: "Win without a playoff", k: "reg" }, { t: "Finish at -2", k: "par", v: -2 }],
         real: "Payne birdied 17, then holed a 15-foot par putt on 18 to win by one at -1." },
     { id: "scott12", diff: 1.07, cat: "history", year: 2012, event: "The Open Championship", course: "Royal Lytham & St Annes", from: 15,
         title: "Four to Play", blurb: "Four clear with four holes left. The Claret Jug is almost in your hands. Ernie Els is still out there.",
+        bio: "Adam Scott, 32, has never won a major. He has played beautifully all week at Royal Lytham, while Ernie Els, a three-time major champion, has quietly climbed the leaderboard playing ahead of him.",
         you: { name: "Adam Scott", age: 32, r: [88, 94, 94, 90, 86, 85, 88, 86], comp: 80, start: -10 },
         rivals: [{ name: "Ernie Els", start: -6, final: -7, from: 18 }],
         goals: [{ t: "Win the Open", k: "win" }, { t: "Win by two or more", k: "margin", v: 2 }, { t: "Finish at -9 or better", k: "par", v: -9 }],
         real: "Scott bogeyed the last four holes. Els, playing ahead, birdied the 18th and won by one at -7." },
     { id: "tiger08", diff: 0.1, cat: "clutch", year: 2008, event: "U.S. Open", course: "Torrey Pines (South)", from: 18,
         title: "On One Leg", blurb: "Rocco Mediate is in at -1. You're level par on the 72nd tee, playing on a broken leg. Birdie to force a playoff.",
+        bio: "Tiger had knee surgery two months earlier and is playing with a torn ACL and a double stress fracture in his left leg. Rocco Mediate, 45 and ranked outside the world's top 150, came through qualifying just to get into the field.",
         you: { name: "Tiger Woods", age: 32, r: [85, 93, 95, 95, 93, 95, 95, 90], comp: 97, start: 0 },
         rivals: [{ name: "Rocco Mediate", start: -1, final: -1, done: true }],
         goals: [{ t: "Make birdie to force a playoff", k: "par", v: -1 }, { t: "Win the U.S. Open", k: "win" }, { t: "Eagle to win outright", k: "par", v: -2 }],
         real: "Tiger holed a 15-foot birdie putt to tie Rocco at -1, then won on the 91st hole after an 18-hole Monday playoff." },
     { id: "rory24", diff: 0.35, cat: "history", year: 2024, event: "U.S. Open", course: "Pinehurst No. 2", from: 13,
         title: "Six to Play", blurb: "Two clear of Bryson DeChambeau with six holes left. Ten years since your last major. Bring it home.",
+        bio: "Rory has won four majors, but the last one was ten years ago. Bryson DeChambeau, the 2020 U.S. Open champion, started the day three clear, and Rory has just made four birdies in five holes to overtake him.",
         you: { name: "Rory McIlroy", age: 35, r: [86, 97, 94, 90, 89, 87, 90, 89], comp: 82, start: -8 },
         rivals: [{ name: "Bryson DeChambeau", start: -6, final: -6 }],
         goals: [{ t: "Win the U.S. Open", k: "win" }, { t: "Finish at -8 or better", k: "par", v: -8 }, { t: "Finish at -9 or better", k: "par", v: -9 }],
         real: "Rory bogeyed 15, 16 and 18, missing two par putts inside four feet. Bryson got up and down from the bunker on 18 to win by one at -6." },
     { id: "rahm21", diff: -0.07, cat: "first", year: 2021, event: "U.S. Open", course: "Torrey Pines (South)", from: 17,
         title: "Birdie, Birdie", blurb: "One behind Louis Oosthuizen with two to play. Your first major is right there.",
+        bio: "Two weeks earlier Rahm led the Memorial by six shots after three rounds and had to withdraw with a positive COVID test. Torrey Pines is where he won his first PGA Tour title, and where he proposed to his wife.",
         you: { name: "Jon Rahm", age: 26, r: [88, 95, 94, 93, 90, 90, 91, 89], comp: 90, start: -4 },
         rivals: [{ name: "Louis Oosthuizen", start: -5, final: -5 }],
         goals: [{ t: "Win the U.S. Open", k: "win" }, { t: "Win without a playoff", k: "reg" }, { t: "Finish at -6 or better (his real score)", k: "par", v: -6 }],
         real: "Rahm holed birdie putts of 24 and 20 feet on 17 and 18 to win by one at -6, his first major." },
+    // the other side of each story: unlocked by winning the original
+    { id: "tiger97_flip", flipOf: "tiger97", diff: 0.37, cat: "dominance", year: 1997, event: "The Masters", course: "Augusta National", from: 10,
+        title: "The Chaser", blurb: "Ten behind the 21-year-old phenomenon with nine to play. Nobody is catching Tiger. Can you at least make him look over his shoulder?",
+        bio: "Tom Kite, 47, won the 1992 U.S. Open and is the captain of this year's Ryder Cup team. He is the closest thing Tiger has to a challenger, and he is ten shots back.",
+        you: { name: "Tom Kite", age: 47, r: [90, 80, 88, 90, 90, 89, 88, 88], comp: 90, start: -5 },
+        rivals: [{ name: "Tiger Woods", start: -15, final: -18 }, { name: "Costantino Rocca", start: -6, final: -3 }],
+        goals: [{ t: "Finish runner-up", k: "rank", v: 2 }, { t: "Finish at -6 or better (his real score)", k: "par", v: -6 }, { t: "Finish at -7 or better", k: "par", v: -7 }],
+        real: "Kite shot 70 to finish second at -6, twelve shots behind Tiger." },
+    { id: "tiger19_flip", flipOf: "tiger19", diff: 0.01, cat: "history", year: 2019, event: "The Masters", course: "Augusta National", from: 10,
+        title: "Hold Off the Tiger", blurb: "You lead the Masters by one at the turn, and the man one behind you is Tiger Woods. Amen Corner is next.",
+        bio: "Francesco Molinari won the 2018 Open at Carnoustie playing alongside Tiger in the final round. Now he leads Tiger again, with a fifth green jacket on the line for Tiger and a second major for him.",
+        you: { name: "Francesco Molinari", age: 36, r: [92, 84, 92, 91, 88, 89, 89, 88], comp: 90, start: -13 },
+        rivals: [{ name: "Tiger Woods", start: -12, final: -13 }, { name: "Brooks Koepka", start: -11, final: -12 }, { name: "Dustin Johnson", start: -9, final: -12 }, { name: "Xander Schauffele", start: -10, final: -12 }, { name: "Tony Finau", start: -11, final: -11 }],
+        goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -14 or better", k: "par", v: -14 }, { t: "Finish at -15 or better", k: "par", v: -15 }],
+        real: "Molinari found the water at the 12th and again at the 15th, made two double bogeys, and finished at -11." },
+    { id: "norman96_flip", flipOf: "norman96", diff: 0.14, cat: "comeback", year: 1996, event: "The Masters", course: "Augusta National", from: 10,
+        title: "The Hunter", blurb: "Six behind this morning, two behind now. Greg Norman is feeling it. Keep the pressure on and the green jacket could be yours.",
+        bio: "Nick Faldo has won three Opens and two Masters. Cold, precise and relentless, he has cut a six-shot deficit to two by the turn, playing alongside Norman.",
+        you: { name: "Nick Faldo", age: 38, r: [91, 84, 93, 93, 90, 90, 89, 90], comp: 94, start: -9 },
+        rivals: [{ name: "Greg Norman", start: -11, free: true }],
+        goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -11 or better", k: "par", v: -11 }, { t: "Finish at -12 or better (his real score)", k: "par", v: -12 }],
+        real: "Faldo shot 67 to win by five at -12, his third green jacket." },
+    { id: "rory11_flip", flipOf: "rory11", diff: -0.3, cat: "first", year: 2011, event: "The Masters", course: "Augusta National", from: 10,
+        title: "Four to Finish", blurb: "One behind the 21-year-old leader at the turn, with Tiger, Day and Scott all charging. Somebody is going to win this. Why not you?",
+        bio: "Charl Schwartzel, 26, chipped in on the 1st and holed his approach at the 3rd for an eagle. Nobody has ever finished the Masters with four straight birdies.",
+        you: { name: "Charl Schwartzel", age: 26, r: [88, 88, 91, 90, 89, 89, 88, 87], comp: 88, start: -10 },
+        rivals: [{ name: "Rory McIlroy", start: -11, free: true }, { name: "Jason Day", start: -9, final: -12 }, { name: "Adam Scott", start: -8, final: -12 }, { name: "Tiger Woods", start: -10, final: -10 }],
+        goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -14 or better (his real score)", k: "par", v: -14 }, { t: "Finish at -15 or better", k: "par", v: -15 }],
+        real: "Schwartzel birdied the last four holes to win by two at -14." },
+    { id: "spieth15_flip", flipOf: "spieth15", diff: -0.35, cat: "comeback", year: 2015, event: "The Masters", course: "Augusta National", from: 10,
+        title: "Chase the Kid", blurb: "Five behind a 21-year-old who has broken every record this week. Make him earn it.",
+        bio: "Justin Rose won the 2013 U.S. Open at Merion. He is playing alongside Spieth in the final group, five back with nine to play.",
+        you: { name: "Justin Rose", age: 34, r: [89, 87, 92, 91, 89, 88, 88, 88], comp: 89, start: -12 },
+        rivals: [{ name: "Jordan Spieth", start: -17, free: true }],
+        goals: [{ t: "Finish at -14 or better (his real score)", k: "par", v: -14 }, { t: "Finish at -16 or better", k: "par", v: -16 }, { t: "Win the Masters", k: "win" }],
+        real: "Rose shot 70 to finish tied second with Phil Mickelson at -14, four behind Spieth." },
+    { id: "spieth16_flip", flipOf: "spieth16", diff: -0.11, cat: "first", year: 2016, event: "The Masters", course: "Augusta National", from: 10,
+        title: "Bogey-Free", blurb: "Five behind the defending champion at the turn. Keep it clean, post a number, and see what happens at the 12th.",
+        bio: "Danny Willett nearly didn't play: his first child was due on the Sunday of the Masters. His son arrived eleven days early, so he made the trip. He has never won a major.",
+        you: { name: "Danny Willett", age: 28, r: [90, 85, 90, 90, 89, 89, 88, 88], comp: 90, start: -2 },
+        rivals: [{ name: "Jordan Spieth", start: -7, final: -3 }, { name: "Smylie Kaufman", start: -1, free: true }, { name: "Hideki Matsuyama", start: -1, free: true }],
+        goals: [{ t: "Win the Masters", k: "win" }, { t: "Finish at -4 or better", k: "par", v: -4 }, { t: "Finish at -5 or better (his real score)", k: "par", v: -5 }],
+        real: "Willett shot a bogey-free 67 to win by three at -5, while Spieth put two balls in the water at the 12th." },
+    { id: "jack86_flip", flipOf: "jack86", diff: -0.16, cat: "history", year: 1986, event: "The Masters", course: "Augusta National", from: 10,
+        title: "The Saturday Slam", blurb: "You lead the Masters at the turn. Behind you, a 46-year-old is about to start the charge of his life.",
+        bio: "Greg Norman led all four majors after 54 holes in 1986, the 'Saturday Slam'. He would win only one of them. This is the first.",
+        you: { name: "Greg Norman", age: 31, r: [86, 95, 91, 89, 88, 88, 88, 88], comp: 82, start: -7 },
+        rivals: [{ name: "Jack Nicklaus", start: -3, final: -9 }],
+        goals: [{ t: "Finish at -8 or better (his real score)", k: "par", v: -8 }, { t: "Finish at -9 or better", k: "par", v: -9 }, { t: "Win the Masters", k: "win" }],
+        real: "Norman birdied 14, 15, 16 and 17 to tie Jack at -9, then pushed his approach at 18 into the crowd and bogeyed to finish one back." },
+    { id: "phil06_flip", flipOf: "phil06", diff: -0.11, cat: "history", year: 2006, event: "U.S. Open", course: "Winged Foot (West)", from: 18,
+        title: "Monty's Moment", blurb: "A 60-foot birdie putt on 17 and you share the lead. Par the 18th and you post the clubhouse lead at the U.S. Open.",
+        bio: "Colin Montgomerie won seven European Order of Merit titles in a row but never a major. At 42, this might be his best chance.",
+        you: { name: "Colin Montgomerie", age: 42, r: [92, 82, 91, 89, 86, 87, 86, 86], comp: 80, start: 4 },
+        rivals: [{ name: "Geoff Ogilvy", start: 5, final: 5, done: true }, { name: "Phil Mickelson", start: 4, free: true }],
+        goals: [{ t: "Par the 18th to post +4", k: "par", v: 4 }, { t: "Win the U.S. Open", k: "win" }, { t: "Win without a playoff", k: "reg" }],
+        real: "Monty's approach came up short in the rough. He chipped on and three-putted for a double bogey to finish at +6." },
+    { id: "payne99_flip", flipOf: "payne99", diff: 0.2, cat: "clutch", year: 1999, event: "U.S. Open", course: "Pinehurst No. 2", from: 17,
+        title: "The Pager", blurb: "Level with Payne Stewart with two to play, and a pager in your bag that could go off at any moment.",
+        bio: "Phil Mickelson, 29, is still looking for his first major. His wife Amy is due with their first child, and he has promised to leave the moment the pager goes off.",
+        you: { name: "Phil Mickelson", age: 29, r: [80, 92, 90, 95, 97, 91, 95, 95], comp: 84, start: 0 },
+        rivals: [{ name: "Payne Stewart", start: 0, free: true }],
+        goals: [{ t: "Win the U.S. Open", k: "win" }, { t: "Win without a playoff", k: "reg" }, { t: "Finish at -1 or better", k: "par", v: -1 }],
+        real: "Phil missed birdie chances on 16 and 17 and finished one behind at level par. His daughter Amanda was born the next day." },
+    { id: "scott12_flip", flipOf: "scott12", diff: -0.03, cat: "clutch", year: 2012, event: "The Open Championship", course: "Royal Lytham & St Annes", from: 18,
+        title: "Post a Number", blurb: "Four behind with Scott on the 15th. Birdie the last, post -7, and let the pressure do the rest.",
+        bio: "Ernie Els, 42, has won two U.S. Opens and the 2002 Open. Ten years on, this is his chance at a fourth major. He is playing a few groups ahead of the leader.",
+        you: { name: "Ernie Els", age: 42, r: [86, 88, 90, 90, 89, 87, 88, 89], comp: 92, start: -6 },
+        rivals: [{ name: "Adam Scott", start: -10, final: -6, from: 15 }],
+        goals: [{ t: "Win the Open", k: "win" }, { t: "Win without a playoff", k: "reg" }, { t: "Birdie the 18th and win outright", k: "par", v: -7 }],
+        real: "Els holed his birdie putt on 18 to post -7, then watched Scott bogey the last four holes. Els won by one." },
+    { id: "tiger08_flip", flipOf: "tiger08", diff: 0.55, cat: "clutch", year: 2008, event: "U.S. Open", course: "Torrey Pines (South)", from: 18,
+        title: "Rocco's Last Hole", blurb: "One hole between you and the clubhouse lead at the U.S. Open. Tiger is playing behind you on one good leg.",
+        bio: "Rocco Mediate, 45, came through qualifying ranked outside the world's top 150. He has never won a major. Everyone loves him.",
+        you: { name: "Rocco Mediate", age: 45, r: [92, 80, 89, 88, 88, 89, 87, 87], comp: 86, start: -1 },
+        rivals: [{ name: "Tiger Woods", start: 0, free: true }],
+        goals: [{ t: "Par the 18th to post -1 (his real score)", k: "par", v: -1 }, { t: "Win the U.S. Open", k: "win" }, { t: "Birdie the 18th to win", k: "par", v: -2 }],
+        real: "Rocco parred 18 to post -1. Tiger birdied the last to force a Monday playoff, and won on the 91st hole." },
+    { id: "rory24_flip", flipOf: "rory24", diff: 0.31, cat: "first", year: 2024, event: "U.S. Open", course: "Pinehurst No. 2", from: 13,
+        title: "Bryson's Bunker", blurb: "Two behind Rory with six to play at Pinehurst. Stay patient, keep making pars, and see if he cracks.",
+        bio: "Bryson DeChambeau won the 2020 U.S. Open at Winged Foot. He started the day three clear and is in the final group, one group behind Rory, who has just overtaken him.",
+        you: { name: "Bryson DeChambeau", age: 30, r: [82, 99, 92, 90, 88, 89, 88, 89], comp: 88, start: -6 },
+        rivals: [{ name: "Rory McIlroy", start: -8, final: -5 }],
+        goals: [{ t: "Win the U.S. Open", k: "win" }, { t: "Win without a playoff", k: "reg" }, { t: "Finish at -7 or better", k: "par", v: -7 }],
+        real: "Bryson parred his way in and got up and down from a greenside bunker at 18 to win by one at -6." },
+    { id: "rahm21_flip", flipOf: "rahm21", diff: -0.11, cat: "history", year: 2021, event: "U.S. Open", course: "Torrey Pines (South)", from: 17,
+        title: "Two to Play", blurb: "Jon Rahm has just birdied the last two to post -6. You're one back with two to play.",
+        bio: "Louis Oosthuizen won the 2010 Open and has finished second in five majors since. He needs to finish birdie-birdie to win the U.S. Open.",
+        you: { name: "Louis Oosthuizen", age: 38, r: [88, 89, 91, 90, 89, 89, 88, 88], comp: 86, start: -5 },
+        rivals: [{ name: "Jon Rahm", start: -6, final: -6, done: true }],
+        goals: [{ t: "Finish at -6 to force a playoff", k: "par", v: -6 }, { t: "Win the U.S. Open", k: "win" }, { t: "Win without a playoff", k: "reg" }],
+        real: "Oosthuizen pulled his drive into the hazard on 17 and made bogey, then birdied 18 to finish second at -5, one behind Rahm." }
 ];
 const CH_FIELD = withNewAttrs({ drivingAccuracy: 87, drivingDistance: 87, longApproach: 87, shortApproach: 87, chipping: 87, putting: 87, recovery: 87, bunker: 87, composure: 84 }, "");
 const chLoad = () => { try { return JSON.parse(localStorage.getItem(CH_KEY) || "{}") || {}; } catch (e) { return {}; } };
 const chStore = (d) => { try { localStorage.setItem(CH_KEY, JSON.stringify(d)); } catch (e) { /* storage blocked: progress just isn't kept */ } };
-const chToday = () => { const n = Math.floor((Date.now() - CH_LAUNCH) / 864e5); const i = ((n % CHALLENGES.length) + CHALLENGES.length) % CHALLENGES.length; return { n: Math.max(1, n + 1), sc: CHALLENGES[i], key: new Date().toISOString().slice(0, 10) }; };
+const CH_MAIN = CHALLENGES.filter((c) => !c.flipOf); // the originals; each one's other side is unlocked by winning it
+const chFlip = (id) => CHALLENGES.find((c) => c.flipOf === id);
+const chToday = () => { const n = Math.floor((Date.now() - CH_LAUNCH) / 864e5); const i = ((n % CH_MAIN.length) + CH_MAIN.length) % CH_MAIN.length; return { n: Math.max(1, n + 1), sc: CH_MAIN[i], key: new Date().toISOString().slice(0, 10) }; };
 const chCourse = (sc) => COURSES.find((c) => c.name === sc.course);
 const chWx = { wind: 1, rain: 0, cold: 0 };
 // a rival's remaining holes, nudged so their total lands near their REAL final score
@@ -2595,15 +2702,19 @@ const chNews = (ch, before, after, played, total) => {
     });
     return out.slice(0, 3);
 };
-const chGoals = (sc, res) => sc.goals.map((gl) => gl.k === "win" ? res.won : gl.k === "reg" ? res.won && !res.playoff : gl.k === "margin" ? res.won && res.margin >= gl.v : res.toPar <= gl.v);
+const chGoals = (sc, res) => sc.goals.map((gl) => gl.k === "win" ? res.won : gl.k === "reg" ? res.won && !res.playoff : gl.k === "margin" ? res.won && res.margin >= gl.v : gl.k === "rank" ? (res.rank || 99) <= gl.v : res.toPar <= gl.v);
 // stars are cumulative: the second star needs the first goal too, and so on
 const chStars = (sc, res) => { const f = chGoals(sc, res), miss = f.findIndex((x) => !x); return f.map((x, i) => miss === -1 || i < miss); };
 const chEmoji = (d) => d <= -2 ? "🟨" : d === -1 ? "🟩" : d === 0 ? "⬜" : d === 1 ? "🟧" : "🟥";
 const CH_MEDAL = ["", "🥉", "🥈", "🥇"];
 const CH_TEST = SAVE_KEY.includes("beta"); // the test mode (pick any challenge, nothing saved) only exists in the beta
 const CH_MEDAL_NAME = ["", "BRONZE", "SILVER", "GOLD"];
+// who really won: winning one of these matches history, losing it rewrites it
+const CH_REAL_WIN = new Set(["tiger97", "tiger19", "spieth15", "jack86", "payne99", "tiger08", "rahm21", "norman96_flip", "rory11_flip", "spieth16_flip", "scott12_flip", "rory24_flip"]);
+const chHeadline = (sc, won) => CH_REAL_WIN.has(sc.id) ? (won ? "LEGEND MATCHED" : "IT SLIPPED AWAY") : (won ? "HISTORY REWRITTEN" : "HISTORY REPEATS");
 // the result if the round stopped right now (a tie isn't a win yet)
-const chNow = (board) => { const my = board.find((r) => r.you).toPar, best = Math.min(...board.filter((r) => !r.you).map((r) => r.toPar)); return { won: my < best, toPar: my, margin: best - my, playoff: false }; };
+const chRank = (board) => { const my = board.find((r) => r.you).toPar; return 1 + board.filter((r) => !r.you && r.toPar < my).length; };
+const chNow = (board) => { const my = board.find((r) => r.you).toPar, best = Math.min(...board.filter((r) => !r.you).map((r) => r.toPar)); return { won: my < best, toPar: my, margin: best - my, playoff: false, rank: chRank(board) }; };
 
 const hofScoreOf = (m) => m.careerWins * 2 + m.careerMajors * 8 + (m.fedexTitles || 0) * 6 + (((m.rc || {}).teamWins || 0) + ((m.pc || {}).teamWins || 0)) * 2 + Math.floor((m.careerMoney || 0) / 2e7);
 const HOF_LINE = 30; // score needed to be inducted
@@ -5892,12 +6003,12 @@ function GolfCareerSim() {
             React.createElement(BackTop, { onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
             React.createElement("div", { className: "text-center mb-3" },
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.blue, lineHeight: 1 } }, "🧪 CHALLENGE TEST MODE"),
-                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "Beta only. Tap any challenge to play it. Results aren't saved, so play each one as often as you like.")),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "Beta only. Tap any challenge to play it, including every other side (no need to unlock them here). Results aren't saved, so play each one as often as you like.")),
             CHALLENGES.map((c) => React.createElement("button", { key: c.id, onClick: () => { setCh({ ...chStart(c), daily: false, test: true }); setScreen("challenge"); }, className: "w-full p-2.5 rounded-xl mb-2 text-left active:scale-[0.99]", style: { background: C.card, border: "1px solid rgba(127,183,217,0.4)" } },
                 React.createElement("div", { className: "flex justify-between items-baseline" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 15, color: C.chalk } }, `${c.you.name} · ${c.year} ${c.event}`),
                     React.createElement("span", { className: "text-[10px]", style: { color: C.muted, fontFamily: MONO } }, `id ${c.id}`)),
-                React.createElement("div", { className: "text-[11px]", style: { color: C.gold } }, `"${c.title}" · ${19 - c.from === 1 ? "18th hole only" : `holes ${c.from}-18`} · ${CH_CATS[c.cat]}`),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.gold } }, `${c.flipOf ? "🔄 OTHER SIDE · " : ""}"${c.title}" · ${19 - c.from === 1 ? "18th hole only" : `holes ${c.from}-18`} · ${CH_CATS[c.cat]}`),
                 React.createElement("div", { className: "text-[10px]", style: { color: C.muted } }, `${c.goals.map((gl, i) => CH_MEDAL[i + 1] + " " + gl.t).join("  ")}${(by[c.id] || {}).stars ? `  · your real best: ${CH_MEDAL[by[c.id].stars]}` : ""}`))),
             React.createElement(Btn, { onClick: () => { if (window.confirm("Clear all your challenge medals and daily results? (For testing the medal flow.)")) { chStore({}); setScreen("chtest"); window.alert("Challenge progress cleared."); } }, kind: "panel" }, "🗑️ CLEAR MY CHALLENGE MEDALS"),
             React.createElement(Btn, { onClick: () => setScreen(g && g.pro ? "hub" : "landing"), kind: "panel" }, "BACK")));
@@ -5907,6 +6018,18 @@ function GolfCareerSim() {
         const totalStars = CHALLENGES.reduce((t, c) => t + ((by[c.id] || {}).stars || 0), 0);
         const medals = [3, 2, 1].map((m) => CHALLENGES.filter((c) => ((by[c.id] || {}).stars || 0) === m).length);
         const playedToday = (st.daily || {})[today.key];
+        // the other side of a story: locked until you've won the original
+        const flipStrip = (c) => {
+            const fl = chFlip(c.id);
+            if (!fl) return null;
+            const open = ((by[c.id] || {}).wins || 0) > 0, fr = by[fl.id] || {};
+            return open ? React.createElement("button", { onClick: () => { track("challenge/start/" + fl.id); setCh({ ...chStart(fl), daily: false }); setScreen("challenge"); }, className: "w-full p-2.5 rounded-b-xl -mt-2 mb-2 text-left active:scale-[0.99]", style: { background: "#1B2A36", border: "1px solid rgba(127,183,217,0.5)", borderTop: "none" } },
+                React.createElement("div", { className: "flex justify-between items-baseline" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 14, color: C.blue } }, `🔄 THE OTHER SIDE: ${fl.you.name.toUpperCase()}`),
+                    React.createElement("span", { style: { fontSize: 14 } }, fr.stars ? CH_MEDAL[fr.stars] : "")),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, `"${fl.title}" · ${fl.blurb}`))
+                : React.createElement("div", { className: "w-full p-2 rounded-b-xl -mt-2 mb-2 text-[11px]", style: { background: "rgba(10,20,14,0.5)", border: "1px solid rgba(244,247,242,0.1)", borderTop: "none", color: C.muted } }, `🔒 Win this to unlock the other side: ${fl.you.name}'s story`);
+        };
         const card = (c, daily) => {
             const rec = by[c.id] || {};
             return (React.createElement("button", { key: (daily ? "d-" : "") + c.id, onClick: () => { track("challenge/start/" + c.id); setCh({ ...chStart(c), daily: !!daily }); setScreen("challenge"); },
@@ -5923,7 +6046,7 @@ function GolfCareerSim() {
             React.createElement("div", { className: "text-center mb-3" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, "SUNDAY PINS"),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk, lineHeight: 1 } }, "🏆 CHALLENGES"),
-                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "Golf's greatest final rounds. Step into the legend's shoes from the real position. Repeat history, or rewrite it.")),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "Golf's greatest final rounds. Step into the legend's shoes from the real position. Repeat history, or rewrite it. Win one to unlock the other side of the story.")),
             React.createElement("div", { className: "p-3 rounded-xl mb-3 text-center", style: { background: C.panel } },
                 React.createElement("div", { className: "text-[10px]", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "YOUR HONOURS"),
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk } }, `🥇 ${medals[0]}  🥈 ${medals[1]}  🥉 ${medals[2]}`),
@@ -5931,10 +6054,10 @@ function GolfCareerSim() {
             React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, `DAILY CHALLENGE #${today.n}${playedToday ? " · PLAYED TODAY " + (playedToday.stars ? CH_MEDAL[playedToday.stars] : "") : ""}`),
             card(today.sc, true),
             Object.entries(CH_CATS).map(([cat, label]) => {
-                const list = CHALLENGES.filter((c) => c.cat === cat);
+                const list = CH_MAIN.filter((c) => c.cat === cat);
                 return list.length ? (React.createElement("div", { key: cat, className: "mt-3" },
                     React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, label.toUpperCase()),
-                    list.map((c) => card(c, false)))) : null;
+                    list.map((c) => React.createElement("div", { key: c.id }, card(c, false), flipStrip(c))))) : null;
             }),
             React.createElement(Btn, { onClick: () => setScreen(g && g.pro ? "hub" : "landing"), kind: "panel" }, "BACK")));
     }
@@ -5949,7 +6072,7 @@ function GolfCareerSim() {
             const fin = chBoard(c);
             const my = fin.find((r) => r.you).toPar, best = Math.min(...fin.filter((r) => !r.you).map((r) => r.toPar));
             if (my === best) return { ...c, phase: "playoff", po: { n: 0, tied: fin.filter((r) => !r.you && r.toPar === best).map((r) => r.name), log: [] }, alerts: [`⚔️ Tied at ${thruPar(my)}. Sudden-death playoff on the ${course.holes.length}th!`] };
-            return chDone(c, { won: my < best, toPar: my, margin: best - my, playoff: false });
+            return chDone(c, { won: my < best, toPar: my, margin: best - my, playoff: false, rank: chRank(fin) });
         };
         const chDone = (c, res) => {
             const stars = chStars(sc, res).filter(Boolean).length;
@@ -5960,7 +6083,8 @@ function GolfCareerSim() {
             if (c.daily && !daily[today.key]) daily[today.key] = { id: sc.id, stars, won: res.won };
             chStore({ ...stx, by, daily });
             track(`challenge/${res.won ? "won" : "lost"}/${sc.id}`);
-            return { ...c, phase: "done", res: { ...res, stars, newBest: stars > (prev.stars || 0) } };
+            const flip = !sc.flipOf && chFlip(sc.id), unlocked = !!(flip && res.won && !prev.wins);
+            return { ...c, phase: "done", res: { ...res, stars, newBest: stars > (prev.stars || 0), unlocked } };
         };
         const holeIdx = ch.phase === "playoff" ? course.holes.length - 1 : ch.idx;
         const hole = course.holes[holeIdx];
@@ -5974,7 +6098,7 @@ function GolfCareerSim() {
                     const log = [...ch.po.log, { me: score, opp }];
                     const nc = { ...ch, h: null, phase: "playoff", putt: null, po: { ...ch.po, n: ch.po.n + 1, log }, last: { score, par: hole[0], note }, alerts: [`Playoff hole ${log.length}: you ${scoreName(score, hole[0]).toLowerCase()}, ${ch.po.tied.length > 1 ? "best of the rest" : ch.po.tied[0]} ${scoreName(opp, hole[0]).toLowerCase()}`] };
                     const fin = chBoard(ch).find((r) => r.you).toPar;
-                    if (score !== opp || log.length >= 6) { const won = score < opp || (score === opp && Math.random() < 0.5); setCh(chDone(nc, { won, toPar: fin, margin: won ? 1 : -1, playoff: true })); }
+                    if (score !== opp || log.length >= 6) { const won = score < opp || (score === opp && Math.random() < 0.5); setCh(chDone(nc, { won, toPar: fin, margin: won ? 1 : -1, playoff: true, rank: won ? 1 : 2 })); }
                     else setCh(nc);
                     return;
                 }
@@ -6002,12 +6126,12 @@ function GolfCareerSim() {
             const flags = chStars(sc, r);
             const row = ch.my.map((s, k) => chEmoji(s - course.holes[sc.from - 1 + k][0])).join("") + (ch.po ? " +" + ch.po.log.map((x) => chEmoji(x.me - course.holes[17][0])).join("") : "");
             const today = chToday();
-            const shareText = `⛳ Sunday Pins ${ch.daily ? `Daily Challenge #${today.n}` : "Challenge"}\n${sc.you.name}, ${sc.year} ${sc.event}: "${sc.title}"\n${r.won ? "History rewritten" : "History repeated"} ${r.stars ? CH_MEDAL[r.stars] + " " + CH_MEDAL_NAME[r.stars] : "no medal"} (${thruPar(r.toPar)})\n${row}\n${ch.pm.a ? `🎯 ${ch.pm.m}/${ch.pm.a} putts holed\n` : ""}${SITE_URL}`;
+            const shareText = `⛳ Sunday Pins ${ch.daily ? `Daily Challenge #${today.n}` : "Challenge"}\n${sc.you.name}, ${sc.year} ${sc.event}: "${sc.title}"\n${chHeadline(sc, r.won).charAt(0) + chHeadline(sc, r.won).slice(1).toLowerCase()} ${r.stars ? CH_MEDAL[r.stars] + " " + CH_MEDAL_NAME[r.stars] : "no medal"} (${thruPar(r.toPar)})\n${row}\n${ch.pm.a ? `🎯 ${ch.pm.m}/${ch.pm.a} putts holed\n` : ""}${SITE_URL}`;
             const share = async () => { track("challenge/share/" + sc.id); try { if (navigator.share) { await navigator.share({ text: shareText }); return; } } catch (e) { return; } try { await navigator.clipboard.writeText(shareText); window.alert("Result copied. Paste it anywhere!"); } catch (e) { window.alert(shareText); } };
             return (React.createElement(Shell, null,
                 React.createElement("div", { className: "pt-6 text-center" },
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, `${sc.year} ${sc.event.toUpperCase()}`),
-                    React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: r.won ? C.gold : C.chalk, lineHeight: 1.05 } }, r.won ? "HISTORY REWRITTEN" : "HISTORY REPEATS"),
+                    React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: r.won ? C.gold : C.chalk, lineHeight: 1.05 } }, chHeadline(sc, r.won)),
                     React.createElement("p", { className: "text-sm mt-1", style: { color: C.chalk } }, `${sc.you.name} finishes at ${thruPar(r.toPar)}${r.playoff ? " after a playoff" : ""}. ${r.won ? (r.playoff ? "Won in sudden death." : `Won by ${r.margin}.`) : r.margin === 0 ? "Lost in the playoff." : `${-r.margin} short.`}`),
                     React.createElement("div", { className: "my-3", style: { fontSize: 40, lineHeight: 1 } }, r.stars ? CH_MEDAL[r.stars] : "🏌️"),
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 18, letterSpacing: 3, color: r.stars ? C.gold : C.muted } }, r.stars ? `${CH_MEDAL_NAME[r.stars]} MEDAL` : "NO MEDAL THIS TIME"),
@@ -6019,6 +6143,10 @@ function GolfCareerSim() {
                 React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.card } },
                     React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "WHAT REALLY HAPPENED"),
                     React.createElement("p", { className: "text-xs", style: { color: C.chalk } }, sc.real)),
+                r.unlocked && React.createElement("div", { className: "p-3 rounded-xl mb-3 text-center", style: { background: "#1B2A36", border: `1.5px solid ${C.blue}` } },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: C.blue, letterSpacing: 2 } }, "🔓 OTHER SIDE UNLOCKED"),
+                    React.createElement("p", { className: "text-xs my-1", style: { color: C.chalk } }, `Now play it as ${chFlip(sc.id).you.name}: "${chFlip(sc.id).title}"`),
+                    React.createElement(Btn, { onClick: () => { const fl = chFlip(sc.id); track("challenge/start/" + fl.id); setCh({ ...chStart(fl), daily: false, test: !!ch.test }); } }, "🔄 PLAY THE OTHER SIDE")),
                 React.createElement(Btn, { onClick: share }, "📤 SHARE YOUR RESULT"),
                 React.createElement(Btn, { onClick: () => { if (!ch.test) track("challenge/retry/" + sc.id); setCh({ ...chStart(sc), daily: false, test: !!ch.test }); }, kind: "panel" }, "🔁 TRY AGAIN"),
                 React.createElement(Btn, { onClick: () => setScreen(chBack), kind: "panel" }, ch.test ? "🧪 BACK TO TEST MODE" : "ALL CHALLENGES")));
@@ -6034,6 +6162,9 @@ function GolfCareerSim() {
                     React.createElement("div", { className: "text-xs", style: { color: C.muted } }, `You are ${sc.you.name}, age ${sc.you.age} · ${course.name}`),
                     ch.test && React.createElement("div", { className: "text-[11px] mt-1", style: { color: C.blue } }, "🧪 Test mode: this run won't be saved")),
                 React.createElement("p", { className: "text-xs my-2 p-2.5 rounded-lg", style: { background: C.panel, color: C.chalk } }, sc.blurb),
+                sc.bio && React.createElement("div", { className: "p-2.5 rounded-xl mb-2", style: { background: C.card } },
+                    React.createElement("div", { className: "text-[10px] text-center", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, sc.flipOf ? "🔄 THE OTHER SIDE" : "📖 THE STORY"),
+                    React.createElement("p", { className: "text-xs", style: { color: C.chalk } }, sc.bio)),
                 React.createElement("div", { className: "p-2.5 rounded-xl mb-2 text-center", style: { background: C.card } },
                     React.createElement("div", { className: "text-[10px]", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "THE SITUATION"),
                     React.createElement("div", { className: "text-sm", style: { color: C.chalk } }, `${total === 1 ? "One hole to play" : `${total} holes to play`}, starting on the ${sc.from}${sc.from === 1 ? "st" : sc.from === 2 ? "nd" : sc.from === 3 ? "rd" : "th"} at ${thruPar(me.toPar)}.`),
