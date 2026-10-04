@@ -5822,6 +5822,13 @@ function GolfCareerSim() {
         const startFresh = (id) => { setConfirmEraseId(null); setMode(id); setAttrs({}); setPair(null); setName(""); setNation(""); setLastTake(null); setScreen("identity"); };
         return (React.createElement(Shell, null,
             React.createElement(HomeHero, null),
+            React.createElement("button", { onClick: () => { track("challenges/open"); setScreen("challenges"); }, className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 17, color: C.gold } }, "\uD83C\uDFC6 NEW: CHALLENGES \u00B7 REWRITE HISTORY"),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.chalk } }, `Daily Challenge #${chToday().n}: ${chToday().sc.you.name}, ${chToday().sc.year} ${chToday().sc.event}. "${chToday().sc.title}"`),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Golf's greatest final rounds, from the real position. Can you change how it ended?")),
+            CH_TEST && React.createElement("button", { onClick: () => setScreen("chtest"), className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: C.panel, border: "1px dashed rgba(127,183,217,0.7)" } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: C.blue } }, "🧪 CHALLENGE TEST MODE (BETA)"),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Pick any challenge and play it. Nothing is saved: no medals, no daily result.")),
             React.createElement(HowItPlays, null),
             React.createElement("div", { className: "text-[10px] mb-2 text-center", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "CHOOSE YOUR WORLD"),
             React.createElement("div", { className: "px-1" }, GAME_MODES.map((md) => {
@@ -5872,13 +5879,6 @@ function GolfCareerSim() {
                             React.createElement(Btn, { small: true, kind: "panel", onClick: () => setConfirmEraseId(null) }, "CANCEL"))))));
             })),
             React.createElement("p", { className: "text-[10px] text-center mb-3", style: { color: C.muted } }, "Every mode keeps its own save \u2014 jump between careers whenever you like."),
-            React.createElement("button", { onClick: () => { track("challenges/open"); setScreen("challenges"); }, className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 17, color: C.gold } }, "\uD83C\uDFC6 CHALLENGES \u00B7 REWRITE HISTORY"),
-                React.createElement("div", { className: "text-[11px]", style: { color: C.chalk } }, `Daily Challenge #${chToday().n}: ${chToday().sc.you.name}, ${chToday().sc.year} ${chToday().sc.event}. "${chToday().sc.title}"`),
-                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Golf's greatest final rounds, from the real position. Can you change how it ended?")),
-            CH_TEST && React.createElement("button", { onClick: () => setScreen("chtest"), className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: C.panel, border: "1px dashed rgba(127,183,217,0.7)" } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: C.blue } }, "🧪 CHALLENGE TEST MODE (BETA)"),
-                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Pick any challenge and play it. Nothing is saved: no medals, no daily result.")),
             React.createElement("button", { onClick: openHof, className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: C.panel, border: `1px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } }, "\uD83C\uDFDB\uFE0F HALL OF FAME"),
                 React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Every career you finish, in any mode, ranked. Can your next pro beat your last?")),
