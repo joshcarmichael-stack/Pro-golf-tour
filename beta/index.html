@@ -947,10 +947,10 @@ const trainCost = (v) => Math.round(trainCostBase(v) * 0.75 / 5) * 5;
 // the last few points are expensive, so a pro that isn't developed carefully falls short. Big wins can break
 // through a ceiling a little; from 33 the physical ceilings start to fall.
 const POT_TIERS = [
-    { id: "journeyman", name: "Journeyman", stars: 2, base: 84, p: 0.25, blurb: "A solid tour pro. Wins will be rare and hard-earned." },
-    { id: "regular", name: "Tour regular", stars: 3, base: 87, p: 0.35, blurb: "Good enough to contend most weeks on a course that suits you." },
-    { id: "star", name: "Star", stars: 4, base: 90, p: 0.27, blurb: "A multiple winner, with majors well within reach." },
-    { id: "generational", name: "Generational", stars: 5, base: 92, p: 0.13, blurb: "Once-in-a-generation talent. The records are there if you put the work in." },
+    { id: "journeyman", name: "Journeyman", stars: 2, base: 78, p: 0.25, blurb: "A solid tour pro. Wins will be rare and hard-earned." },
+    { id: "regular", name: "Tour regular", stars: 3, base: 81, p: 0.35, blurb: "Good enough to contend most weeks on a course that suits you." },
+    { id: "star", name: "Star", stars: 4, base: 85, p: 0.27, blurb: "A multiple winner, with majors well within reach." },
+    { id: "generational", name: "Generational", stars: 5, base: 89, p: 0.13, blurb: "Once-in-a-generation talent. The records are there if you put the work in." },
 ];
 const POT_KEYS = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker", "composure", "paceControl", "shotShaping", "courseManagement"];
 const rollPotential = (attrs, forceTier) => {
@@ -3970,8 +3970,8 @@ function GolfCareerSim() {
         const have = [...(st.badges || [])];
         let attrs = { ...st.pro.attrs };
         const pot = st.pot ? { ...st.pot, caps: { ...st.pot.caps } } : null;
-        // a breakthrough raises the ceiling too, but only so far: +2 per skill across a whole career
-        const lift = (k) => { if (pot && pot.caps[k] != null) { pot.lift = { ...(pot.lift || {}) }; if ((pot.lift[k] || 0) < 2) { pot.caps[k] = Math.min(99, pot.caps[k] + 1); pot.lift[k] = (pot.lift[k] || 0) + 1; } } };
+        // a breakthrough raises the ceiling too, but only so far: +1 per skill across a whole career
+        const lift = (k) => { if (pot && pot.caps[k] != null) { pot.lift = { ...(pot.lift || {}) }; if ((pot.lift[k] || 0) < 1) { pot.caps[k] = Math.min(99, pot.caps[k] + 1); pot.lift[k] = (pot.lift[k] || 0) + 1; } } };
         const news = [...(st.badgeNews || [])];
         let changed = false;
         const earned = { ...(st.earned || {}) };
@@ -5664,7 +5664,7 @@ function GolfCareerSim() {
             const amt = coachBoost(g.coach);
             const keys = g.coach.attr === "ALL" ? ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker", "composure", ...NEW_KEYS] : [g.coach.attr];
             // the elite programme can push your ceilings a little higher (twice in a career at most)
-            if (pot && g.coach.attr === "ALL" && (pot.coachBonus || 0) < 2) { keys.forEach((k) => { if (pot.caps[k] != null) pot.caps[k] = Math.min(99, pot.caps[k] + 1); }); pot.coachBonus = (pot.coachBonus || 0) + 1; }
+            if (pot && g.coach.attr === "ALL" && (pot.coachBonus || 0) < 1) { keys.forEach((k) => { if (pot.caps[k] != null) pot.caps[k] = Math.min(99, pot.caps[k] + 1); }); pot.coachBonus = (pot.coachBonus || 0) + 1; }
             keys.forEach((k) => {
                 const before = newAttrs[k];
                 newAttrs[k] = Math.min(pot && pot.caps[k] != null ? Math.max(before, pot.caps[k]) : 99, newAttrs[k] + amt);
