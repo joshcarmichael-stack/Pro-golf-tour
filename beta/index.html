@@ -6290,7 +6290,10 @@ function GolfCareerSim() {
     }
     // ---------- turn pro or go to college ----------
     if (screen === "path" && pendingPro) {
-        const go = (path) => { const p = { ...pendingPro, path }; setPendingPro(null); beginCareer(p); };
+        if (pendingPro.starting) // career is being set up; beginCareer moves to the hub shortly
+            return React.createElement("div", { className: "min-h-screen flex items-center justify-center p-6", style: { background: C.bg, color: C.chalk } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.gold } }, pendingPro.path === "college" ? "🎓 Heading to college…" : "🏌️ Turning pro…"));
+        const go = (path) => { const { starting, ...pro } = pendingPro; setPendingPro({ ...pro, path, starting: true }); beginCareer({ ...pro, path }); };
         const card = (path, icon, title, lines, kind) => React.createElement("button", { onClick: () => go(path), className: "w-full p-4 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: C.card, border: `1.5px solid ${kind}` } },
             React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: kind } }, `${icon} ${title}`),
             lines.map((t, i) => React.createElement("div", { key: i, className: "text-xs mt-1", style: { color: C.chalk } }, t)));
