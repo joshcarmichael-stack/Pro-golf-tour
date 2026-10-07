@@ -949,8 +949,8 @@ const trainCost = (v) => Math.round(trainCostBase(v) * 0.75 / 5) * 5;
 const POT_TIERS = [
     { id: "journeyman", name: "Journeyman", stars: 2, base: 78, p: 0.25, blurb: "A solid tour pro. Wins will be rare and hard-earned." },
     { id: "regular", name: "Tour regular", stars: 3, base: 81, p: 0.35, blurb: "Good enough to contend most weeks on a course that suits you." },
-    { id: "star", name: "Star", stars: 4, base: 85, p: 0.27, blurb: "A multiple winner, with majors well within reach." },
-    { id: "generational", name: "Generational", stars: 5, base: 89, p: 0.13, blurb: "Once-in-a-generation talent. The records are there if you put the work in." },
+    { id: "star", name: "Star", stars: 4, base: 86, p: 0.27, blurb: "A multiple winner, with majors well within reach." },
+    { id: "generational", name: "Generational", stars: 5, base: 88, p: 0.13, blurb: "Once-in-a-generation talent. The records are there if you put the work in." },
 ];
 const POT_KEYS = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker", "composure", "paceControl", "shotShaping", "courseManagement"];
 const rollPotential = (attrs, forceTier) => {
@@ -5652,8 +5652,10 @@ function GolfCareerSim() {
         const earnedN = { ...(g.earned || {}) };
         const pot = g.pot ? { ...g.pot, caps: { ...g.pot.caps } } : null;
         if (pot && newAge >= (life ? 34 : 33)) {
-            // ceilings fall with age: distance from 34, long irons and scrambling from 36, the putting stroke from 38 (every other year)
-            const fall = life ? ["drivingDistance", ...(newAge >= 36 && newAge % 2 === 0 ? ["longApproach", "recovery"] : []), ...(newAge >= 38 && newAge % 2 === 1 ? ["putting"] : [])]
+            // ceilings fall with age: distance from 34, long irons and scrambling from 36, the putting stroke and touch from 38,
+            // and from 40 every part of the game slips a little each year
+            const fall = life ? ["drivingDistance", ...(newAge >= 36 ? ["longApproach", "recovery"] : []), ...(newAge >= 38 ? ["putting"] : []),
+                ...(newAge >= 38 && newAge % 2 === 0 ? ["shortApproach", "chipping"] : []), ...(newAge >= 40 ? ["drivingAccuracy", "bunker", "shortApproach", "chipping", "paceControl", "shotShaping"].filter((k) => !(newAge % 2 === 0 && (k === "shortApproach" || k === "chipping"))) : [])]
                 : ["drivingDistance", "longApproach", "recovery", ...(newAge >= 35 && newAge % 2 === 1 ? ["putting"] : [])];
             fall.forEach((k) => {
                 pot.caps[k] = Math.max(60, pot.caps[k] - 1);
