@@ -979,6 +979,69 @@ const potLabel = (st) => {
     const i = POT_TIERS.indexOf(t), lo = POT_TIERS[Math.max(0, i - (i === POT_TIERS.length - 1 ? 1 : 0))], hi = POT_TIERS[Math.min(POT_TIERS.length - 1, i + (i === POT_TIERS.length - 1 ? 0 : 1))];
     return `${lo.name} or ${hi.name}?`;
 };
+// ============ CAREER LIFE (Tour Career and All-Time Greats) ============
+// decisions and events that move a career off its expected path: workload, injuries, slumps, swing rebuilds,
+// college, a mentor, sponsor time and retirement. Every one of them goes into your story.
+const LIFE = (st) => !!st && (!st.mode || st.mode === "standard" || st.mode === "alltime");
+const storyAdd = (st, icon, txt) => { st.story = [...(st.story || []), { age: st.pro.age, season: st.season, icon, txt }].slice(-60); };
+const potNote = (pot, age, txt) => { pot.hist = [...(pot.hist || []), { age, txt }].slice(-30); };
+const WORKLOADS = {
+    grind: { label: "Grind", icon: "🔥", xp: 1.25, risk: 2.1, desc: "Practise harder and play every week. 25% more XP, but injuries are twice as likely (and worse after 30)." },
+    balanced: { label: "Balanced", icon: "⚖️", xp: 1, risk: 1, desc: "A normal tour schedule and practice load." },
+    protect: { label: "Protect the body", icon: "🛡️", xp: 0.85, risk: 0.45, desc: "Lighter practice, more rest. 15% less XP, and far fewer injuries." },
+};
+const workloadOf = (st) => WORKLOADS[(st && st.workload) || "balanced"] || WORKLOADS.balanced;
+const INJURY_PARTS = [
+    { part: "back", skill: "drivingDistance" }, { part: "wrist", skill: "longApproach" }, { part: "shoulder", skill: "drivingAccuracy" },
+    { part: "knee", skill: "recovery" }, { part: "elbow", skill: "shortApproach" }, { part: "neck", skill: "putting" },
+];
+// the chance of getting hurt in any one event: your workload, your age, and an old injury that never quite healed
+const injuryRisk = (st) => 0.0042 * workloadOf(st).risk * (1 + Math.max(0, (st.pro.age || 22) - 29) * 0.12 * (st.workload === "grind" ? 2 : 1)) * (st.chronic ? 1.5 : 1);
+const rollInjury = (st) => {
+    if (Math.random() >= injuryRisk(st)) return null;
+    const ip = INJURY_PARTS[Math.floor(Math.random() * INJURY_PARTS.length)], r = Math.random();
+    if (r < 0.68) return { ...ip, sev: "minor", out: ri(1, 3), pen: 0, penLeft: 0 };
+    if (r < 0.95) return { ...ip, sev: "serious", out: 0, pen: 0, penLeft: 0, decide: true };
+    return { ...ip, sev: "major", out: ri(14, 24), pen: 4, penLeft: 8, major: true };
+};
+const SLUMP_SKILLS = ["putting", "drivingAccuracy", "longApproach", "shortApproach", "chipping"];
+// a cold spell: random, more likely after you've just let a good week slip; the yips can find a putter in their 30s
+const rollSlump = (st, choked) => {
+    const age = st.pro.age || 22;
+    if (age >= 32 && age <= 42 && Math.random() < 0.0035) return { skill: "putting", pen: 8, left: 14, yips: true };
+    if (Math.random() < (choked ? 0.06 : 0.012)) return { skill: SLUMP_SKILLS[Math.floor(Math.random() * SLUMP_SKILLS.length)], pen: ri(3, 6), left: ri(4, 8) };
+    return null;
+};
+// temporary penalties from injuries, slumps and a swing being rebuilt
+const lifePenalty = (st) => {
+    const p = {};
+    const add = (k, v) => { p[k] = (p[k] || 0) + v; };
+    if (st.injury && st.injury.penLeft > 0 && st.injury.pen) add(st.injury.skill, st.injury.pen);
+    if (st.slump && st.slump.left > 0) add(st.slump.skill, st.slump.pen);
+    if (st.rebuild && st.rebuild.season === st.season) ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach"].forEach((k) => add(k, st.rebuild.drop));
+    return p;
+};
+// sponsors want appearance days: the bigger the deal, the less time to practise
+const sponsorXpCut = (st) => !LIFE(st) || !st.sponsor ? 0 : /FLAGSHIP/.test(st.sponsor.tier || "") ? 0.2 : /GLOBAL/.test(st.sponsor.tier || "") ? 0.1 : 0;
+// retiring early leaves a legacy: your next pro starts with a random boost, the bigger the earlier you go (38 best, 45 forced)
+const legacyKey = () => SAVE_KEY + "-legacy"; // a function: SAVE_KEY is defined further down
+const rollLegacy = (age) => {
+    const pts = clampN(46 - age, 1, 8), keys = POT_KEYS.slice(0, 8), bonus = {};
+    if (pts >= 6 && Math.random() < 0.35) { keys.forEach((k) => { bonus[k] = 1; }); return { bonus, pts: 8, all: true, age }; } // sometimes a boost across the board
+    for (let i = 0; i < pts; i++) { const k = keys[Math.floor(Math.random() * keys.length)]; bonus[k] = (bonus[k] || 0) + 1; }
+    return { bonus, pts, all: false, age };
+};
+const lifeLab = (k) => ((typeof SLOTS !== "undefined" && SLOTS.find((x) => x.key === k)) || { label: k }).label.toLowerCase();
+const legacyLine = (lg) => lg.all ? "+1 to every core skill" : Object.entries(lg.bonus).map(([k, v]) => `+${v} ${lifeLab(k)}`).join(", ");
+function StoryList({ story, limit }) {
+    const items = (story || []).slice(-(limit || 60)).reverse();
+    if (!items.length) return null;
+    return React.createElement("div", { className: "p-3 rounded-xl mt-3 text-left", style: { background: C.panel } },
+        React.createElement("div", { className: "mb-1", style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold } }, "📜 YOUR STORY"),
+        items.map((e, i) => React.createElement("div", { key: i, className: "text-xs py-0.5 flex gap-2", style: { color: C.chalk } },
+            React.createElement("span", { style: { color: C.muted, minWidth: 44 } }, `Age ${e.age}`),
+            React.createElement("span", null, `${e.icon} ${e.txt}`))));
+}
 const potOvr = (st) => st && st.pot ? calcOverall({ ...st.pro.attrs, ...st.pot.caps }) : null; // what you'd be with every skill at its ceiling
 // the last points before a ceiling cost far more, and nothing goes past it
 const trainCostFor = (st, k) => {
@@ -3098,6 +3161,7 @@ function GolfCareerSim() {
     const [namesQuery, setNamesQuery] = useState("");
     const [namesEdits, setNamesEdits] = useState({});
     const [ch, setCh] = useState(null);
+    const [pendingPro, setPendingPro] = useState(null); // a new pro waiting on "turn pro or go to college"
     useEffect(() => { chLiveSave(ch); }, [ch]);
     const resumeCh = (live) => { setCh(live); setScreen("challenge"); };
     const [wcStage, setWcStage] = useState(0);
@@ -3337,6 +3401,7 @@ function GolfCareerSim() {
         const em = bagOf(st) ? bagOf(st).mods : equipMods(st.equip);
         for (const k in em)
             if (a[k] != null) a[k] = a[k] + em[k];
+        if (LIFE(st)) { const lp = lifePenalty(st); for (const k in lp) if (a[k] != null) a[k] -= lp[k]; }
         for (const k in a)
             a[k] = clampN(a[k], 50, 99);
         return a;
@@ -3742,6 +3807,19 @@ function GolfCareerSim() {
         }
     };
     const beginCareer = async (pro) => {
+        const lifeMode = !mode || mode === "standard" || mode === "alltime";
+        if (lifeMode && !pro.path) { setPendingPro(pro); setScreen("path"); return; }
+        let legacyUsed = null;
+        if (lifeMode) {
+            // the last pro's retirement legacy
+            try { const lg = JSON.parse(localStorage.getItem(legacyKey()) || "null"); if (lg && lg.bonus) { const a = { ...pro.attrs }; Object.entries(lg.bonus).forEach(([k, v]) => { if (a[k] != null) a[k] = Math.min(99, a[k] + v); }); pro = { ...pro, attrs: a, overall: calcOverall(a) }; legacyUsed = lg; localStorage.removeItem(legacyKey()); } } catch (e) { /* storage blocked */ }
+            if (pro.path === "college") {
+                // three years of college golf: a little stronger everywhere, and a pro at 20
+                const a = { ...pro.attrs };
+                POT_KEYS.forEach((k, i) => { if (a[k] != null) a[k] = Math.min(99, a[k] + (i < 8 ? 2 : 1)); });
+                pro = { ...pro, age: 20, attrs: a, overall: calcOverall(a) };
+            }
+        }
         track("career-start/" + (mode || "standard"));
         if (!pro.wx)
             pro.wx = [68 + Math.floor(Math.random() * 23), 68 + Math.floor(Math.random() * 23), 68 + Math.floor(Math.random() * 23)];
@@ -3774,7 +3852,21 @@ function GolfCareerSim() {
             standings: Object.fromEntries([...PLAYERS.map((p) => [p.name, { pts: 0, money: 0 }]), [pro.name, { pts: 0, money: 0 }]]),
             myStats: freshStats(), history: [], seasonLog: [], tally: {}, ryderHolder: "USA", lastRyder: null,
             careerId: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), eventHistory: {}, courseXP: {}, rcRace: {}, pastWinners: {}, owgrBase: { ...OWGR_SEED }, xp: 0, bank: 0,
-            pot: rollPotential(pro.attrs, (typeof window !== "undefined" && window.SP_FORCE_POT) || null),
+            pot: (() => {
+                const force = (typeof window !== "undefined" && window.SP_FORCE_POT) || null;
+                let pot = rollPotential(pro.attrs, force);
+                if (pro.path === "college") {
+                    if (pot.tier === "journeyman" && !force) pot = rollPotential(pro.attrs, "regular"); // college gives you a solid floor
+                    Object.keys(pot.caps).forEach((k) => { pot.caps[k] = Math.min(99, pot.caps[k] + 2); });
+                    potNote(pot, 20, "+2 everywhere: three years of college golf");
+                }
+                return pot;
+            })(),
+            story: [
+                ...(legacyUsed ? [{ age: pro.age, season: 1, icon: "🏛️", txt: `Started with a legacy from your last pro: ${legacyLine(legacyUsed)}` }] : []),
+                ...(pro.path === "college" ? [{ age: 17, season: 0, icon: "🎓", txt: "Went to college instead of turning pro" }, { age: 20, season: 1, icon: "🎓", txt: (() => { const r = Math.random(); return r < 0.12 ? "Left college as the NCAA individual champion" : r < 0.5 ? "Left college as a First-Team All-American" : "Left college with a degree and a game ready for tour"; })() }]
+                    : pro.path === "pro" ? [{ age: 17, season: 1, icon: "🚀", txt: "Turned pro at 17" }] : []),
+            ],
             sponsor: null, sponsorOffers: makeSponsorOffers(999, 0, null), rival: null, wxXP: [0, 0, 0], earned: {}, ownedGear: [...STOCK_GEAR], coach: null, badges: [], badgeNews: [], caddie: null, caddieOffers: pickCaddieOffers(), rerollAvailable: false };
         setG(st);
         save(st);
@@ -3960,6 +4052,7 @@ function GolfCareerSim() {
     };
     const startEvent = () => {
         const ev = SCHEDULE[g.evIdx];
+        if (LIFE(g) && g.injury && g.injury.decide) return; // decide on the injury first
         // ===== TEAM SELECTION (league): manager plays the best 4 of 5; the weakest is reserve this week =====
         if (g.mode === "league" && g.leagues && ev.type !== "team") {
             const mt = g.leagues.find((t) => t.members.some((m) => m.includes("(YOU)")));
@@ -4057,6 +4150,7 @@ function GolfCareerSim() {
         let field = buildField(pr.ev, g);
         if (pr.filterNames)
             field = field.filter((f) => f.isYou || pr.filterNames.includes(f.name));
+        if (LIFE(g) && g.injury && (g.injury.out > 0 || g.injury.decide)) field = field.filter((f) => !f.isYou); // injured: watching from home
         const bank0 = g.bank != null ? g.bank : g.myStats.careerMoney;
         const withCamp = camp && CAMP_EVENTS.includes(pr.ev.type) && !pr.ev.opposite && bank0 >= campCost(pr.ev);
         let trained = null;
@@ -4674,6 +4768,11 @@ function GolfCareerSim() {
                         xpGain = Math.round(xpGain * 0.6);
                         xpParts.push({ label: "Weaker field (alternate)", amt: 0, note: "×0.6" });
                     }
+                    if (LIFE(g)) {
+                        const wl = workloadOf(g), cut = sponsorXpCut(g) + (g.mentor ? 0.1 : 0);
+                        if (wl.xp !== 1) { xpGain = Math.round(xpGain * wl.xp); xpParts.push({ label: `${wl.label} workload`, amt: 0, note: `×${wl.xp}` }); }
+                        if (cut) { xpGain = Math.round(xpGain * (1 - cut)); xpParts.push({ label: g.mentor && sponsorXpCut(g) ? "Sponsor days and mentor rounds" : g.mentor ? "Practice rounds with your mentor" : "Sponsor appearance days", amt: 0, note: `×${(1 - cut).toFixed(2)}` }); }
+                    }
                     st.xp = (st.xp || 0) + xpGain;
                     st.xpGainLast = xpGain;
                     st.xpBreakdown = xpParts;
@@ -5014,6 +5113,56 @@ function GolfCareerSim() {
             track("event-complete");
         if (myLine && myLine.pos === 1)
             track("win/" + (ev.type || "event"));
+        if (LIFE(st) && !tour.team) {
+            const mailL = (item) => { st.mailbox = [{ season: st.season, ...item }, ...(st.mailbox || [])].slice(0, 41); };
+            const lab = lifeLab;
+            if (st.injury) {
+                const inj = { ...st.injury };
+                if (!tour.inField && inj.out > 0) inj.out--;
+                else if (tour.inField && inj.penLeft > 0) inj.penLeft--;
+                if (!inj.decide && inj.out <= 0 && inj.penLeft <= 0) {
+                    if (inj.chronicRisk && Math.random() < inj.chronicRisk && st.pot) {
+                        const pot = { ...st.pot, caps: { ...st.pot.caps } }, drop = ri(1, 3);
+                        pot.caps[inj.skill] = Math.max(60, pot.caps[inj.skill] - drop);
+                        potNote(pot, st.pro.age, `-${drop} ${lab(inj.skill)}: chronic ${inj.part} injury`);
+                        st.pot = pot; st.chronic = true;
+                        if (st.pro.attrs[inj.skill] > pot.caps[inj.skill]) st.pro = { ...st.pro, attrs: { ...st.pro.attrs, [inj.skill]: pot.caps[inj.skill] } };
+                        storyAdd(st, "🩹", `Playing through the ${inj.part} injury left a lasting mark (-${drop} ${lab(inj.skill)} ceiling)`);
+                        mailL({ id: `inj-chronic-${st.season}-${st.evIdx}`, kind: "injury", title: `Your ${inj.part} never quite healed`, body: `Playing through it took its toll. Your ${lab(inj.skill)} ceiling drops by ${drop}, and you're a little more injury-prone from now on.` });
+                    } else mailL({ id: `inj-ok-${st.season}-${st.evIdx}`, kind: "injury", title: inj.sev === "rest" ? "Back from your break" : "Fully fit again", body: inj.sev === "rest" ? "Two weeks away and a clear head. Back to it." : `The ${inj.part} has healed. Back to full strength.` });
+                    st.injury = null;
+                } else st.injury = inj;
+            } else if (tour.inField) {
+                const inj = rollInjury(st);
+                if (inj) {
+                    st.injury = inj;
+                    if (inj.major && st.pot) {
+                        const pot = { ...st.pot, caps: { ...st.pot.caps } };
+                        pot.caps[inj.skill] = Math.max(60, pot.caps[inj.skill] - 1);
+                        potNote(pot, st.pro.age, `-1 ${lab(inj.skill)}: career-threatening ${inj.part} injury`);
+                        st.pot = pot;
+                    }
+                    storyAdd(st, "🤕", inj.major ? `Career-threatening ${inj.part} injury: out for ${inj.out} events` : inj.sev === "serious" ? `Serious ${inj.part} injury` : `Tweaked ${inj.part}: missed ${inj.out} event${inj.out === 1 ? "" : "s"}`);
+                    mailL({ id: `inj-${st.season}-${st.evIdx}`, kind: "injury", title: inj.major ? `Devastating news: ${inj.part} surgery` : inj.sev === "serious" ? `Serious ${inj.part} injury: your call` : `Minor ${inj.part} tweak`,
+                        body: inj.major ? `The scans are bad. You'll be out for about ${inj.out} events and your ${lab(inj.skill)} will need time to come back. This is where comebacks are made.` : inj.sev === "serious" ? `The doctors give you a choice: play through it, or have surgery and rest. Decide on your hub.` : `You'll sit out the next ${inj.out} event${inj.out === 1 ? "" : "s"} to rest it.` });
+                }
+            }
+            if (st.slump) {
+                if (tour.inField) {
+                    const sl = { ...st.slump, left: st.slump.left - 1 };
+                    if (sl.left <= 0) { st.slump = null; mailL({ id: `sl-end-${st.season}-${st.evIdx}`, kind: "form", title: "The feel is back", body: `Your ${lab(sl.skill)} is back to normal.` }); }
+                    else st.slump = sl;
+                }
+            } else if (tour.inField) {
+                const choked = !!(myLine && myLine.pos >= 2 && myLine.pos <= 4);
+                const sl = rollSlump(st, choked);
+                if (sl) {
+                    st.slump = sl;
+                    storyAdd(st, sl.yips ? "😰" : "📉", sl.yips ? "The yips arrived" : `A slump in your ${lab(sl.skill)}`);
+                    mailL({ id: `sl-${st.season}-${st.evIdx}`, kind: "form", title: sl.yips ? "The yips" : `Your ${lab(sl.skill)} has gone cold`, body: sl.yips ? "Short putts suddenly feel impossible. You can ride it out, or try to fix it from your hub." : `Something's off. It'll pass, but you can try to fix it faster from your hub.` });
+                }
+            }
+        }
         if (st.evIdx >= SCHEDULE.length) {
             if (st.champion === st.pro.name) {
                 st.myStats.fedexTitles++;
@@ -5478,17 +5627,19 @@ function GolfCareerSim() {
         let newAttrs = { ...g.pro.attrs };
         let declined = false;
         const ageNotes = [];
-        if (newAge >= 32) {
+        const life = LIFE(g);
+        // the body slows down. Tour Career and All-Time Greats: from 34 (distance), 36 (scrambling); other modes from 32
+        if (newAge >= (life ? 34 : 32)) {
             newAttrs.drivingDistance = Math.max(60, newAttrs.drivingDistance - 1);
             ageNotes.push(["drivingDistance", -1]);
-            if (newAge % 2 === 0) {
+            if (newAge % 2 === 0 && newAge >= (life ? 36 : 32)) {
                 newAttrs.recovery = Math.max(60, newAttrs.recovery - 1);
                 ageNotes.push(["recovery", -1]);
             }
             declined = true;
         }
-        // the veteran's edge: from 29 to 38, seasons on tour bring composure and better decisions
-        if (newAge >= 29 && newAge <= 38) {
+        // the veteran's edge: from 29 (to 40 on tour, 38 elsewhere), seasons on tour bring composure and better decisions
+        if (newAge >= 29 && newAge <= (life ? 40 : 38)) {
             ["composure", "courseManagement"].forEach((k) => {
                 if (newAttrs[k] != null && newAttrs[k] < 95 && (k === "courseManagement" || newAge % 2 === 1)) {
                     newAttrs[k] += 1;
@@ -5499,9 +5650,10 @@ function GolfCareerSim() {
         let coachNote = null;
         const earnedN = { ...(g.earned || {}) };
         const pot = g.pot ? { ...g.pot, caps: { ...g.pot.caps } } : null;
-        if (pot && newAge >= 33) {
-            // the body slows down: distance, long irons and scrambling ceilings fall each year, the putting stroke from 35
-            const fall = ["drivingDistance", "longApproach", "recovery", ...(newAge >= 35 && newAge % 2 === 1 ? ["putting"] : [])];
+        if (pot && newAge >= (life ? 34 : 33)) {
+            // ceilings fall with age: distance from 34, long irons and scrambling from 36, the putting stroke from 38 (every other year)
+            const fall = life ? ["drivingDistance", ...(newAge >= 36 && newAge % 2 === 0 ? ["longApproach", "recovery"] : []), ...(newAge >= 38 && newAge % 2 === 1 ? ["putting"] : [])]
+                : ["drivingDistance", "longApproach", "recovery", ...(newAge >= 35 && newAge % 2 === 1 ? ["putting"] : [])];
             fall.forEach((k) => {
                 pot.caps[k] = Math.max(60, pot.caps[k] - 1);
                 if (newAttrs[k] > pot.caps[k]) { newAttrs[k] = pot.caps[k]; if (!ageNotes.some((x) => x[0] === k)) ageNotes.push([k, -1]); declined = true; }
@@ -5519,7 +5671,38 @@ function GolfCareerSim() {
             });
             coachNote = { attr: g.coach.attr, name: g.coach.name, amt };
         }
+        // career life: how last winter's swing rebuild worked out, a mentor's lessons, and the end of the road at 45
+        const lifeNotes = [];
+        const story = [...(g.story || [])];
+        const tell = (icon, txt) => { story.push({ age: g.pro.age, season: g.season, icon, txt }); };
+        let rebuildResult = null;
+        if (life && pot && g.rebuild && g.rebuild.season === g.season) {
+            const keys = ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach"];
+            const coached = g.coach || g.rebuild.coached ? 0.15 : 0, r = Math.random();
+            const res = r < 0.6 + coached ? "success" : r < 0.9 + coached * 0.5 ? "partial" : "fail";
+            const d = res === "success" ? ri(2, 3) : res === "partial" ? 1 : -1;
+            keys.forEach((k) => { pot.caps[k] = clampN(pot.caps[k] + d, 60, 99); if (newAttrs[k] > pot.caps[k]) newAttrs[k] = pot.caps[k]; });
+            potNote(pot, g.pro.age, `${d > 0 ? "+" : ""}${d} ball-striking: swing rebuild ${res === "fail" ? "failed" : res === "partial" ? "half-worked" : "worked"}`);
+            rebuildResult = { res, d };
+            tell("🔧", res === "success" ? `The swing rebuild worked: ball-striking ceilings +${d}` : res === "partial" ? "The swing rebuild half-worked: ceilings +1" : "The swing rebuild failed: ceilings -1");
+        }
+        if (life && pot && g.mentor && g.mentor.left > 0) {
+            const k = g.mentor.skills[(g.mentor.left + 1) % g.mentor.skills.length];
+            pot.caps[k] = Math.min(99, pot.caps[k] + 1);
+            newAttrs.composure = Math.min(pot.caps.composure || 99, (newAttrs.composure || 75) + 1);
+            potNote(pot, g.pro.age, `+1 ${lifeLab(k)}: lessons from ${g.mentor.name}`);
+            lifeNotes.push(`${g.mentor.name}'s mentoring: +1 ${lifeLab(k)} ceiling, +1 composure`);
+        }
+        const forcedOut = life && newAge > 45;
+        let legacy = null;
+        if (forcedOut) {
+            legacy = rollLegacy(45);
+            try { localStorage.setItem(legacyKey(), JSON.stringify(legacy)); } catch (e) { /* storage blocked */ }
+            tell("🏁", "Retired at 45");
+        }
         const st = { ...g, season: g.season + 1, evIdx: 0, champion: null, coach: null, coachNote, earned: earnedN, ...(pot ? { pot } : {}),
+            story, lifeNotes, rebuildResult, rebuild: null, mentor: g.mentor ? (g.mentor.left > 1 ? { ...g.mentor, left: g.mentor.left - 1 } : null) : null,
+            ...(forcedOut ? { retired: true, forcedRetire: true, legacy } : {}),
             pro: { ...g.pro, age: newAge, attrs: newAttrs, overall: calcOverall(newAttrs) }, agedNote: declined, ageNotes, peakOvr: Math.max(g.peakOvr || 0, g.pro.overall || 0, calcOverall(effAttrs(g))),
             standings: Object.fromEntries([...rosterNames.filter((n) => n !== g.pro.name).map((n) => [n, { pts: 0, money: 0 }]), [g.pro.name, { pts: 0, money: 0 }]]),
             retiredNews: evo.news,
@@ -6105,6 +6288,23 @@ function GolfCareerSim() {
                     React.createElement(Btn, { small: true, kind: o.kind, onClick: () => name.trim() && nation && setScreen(o.id), disabled: !name.trim() || !nation }, o.icon + " " + (o.id === "spin" ? "START SPINNING" : "CHOOSE A TYPE"))))),
                 !(name.trim() && nation) && React.createElement("p", { className: "text-[11px] mt-1", style: { color: C.muted } }, "Enter a name and nationality first."))));
     }
+    // ---------- turn pro or go to college ----------
+    if (screen === "path" && pendingPro) {
+        const go = (path) => { const p = { ...pendingPro, path }; setPendingPro(null); beginCareer(p); };
+        const card = (path, icon, title, lines, kind) => React.createElement("button", { onClick: () => go(path), className: "w-full p-4 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: C.card, border: `1.5px solid ${kind}` } },
+            React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: kind } }, `${icon} ${title}`),
+            lines.map((t, i) => React.createElement("div", { key: i, className: "text-xs mt-1", style: { color: C.chalk } }, t)));
+        let legacy = null;
+        try { legacy = JSON.parse(localStorage.getItem(legacyKey()) || "null"); } catch (e) { /* ignore */ }
+        return (React.createElement(Shell, null,
+            React.createElement("div", { className: "text-center pt-4 mb-3" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, `${pendingPro.name.toUpperCase()} · AGE 17`),
+                React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1.05 } }, "Your first big decision"),
+                React.createElement("p", { className: "text-xs mt-1", style: { color: C.muted } }, "The scouts aren't sure how good you'll be. How you start shapes how high you can go.")),
+            legacy && legacy.bonus && React.createElement("p", { className: "text-xs mb-3 p-2.5 rounded-lg", style: { background: "rgba(232,195,90,0.08)", color: C.gold } }, `🏛️ Your last pro's legacy carries over: ${legacyLine(legacy)}.`),
+            card("pro", "🚀", "TURN PRO NOW", ["Start on tour at 17, earning and climbing the rankings straight away.", "Your potential is whatever talent you were born with."], C.gold),
+            card("college", "🎓", "GO TO COLLEGE", ["Three years of college golf: turn pro at 20, a little stronger everywhere.", "Every skill ceiling +2, and you won't be a journeyman.", "You give up three years of tour earnings, ranking points and wins."], C.blue)));
+    }
     // ---------- archetype selection ----------
     if (screen === "archetype") {
         const choose = async (arch) => {
@@ -6673,6 +6873,7 @@ function GolfCareerSim() {
                             o.name),
                         React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded", style: { background: "rgba(244,247,242,0.08)", color: C.muted, letterSpacing: 1 } }, o.renewal ? "RENEWAL" : o.style.toUpperCase())),
                     React.createElement("div", { className: "text-[10px] mb-2", style: { color: C.gold, letterSpacing: 2, fontFamily: FONT } }, o.tier),
+                    LIFE(g) && /FLAGSHIP|GLOBAL/.test(o.tier || "") && React.createElement("div", { className: "text-[11px] mb-2", style: { color: C.bogey } }, `📅 Appearance days: ${/FLAGSHIP/.test(o.tier) ? "20" : "10"}% less XP while you're with them`),
                     React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2" },
                         React.createElement("div", { className: "p-2 rounded-md", style: { background: "rgba(244,247,242,0.05)" } },
                             React.createElement("div", { className: "text-[9px]", style: { color: C.muted, letterSpacing: 1 } }, "RETAINER / EVENT"),
@@ -6710,6 +6911,31 @@ function GolfCareerSim() {
                 `Age ${g.pro.age}: `,
                 ageN.map(([k, d], i) => React.createElement("span", { key: k, style: { color: d > 0 ? C.green : C.red } }, `${i ? ", " : ""}${d > 0 ? "+" : ""}${d} ${lab(k).toLowerCase()}`)),
                 ageN.some(([, d]) => d > 0) ? " (experience)" : "")),
+            LIFE(g) && (() => {
+                const age = g.pro.age || 22, upd = async (patch, icon, txt) => { const st = { ...g, ...patch }; if (txt) storyAdd(st, icon, txt); setG(st); await save(st); };
+                const canRebuild = age >= 21 && age <= 34 && (g.rebuilds || 0) < 2 && !g.rebuild;
+                const mentorPick = (() => { if (g.mentorOffered || age < 18 || age > 22) return null; const vets = PLAYERS.filter((p) => aiAgeOf(p.name) >= 36 && p.overall >= 82); if (!vets.length) return null; const v = vets[(g.season * 7 + age) % vets.length];
+                    const top = POT_KEYS.slice(0, 8).sort((a, b) => (v[b] || 0) - (v[a] || 0)).slice(0, 2); return { name: v.name, skills: top }; })();
+                return React.createElement("div", null,
+                    (g.rebuildResult || (g.lifeNotes || []).length > 0) && React.createElement("div", { className: "p-2.5 rounded-lg mb-3 text-xs", style: { background: C.panel, color: C.chalk } },
+                        g.rebuildResult && React.createElement("div", { style: { color: g.rebuildResult.d > 0 ? C.green : C.red } }, g.rebuildResult.res === "success" ? `🔧 Your swing rebuild worked: ball-striking ceilings +${g.rebuildResult.d}.` : g.rebuildResult.res === "partial" ? "🔧 Your swing rebuild half-worked: ball-striking ceilings +1." : "🔧 Your swing rebuild didn't take: ball-striking ceilings -1."),
+                        (g.lifeNotes || []).map((t, i) => React.createElement("div", { key: i, style: { color: C.green } }, `🎓 ${t}`))),
+                    React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.card } },
+                        React.createElement("div", { className: "mb-1", style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold } }, "📅 THIS SEASON'S WORKLOAD"),
+                        React.createElement("div", { className: "grid grid-cols-3 gap-1.5" }, Object.entries(WORKLOADS).map(([id, w]) => React.createElement("button", { key: id, onClick: () => upd({ workload: id }), className: "p-2 rounded-lg active:scale-95 text-[11px]", style: { background: (g.workload || "balanced") === id ? C.gold : C.panel, color: (g.workload || "balanced") === id ? C.bg : C.chalk } }, `${w.icon} ${w.label}`))),
+                        React.createElement("p", { className: "text-[11px] mt-1", style: { color: C.muted } }, workloadOf(g).desc)),
+                    canRebuild && React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.card, border: "1px solid rgba(127,183,217,0.5)" } },
+                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.blue } }, "🔧 REBUILD YOUR SWING?"),
+                        React.createElement("p", { className: "text-[11px] my-1", style: { color: C.chalk } }, `A full rebuild: driving, irons and wedges each drop 4 for this whole season. Next winter, about 6 in 10 rebuilds lift those ceilings by 2 or 3, 3 in 10 by 1, and 1 in 10 fails (-1). Having a coach for the season improves the odds. ${2 - (g.rebuilds || 0)} left in your career.`),
+                        React.createElement(Btn, { small: true, kind: "panel", onClick: () => upd({ rebuild: { season: g.season, drop: 4 }, rebuilds: (g.rebuilds || 0) + 1 }, "🔧", `Started a swing rebuild at ${age}`) }, "START THE REBUILD")),
+                    g.rebuild && g.rebuild.season === g.season && React.createElement("p", { className: "text-[11px] mb-3 text-center", style: { color: C.blue } }, "🔧 Swing rebuild under way this season: ball-striking -4 until next winter."),
+                    mentorPick && React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.card, border: `1px solid ${C.green}` } },
+                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.green } }, "🎓 A MENTOR OFFER"),
+                        React.createElement("p", { className: "text-[11px] my-1", style: { color: C.chalk } }, `${mentorPick.name}, one of the tour's veterans, has offered to take you under their wing for two seasons. Practice rounds together instead of some range time: 10% less XP, but each winter +1 composure and +1 to your ${mentorPick.skills.map(lifeLab).join(" or ")} ceiling.`),
+                        React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                            React.createElement(Btn, { small: true, onClick: () => upd({ mentor: { name: mentorPick.name, skills: mentorPick.skills, left: 2 }, mentorOffered: true }, "🎓", `Taken under the wing of ${mentorPick.name}`) }, "ACCEPT"),
+                            React.createElement(Btn, { small: true, kind: "panel", onClick: () => upd({ mentorOffered: true }) }, "NO THANKS"))));
+            })(),
             !cards && React.createElement(Btn, { onClick: dealWinter }, "DEAL MY CARDS \uD83C\uDCCF"),
             cards && (React.createElement("div", null,
                 React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3" }, cards.map((c, i) => {
@@ -6801,7 +7027,7 @@ function GolfCareerSim() {
                     " OVR")),
             React.createElement("h1", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, g.pro.name),
             g.pot && React.createElement("button", { onClick: () => setScreen("develop"), className: "text-[11px] mb-0.5 text-left", style: { color: C.gold } },
-                `🔭 Scouts: ${potLabel(g)}${potKnown(g) ? ` · ceiling ~${potOvr(g)} OVR` : " (they'll know by 20)"}`),
+                `🔭 Scouts: ${potLabel(g)}${potKnown(g) ? ` · ceiling ${potOvr(g) - 1}–${potOvr(g) + 1} OVR` : " (they'll know by 20)"}`),
             (g.myStats.careerWins || 0) > 0 && g.mode !== "league" && React.createElement("div", { className: "text-[11px] mb-0.5", style: { color: C.muted } },
                 `🏆 Chasing the greats: ${g.myStats.careerWins}/${RECORD_WINS} wins (Tiger) · ${g.myStats.careerMajors}/${RECORD_MAJORS} majors (Jack)`),
             React.createElement("div", { className: "text-xs mb-2", style: { color: C.muted } },
@@ -6949,6 +7175,40 @@ function GolfCareerSim() {
                         p.amt)))),
                 React.createElement("button", { onClick: () => setScreen("develop"), className: "w-full mt-2 py-1.5 rounded-md active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 12, letterSpacing: 1 } }, "\uD83D\uDCAA SPEND XP TO DEVELOP \u25B8"),
                 React.createElement("button", { onClick: async () => { const st = { ...g, xpBreakdown: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))) : null,
+            LIFE(g) && g.injury && (() => {
+                const inj = g.injury, lab = lifeLab(inj.skill);
+                const upd = async (patch, icon, txt) => { const st = { ...g, injury: patch ? { ...inj, ...patch } : null }; if (txt) storyAdd(st, icon, txt); setG(st); await save(st); };
+                return React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(216,66,58,0.10)", border: `1.5px solid ${C.red}` } },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, letterSpacing: 1, color: C.red } }, inj.sev === "rest" ? "🏖️ TAKING A BREAK" : inj.decide ? `🤕 SERIOUS ${inj.part.toUpperCase()} INJURY: YOUR CALL` : `🤕 ${inj.part.toUpperCase()} INJURY`),
+                    inj.decide ? React.createElement("div", null,
+                        React.createElement("p", { className: "text-xs my-1", style: { color: C.chalk } }, `The doctors can't decide for you. Your ${lab} is affected either way.`),
+                        React.createElement("div", { className: "grid gap-2" },
+                            React.createElement("button", { onClick: () => upd({ decide: false, out: 0, pen: 4, penLeft: 10, chronicRisk: 0.35 }, "💪", `Played through a ${inj.part} injury`), className: "p-2.5 rounded-lg text-left active:scale-[0.99]", style: { background: C.card, border: `1px solid ${C.gold}` } },
+                                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, color: C.gold } }, "💪 PLAY THROUGH IT"),
+                                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, `Keep playing with ${lab} -4 for 10 events. About a 1 in 3 chance it never fully heals (ceiling -1 to -3).`)),
+                            React.createElement("button", { onClick: () => upd({ decide: false, out: ri(6, 10), pen: 2, penLeft: 6, chronicRisk: 0.08 }, "🏥", `Had surgery on ${inj.part}`), className: "p-2.5 rounded-lg text-left active:scale-[0.99]", style: { background: C.card, border: "1px solid rgba(127,183,217,0.5)" } },
+                                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, color: C.blue } }, "🏥 SURGERY AND REST"),
+                                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, `Miss 6 to 10 events, then ${lab} -2 for 6 more while you rebuild. The ceiling is almost always protected.`))))
+                    : React.createElement("p", { className: "text-xs mt-1", style: { color: C.chalk } }, inj.out > 0 ? `${inj.sev === "rest" ? "Resting" : "Out injured"}: ${inj.out} more event${inj.out === 1 ? "" : "s"}. You'll watch from home.` : `Back playing, but ${lab} is -${inj.pen} for ${inj.penLeft} more event${inj.penLeft === 1 ? "" : "s"}.${inj.chronicRisk >= 0.3 ? " Fingers crossed it heals properly." : ""}`));
+            })(),
+            LIFE(g) && g.slump && (() => {
+                const sl = g.slump, lab = lifeLab(sl.skill), bank = g.bank != null ? g.bank : g.myStats.careerMoney, fee = sl.yips ? 1.2e6 : 0.6e6;
+                const fix = async (how) => {
+                    const st = { ...g, slump: { ...sl, tried: how } };
+                    if (how === "coach") { st.bank = bank - fee; st.slump.left = sl.yips ? Math.max(4, Math.ceil(sl.left / 2)) : Math.min(sl.left, 2); }
+                    if (how === "gear" && Math.random() < 0.5) st.slump.left = 1;
+                    if (how === "rest") { st.slump = null; st.injury = { part: "break", sev: "rest", skill: sl.skill, out: 2, pen: 0, penLeft: 0 }; }
+                    storyAdd(st, "🛠️", how === "coach" ? `Hired a specialist to fix the ${sl.yips ? "yips" : lab}` : how === "gear" ? "Changed equipment to break a slump" : how === "rest" ? "Took two weeks off to reset" : "Rode out a slump");
+                    setG(st); await save(st);
+                };
+                return React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(232,195,90,0.08)", border: `1.5px solid ${C.bogey}` } },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, letterSpacing: 1, color: C.bogey } }, sl.yips ? "😰 THE YIPS" : `📉 SLUMP: ${lab.toUpperCase()}`),
+                    React.createElement("p", { className: "text-xs my-1", style: { color: C.chalk } }, `${lab.charAt(0).toUpperCase() + lab.slice(1)} -${sl.pen} for about ${sl.left} more event${sl.left === 1 ? "" : "s"}.`),
+                    !sl.tried ? React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                        [["coach", `🧑‍🏫 Specialist (${fmtMoney(fee)})`, bank >= fee], ["gear", "🔄 Change equipment", true], ["rest", "🏖️ Two weeks off", true], ["ride", "🤷 Ride it out", true]].map(([id, label, ok]) =>
+                            React.createElement("button", { key: id, disabled: !ok, onClick: () => fix(id), className: `p-2 rounded-lg text-[11px] ${ok ? "active:scale-95" : "opacity-40"}`, style: { background: C.card, color: C.chalk } }, label)))
+                    : React.createElement("p", { className: "text-[11px]", style: { color: C.muted } }, sl.tried === "gear" ? "New gear in the bag. Let's see if it helps." : sl.tried === "coach" ? "Working with the specialist." : "Riding it out."));
+            })(),
             (g.season > 1 || (g.myStats.careerWins || 0) > 0) && React.createElement(ShareResult, { tag: "career", kicker: `CAREER CARD \u00B7 SEASON ${g.season}`,
                 headline: `${g.myStats.careerWins || 0} win${g.myStats.careerWins === 1 ? "" : "s"} \u00B7 ${g.myStats.careerMajors || 0} major${g.myStats.careerMajors === 1 ? "" : "s"}`,
                 sub: `${calcOverall(effAttrs(g))} OVR${g.myStats.reachedNo1 ? " \u00B7 reached World No. 1" : ""}${g.pot && potKnown(g) ? ` \u00B7 ${potTier(g).name} talent` : ""}`,
@@ -7042,7 +7302,7 @@ function GolfCareerSim() {
                         ev.type === "major" ? "Get inside the world top 100 (or win) to make these fields." : "World top 50 or FedEx top 30 gets you in."));
                 })(),
                 React.createElement("div", { className: "mt-2" },
-                    React.createElement(Btn, { onClick: startEvent }, ev.type === "team" ? "FIND A PARTNER" : (g.isFreeAgent || ((ev.type === "major" || ev.type === "signature") && !qualifiedCheck(ev)(g.pro.name))) ? "PLAY THE OPPOSITE EVENT" : "HIT THE RANGE")))),
+                    React.createElement(Btn, { onClick: startEvent }, LIFE(g) && g.injury && (g.injury.out > 0 || g.injury.decide) ? (g.injury.decide ? "🤕 DECIDE ON YOUR INJURY FIRST" : "📺 WATCH THIS WEEK FROM HOME") : ev.type === "team" ? "FIND A PARTNER" : (g.isFreeAgent || ((ev.type === "major" || ev.type === "signature") && !qualifiedCheck(ev)(g.pro.name))) ? "PLAY THE OPPOSITE EVENT" : "HIT THE RANGE")))),
             React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2" },
                 React.createElement(Btn, { small: true, onClick: () => setScreen("develop") },
                     "\uD83D\uDCAA DEVELOP",
@@ -8931,7 +9191,14 @@ function GolfCareerSim() {
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 2, color: C.gold } }, `🔭 SCOUTS' VERDICT: ${potLabel(g).toUpperCase()}`),
                     React.createElement("p", { className: "text-xs", style: { color: C.chalk } }, potKnown(g)
                         ? `${potTier(g).blurb} Every skill at its ceiling would make you about ${potOvr(g)} overall; you're ${g.pro.overall} now. The last points before a ceiling cost double or triple, so whether you get there is up to you. Big milestones (first win, majors, titles) can break through a ceiling.`
-                        : "Too early to call. Scouts will know your ceiling by the time you're 20. Train hard now: young players grow fastest."))),
+                        : "Too early to call. Scouts will know your ceiling by the time you're 20. Train hard now: young players grow fastest."),
+                    (g.pot.hist || []).length > 0 && React.createElement("div", { className: "mt-2" },
+                        React.createElement("div", { className: "text-[10px]", style: { color: C.gold, letterSpacing: 2, fontFamily: FONT } }, "WHAT'S MOVED YOUR CEILINGS"),
+                        g.pot.hist.slice(-8).reverse().map((h, i) => React.createElement("div", { key: i, className: "text-[11px]", style: { color: /^\+/.test(h.txt) ? C.green : C.red } }, `Age ${h.age}: ${h.txt}`)))),
+                LIFE(g) && React.createElement("div", { className: "p-3 rounded-xl mt-2", style: { background: C.panel } },
+                    React.createElement("div", { className: "mb-1", style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } }, "📅 WORKLOAD"),
+                    React.createElement("div", { className: "grid grid-cols-3 gap-1.5" }, Object.entries(WORKLOADS).map(([id, w]) => React.createElement("button", { key: id, onClick: async () => { const st = { ...g, workload: id }; setG(st); await save(st); }, className: "p-2 rounded-lg active:scale-95 text-[11px]", style: { background: (g.workload || "balanced") === id ? C.gold : C.card, color: (g.workload || "balanced") === id ? C.bg : C.chalk } }, `${w.icon} ${w.label}`))),
+                    React.createElement("p", { className: "text-[11px] mt-1", style: { color: C.muted } }, workloadOf(g).desc))),
             React.createElement("div", { className: "grid gap-2" }, SLOTS.map((s) => {
                 const base = g.pro.attrs[s.key] != null ? g.pro.attrs[s.key] : 70;
                 const eff = cur[s.key] != null ? cur[s.key] : base;
@@ -8953,7 +9220,8 @@ function GolfCareerSim() {
                             maxed ? " · at your ceiling" : ` · next costs ${cost} XP`)),
                     React.createElement("button", { onClick: () => canAfford && trainAttr(s.key), disabled: !canAfford, className: `px-3 py-2 rounded-md ${canAfford ? "active:scale-95" : "opacity-40"}`, style: { background: canAfford ? C.gold : "rgba(244,247,242,0.1)", color: canAfford ? C.bg : C.muted, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, maxed ? "MAX" : "+1")));
             })),
-            React.createElement("p", { className: "text-[11px] mt-3 text-center", style: { color: C.muted } }, "Earn XP by playing \u2014 every start counts, and finishing well earns more. Gear and caddie bonuses stack on top of your trained level.")));
+            React.createElement("p", { className: "text-[11px] mt-3 text-center", style: { color: C.muted } }, "Earn XP by playing \u2014 every start counts, and finishing well earns more. Gear and caddie bonuses stack on top of your trained level."),
+            React.createElement(StoryList, { story: g.story })));
     }
     if (screen === "achievements") {
         const have = g.badges || [];
@@ -10767,7 +11035,10 @@ function GolfCareerSim() {
                     ((_4 = g.pro.age) !== null && _4 !== void 0 ? _4 : 22) + 1 >= 32 ? ` · AGE ${((_5 = g.pro.age) !== null && _5 !== void 0 ? _5 : 22) + 1}` : ""),
                 ((_6 = g.pro.age) !== null && _6 !== void 0 ? _6 : 22) + 1 >= 32 && React.createElement("p", { className: "text-xs mt-1", style: { color: C.bogey } }, "\u23F3 The body slows past 31 \u2014 distance and recovery fade a touch each year. Skill holds."),
                 ((_7 = g.pro.age) !== null && _7 !== void 0 ? _7 : 22) >= 38 && React.createElement("div", { className: "mt-2" },
-                    React.createElement(Btn, { small: true, kind: "red", onClick: async () => { const st = { ...g, retired: true }; setG(st); await save(st); setScreen("retired"); } }, "\uD83C\uDFC1 RETIRE \u2014 END YOUR CAREER")),
+                    LIFE(g) && React.createElement("p", { className: "text-[11px] mb-1", style: { color: C.gold } }, `🏛️ Retire now and your next pro gets a legacy bonus of about ${clampN(46 - (g.pro.age || 38), 1, 8)} skill point${clampN(46 - (g.pro.age || 38), 1, 8) === 1 ? "" : "s"}. It shrinks every year you play on, and at 45 you have to retire.`),
+                    React.createElement(Btn, { small: true, kind: "red", onClick: async () => { const st = { ...g, retired: true };
+                        if (LIFE(g)) { const lg = rollLegacy(g.pro.age || 38); st.legacy = lg; storyAdd(st, "🏁", `Retired at ${g.pro.age}`); try { localStorage.setItem(legacyKey(), JSON.stringify(lg)); } catch (e) { /* storage blocked */ } }
+                        setG(st); await save(st); setScreen("retired"); } }, "\uD83C\uDFC1 RETIRE \u2014 END YOUR CAREER")),
                 React.createElement("button", { onClick: resetAll, className: "w-full text-xs mt-3", style: { color: C.muted } }, "Delete career & start over"))));
     }
     // ---------- retirement & hall of fame ----------
@@ -10777,7 +11048,11 @@ function GolfCareerSim() {
         const hof = hofScore >= HOF_LINE;
         return (React.createElement(Shell, null,
             React.createElement("div", { className: "pt-8 text-center" },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 4, color: C.gold } }, "THE FINAL WALK UP 18"),
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 4, color: C.gold } }, g.forcedRetire ? "45 AND DONE: THE FINAL WALK UP 18" : "THE FINAL WALK UP 18"),
+                g.legacy && React.createElement("div", { className: "p-3 rounded-xl my-3", style: { background: "rgba(232,195,90,0.08)", border: `1px solid ${C.gold}` } },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, letterSpacing: 2, color: C.gold } }, "🏛️ YOUR LEGACY"),
+                    React.createElement("p", { className: "text-xs", style: { color: C.chalk } }, `Your next pro in Tour Career or All-Time Greats starts with ${legacyLine(g.legacy)}${g.legacy.all ? " (a rare all-round legacy)" : ""}.`)),
+                React.createElement(StoryList, { story: g.story }),
                 React.createElement("h1", { style: { fontFamily: FONT, fontSize: 40, color: C.chalk, lineHeight: 1 } },
                     g.pro.name.toUpperCase(),
                     " RETIRES"),
