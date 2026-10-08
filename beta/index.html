@@ -2437,7 +2437,9 @@ const Shell = ({ children, theme }) => {
     const t = theme || ACTIVE_THEME || THEMES.home;
     const g = NAV.g, secs = navSections(g);
     const secIdx = secs.findIndex((x) => x.screens.includes(SCREEN_KEY));
-    const shown = !!(g && g.mode && g.pro && !g.retired && secIdx >= 0 && !(g.caddieOffers && !g.caddie) && !(g.sponsorOffers && !g.sponsor && SCREEN_KEY === "hub"));
+    // pre-season choices (caddie, sponsor, winter cards) take over the home screen: no menu until they're made
+    const preseason = g && SCREEN_KEY === "hub" && ((g.caddieOffers && !g.caddie) || g.sponsorOffers || g.rerollAvailable);
+    const shown = !!(g && g.mode && g.pro && !g.retired && secIdx >= 0 && !preseason);
     NAV.shown = shown; NAV.root = shown;
     // which way the new screen comes in: tabs slide by their order, going deeper slides from the right, coming home from the left
     if (SCREEN_KEY !== SHELL_LAST.key) {
