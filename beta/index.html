@@ -21,7 +21,7 @@
 <meta name="twitter:description" content="Free golf career sim in your browser. Win majors, make the Ryder Cup, hole the clutch putts yourself. No ads.">
 <meta name="twitter:image" content="https://sunday-pins.com/og-image.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
-<meta name="theme-color" content="#0E2A1C">
+<meta name="theme-color" content="#0B2318">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -30,11 +30,42 @@
 <meta name="apple-mobile-web-app-title" content="Sunday Pins">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<style>html,body{margin:0;padding:0;background:#0E2A1C}
+<style>html,body{margin:0;padding:0;background:#0B2318;font-family:'Source Sans 3',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+html{font-size-adjust:0.53} /* Source Sans runs small: match the x-height the layout was sized for */
+button{-webkit-tap-highlight-color:transparent}
+/* app frame: a side menu on desktop, a tab bar on phones */
+.sp-app{min-height:100vh}
+.sp-main{max-width:28rem;margin:0 auto;padding:1rem 1rem 6.5rem}
+.sp-main.sp-solo{padding-bottom:2.5rem}
+.sp-side{display:none}
+.sp-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:space-around;padding:6px 4px calc(10px + env(safe-area-inset-bottom));background:rgba(11,35,24,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid rgba(244,247,242,.1)}
+.sp-tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:60px;min-height:46px;padding-top:4px;border:0;background:none;font:600 11px 'Source Sans 3',sans-serif;color:#8FAA98;cursor:pointer}
+.sp-tab.on{color:#E8C35A}
+.sp-badge{position:absolute;top:0;right:10px;min-width:16px;height:16px;line-height:16px;border-radius:8px;background:#D9573C;color:#fff;font:700 10px 'Source Sans 3',sans-serif;text-align:center;padding:0 4px}
+.sp-dot{position:absolute;top:2px;right:18px;width:8px;height:8px;border-radius:4px;background:#E8C35A}
+.sp-subnav{display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px;scrollbar-width:none}
+.sp-subnav button{flex:none;border-radius:999px;padding:7px 14px;font:600 13px 'Source Sans 3',sans-serif;border:1px solid rgba(244,247,242,.14);background:transparent;color:#B9CFC0;cursor:pointer}
+.sp-subnav button.on{background:#E8C35A;color:#1A1405;border-color:#E8C35A}
+@media (min-width:1024px){
+  .sp-app.sp-nav{display:grid;grid-template-columns:240px minmax(0,1fr)}
+  .sp-side{display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh;padding:22px 14px;box-sizing:border-box;border-right:1px solid rgba(244,247,242,.09)}
+  .sp-side .sp-brand{font:700 21px 'Fraunces',Georgia,serif;color:#E8C35A;padding:4px 12px 20px}
+  .sp-side button{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;border:0;background:none;color:#B9CFC0;font:500 15px 'Source Sans 3',sans-serif;cursor:pointer;text-align:left;position:relative}
+  .sp-side button:hover{background:rgba(244,247,242,.05);color:#F4F7F2}
+  .sp-side button.on{background:#163C28;color:#F4F7F2}
+  .sp-side .sp-count{margin-left:auto;font:700 11px 'Source Sans 3',sans-serif;border-radius:999px;padding:2px 8px;background:#D9573C;color:#fff}
+  .sp-side .sp-count.xp{background:#E8C35A;color:#1A1405}
+  .sp-tabbar{display:none}
+  .sp-nav .sp-main{max-width:46rem;padding:28px 32px 48px}
+  .sp-main.sp-wide{max-width:34rem}
+}
+@keyframes spInR{0%{opacity:0;transform:translateX(44px)}100%{opacity:1;transform:none}}
+@keyframes spInL{0%{opacity:0;transform:translateX(-44px)}100%{opacity:1;transform:none}}
+@keyframes spGrow{0%{opacity:0;transform:translateY(60px) scale(.96)}100%{opacity:1;transform:none}}
 @keyframes spConfetti{0%{transform:translate3d(0,-10vh,0) rotate(0)}100%{transform:translate3d(var(--dx),110vh,0) rotate(var(--rot))}}
 @keyframes spTrophy{0%{transform:scale(.2) translateY(40px);opacity:0}55%{transform:scale(1.15) translateY(-6px);opacity:1}75%{transform:scale(.96)}100%{transform:scale(1);opacity:1}}
 @keyframes spTrophyOut{to{opacity:0;transform:scale(.8) translateY(-30px)}}
@@ -2141,7 +2172,7 @@ const C = new Proxy(C_CONST, {
         return target[prop];
     },
 });
-const THEMES_HOME = { bg: "#0E2A1C", panel: "#143D29", card: "#1B4D34", accent: "#E8C35A", accentSoft: "#9FD98B" };
+const THEMES_HOME = { bg: "#0B2318", panel: "#10301F", card: "#163C28", accent: "#E8C35A", accentSoft: "#9FD98B" };
 const THEMES = {
     home: THEMES_HOME, // clubhouse green + gold
     cup: { bg: "#0A1A30", panel: "#13284A", card: "#1B355F", accent: "#5BA8E8", accentSoft: "#E8C35A" }, // floodlit navy + electric blue
@@ -2151,7 +2182,30 @@ const THEMES = {
 ACTIVE_THEME = THEMES_HOME;
 const FONT = "'Fraunces', Georgia, serif"; // vintage scorecard test — was Bebas Neue
 const MONO = "'IBM Plex Mono', 'Courier New', monospace"; // scorecard numbers
-const tint = (v) => v >= 90 ? C.gold : v >= 85 ? C.green : v >= 80 ? C.chalk : C.red;
+const UI = "'Source Sans 3', system-ui, -apple-system, sans-serif"; // interface text: labels, buttons, body
+// TYPE SYSTEM. The serif (FONT) is for names and titles only. Older screens set FONT with wide letter-spacing for
+// every small label; this maps those onto the two UI styles at render time (a small caps "eyebrow" label, or a bold
+// UI heading) so every screen follows one system while screens are moved over to the shared pieces one by one.
+const typeStyle = (st) => {
+    const ls = typeof st.letterSpacing === "number" ? st.letterSpacing : 0, fs = st.fontSize || 16;
+    if (ls < 1) return st;
+    if (fs <= 16) return { ...st, fontFamily: UI, fontWeight: 700, fontSize: Math.max(11, fs - 2), letterSpacing: "0.12em", textTransform: "uppercase" };
+    return { ...st, fontFamily: UI, fontWeight: 800, letterSpacing: "0.03em" };
+};
+{
+    const ce = React.createElement;
+    React.createElement = function (type, props) {
+        if (props && props.style && props.style.fontFamily === FONT) {
+            const args = Array.prototype.slice.call(arguments);
+            args[1] = { ...props, style: typeStyle(props.style) };
+            return ce.apply(React, args);
+        }
+        return ce.apply(React, arguments);
+    };
+}
+// leading emoji on buttons ("💪 DEVELOP") go: icons live in the menus, labels stay text
+const stripEmoji = (c) => typeof c === "string" ? c.replace(/^(?:[\u2190-\u2BFF\u2600-\u27BF\uFE0F\u200D]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDC00-\uDFFF])+\s*/, "") : c;
+const tint = (v) => v >= 90 ? C.gold : v >= 85 ? C.green : C.chalk; // low isn't an error: no red
 const scoreColor = (sc, par) => { const d = sc - par; return d <= -2 ? C.gold : d === -1 ? C.green : d === 0 ? C.chalk : d === 1 ? C.bogey : C.red; };
 const scoreName = (sc, par) => { if (sc === 1)
     return "HOLE IN ONE!!"; const d = sc - par; return d <= -3 ? "ALBATROSS!!" : d === -2 ? "EAGLE!" : d === -1 ? "BIRDIE" : d === 0 ? "PAR" : d === 1 ? "BOGEY" : d === 2 ? "DOUBLE BOGEY" : "TRIPLE+"; };
@@ -2332,17 +2386,96 @@ const SLOTS = [
 ];
 const NATIONS = Object.keys(NATION_CODE);
 function Btn({ children, onClick, disabled, kind = "gold", small }) {
-    const bg = kind === "gold" ? C.gold : kind === "green" ? "#2E7D4F" : kind === "panel" ? C.panel : C.red;
-    const fg = kind === "gold" ? C.bg : C.chalk;
-    return (React.createElement("button", { onClick: onClick, disabled: disabled, className: `w-full rounded-md active:scale-95 transition-transform ${small ? "py-2.5" : "py-4"} ${disabled ? "opacity-40" : ""}`, style: { background: bg, color: fg, fontFamily: FONT, fontSize: small ? 17 : 22, letterSpacing: 2, border: kind === "panel" ? "1px solid rgba(244,247,242,0.25)" : "none" } }, children));
+    const gold = kind === "gold", solid = gold || kind === "green" || kind === "red";
+    const bg = gold ? C.gold : kind === "green" ? "#2E7D4F" : kind === "red" ? "#B84A33" : "rgba(244,247,242,0.06)";
+    const fg = gold ? "#1A1405" : C.chalk;
+    const kids = React.Children.map(children, (c, i) => i === 0 ? stripEmoji(c) : c);
+    return (React.createElement("button", { onClick: onClick, disabled: disabled, className: `w-full rounded-xl active:scale-[0.97] transition-transform ${small ? "py-3" : "py-4"} ${disabled ? "opacity-40" : ""}`, style: { background: bg, color: fg, fontFamily: UI, fontWeight: 700, fontSize: small ? 14 : 16, letterSpacing: "0.04em", border: solid ? "none" : "1px solid rgba(244,247,242,0.14)", minHeight: small ? 44 : 52 } }, kids));
+}
+// how fast AUTO plays through holes; kept on this device, changeable mid-round
+const SIM_SPEEDS = { slow: { label: "Slow", mult: 2 }, normal: { label: "Normal", mult: 1 }, fast: { label: "Fast", mult: 0.4 } };
+const simSpeed = () => { try { const v = localStorage.getItem("sp-sim-speed"); return SIM_SPEEDS[v] ? v : "normal"; } catch (e) { return "normal"; } };
+function SpeedPicker() {
+    const [v, setV] = useState(simSpeed());
+    const pick = (k) => { try { localStorage.setItem("sp-sim-speed", k); } catch (e) { } setV(k); track("sim-speed/" + k); };
+    return React.createElement("div", { className: "flex items-center justify-between gap-2 mt-3 text-xs", style: { color: C.muted } },
+        React.createElement("span", null, "Play-through speed"),
+        React.createElement("div", { className: "flex rounded-full p-0.5", style: { background: "rgba(244,247,242,0.06)" }, role: "group", "aria-label": "Play-through speed" },
+            Object.entries(SIM_SPEEDS).map(([k, sp]) => React.createElement("button", { key: k, onClick: () => pick(k), "aria-pressed": v === k, className: "rounded-full px-3 py-1.5", style: { background: v === k ? C.gold : "transparent", color: v === k ? "#1A1405" : C.chalk, fontWeight: 600, fontSize: 13, minHeight: 34 } }, sp.label))));
 }
 function BackTop({ onClick }) {
-    return (React.createElement("button", { onClick: onClick, className: "mb-2 px-3 py-1.5 rounded-md active:scale-95", style: { background: C.panel, color: C.chalk, fontFamily: FONT, fontSize: 14, letterSpacing: 2, border: "1px solid rgba(244,247,242,0.25)" } }, "\u2039 BACK"));
+    if (NAV.shown && NAV.root) return null; // the menu is the way around on section pages
+    return (React.createElement("button", { onClick: onClick, className: "mb-3 px-3 py-2 rounded-lg active:scale-95 flex items-center gap-1", style: { background: "transparent", color: C.chalk, fontFamily: UI, fontWeight: 600, fontSize: 14, border: "1px solid rgba(244,247,242,0.16)", minHeight: 40 } }, "\u2039 Back"));
 }
+// NAVIGATION. One menu for the whole career: a side menu on desktop, a tab bar on phones. NAV is refreshed every
+// render by the main component (like SCREEN_KEY) so the Shell can draw it without threading props everywhere.
+let NAV = { g: null, screen: "", go: () => { }, shown: false, root: false };
+const ICONS = {
+    home: "M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z", develop: "M4 17l6-6 4 4 6-7M14 8h6v6", tour: "M6 21V3M6 4h11l-2 4 2 4H6",
+    career: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0", club: "M4 21h16M6 21V10l6-5 6 5v11M10 21v-5h4v5",
+    mail: "M3 6h18v12H3zM3 7l9 6 9-6", setup: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1",
+    trophy: "M8 4h8v5a4 4 0 0 1-8 0zM8 6H4v1a4 4 0 0 0 4 4M16 6h4v1a4 4 0 0 1-4 4M12 13v4M8 21h8M9 17h6",
+};
+const Icon = ({ name, size = 20 }) => React.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", style: { flex: "none" } },
+    React.createElement("path", { d: ICONS[name] }));
+const navSections = (g) => {
+    const lg = g && g.mode === "league";
+    return [
+        { id: "home", label: "Home", icon: "home", go: "hub", screens: ["hub"] },
+        { id: "develop", label: "Develop", icon: "develop", go: "develop", screens: ["develop"] },
+        { id: "tour", label: "Tour", icon: "tour", go: "schedule", screens: ["schedule", "world", "worldCupQual"], subs: [["schedule", "Schedule"], ["world", "World rankings"], ["worldCupQual", "World Cup"]] },
+        { id: "career", label: "Career", icon: "career", go: "records", screens: ["records", "mystats", "cabinet", "achievements"], subs: [["records", "Records"], ["mystats", "Numbers"], ["cabinet", "Cabinet"], ["achievements", "Achievements"]] },
+        { id: "club", label: lg ? "My club" : "Cups", icon: "club", go: lg ? "league" : (g && g.mode === "team" ? "team" : "ryderHQ"), screens: ["league", "team", "transferMarket", "scoutMarket", "ryderHQ"],
+            subs: [...(lg ? [["league", "My league"], ["transferMarket", "Transfers"], ["scoutMarket", "Scouting"]] : g && g.mode === "team" ? [["team", "My team"]] : []), ["ryderHQ", "Cups HQ"]] },
+        { id: "mail", label: "Mailbox", short: "Mail", icon: "mail", go: "mailbox", screens: ["mailbox"] },
+        { id: "setup", label: "Setup", icon: "setup", go: "coaches", screens: ["coaches", "equipment", "names"], subs: [["coaches", "Coaches"], ["equipment", "Equipment"]] },
+    ];
+};
+const PHONE_TABS = ["home", "develop", "tour", "career", "mail"];
+let SHELL_LAST = { key: "", anim: "spEnter .28s ease-out both", sec: -1 };
 const Shell = ({ children, theme }) => {
     const t = theme || ACTIVE_THEME || THEMES.home;
-    return (React.createElement("div", { className: "min-h-screen", style: { background: t.bg, transition: "background 0.4s ease" } },
-        React.createElement("div", { key: SCREEN_KEY, className: "max-w-md mx-auto p-4 pb-10 sp-anim", style: { animation: "spEnter .28s ease-out both" } }, children)));
+    const g = NAV.g, secs = navSections(g);
+    const secIdx = secs.findIndex((x) => x.screens.includes(SCREEN_KEY));
+    const shown = !!(g && g.mode && g.pro && !g.retired && secIdx >= 0 && !(g.caddieOffers && !g.caddie) && !(g.sponsorOffers && !g.sponsor && SCREEN_KEY === "hub"));
+    NAV.shown = shown; NAV.root = shown;
+    // which way the new screen comes in: tabs slide by their order, going deeper slides from the right, coming home from the left
+    if (SCREEN_KEY !== SHELL_LAST.key) {
+        const prevSec = SHELL_LAST.sec;
+        let anim = "spEnter .28s ease-out both";
+        if (secIdx >= 0 && prevSec >= 0 && secIdx !== prevSec) anim = `${secIdx > prevSec ? "spInR" : "spInL"} .3s cubic-bezier(.2,.8,.2,1) both`;
+        else if (secIdx >= 0 && prevSec >= 0) anim = "spEnter .22s ease-out both";
+        else if (secIdx < 0 && prevSec >= 0) anim = (SCREEN_KEY === "event" || SCREEN_KEY === "prep" || SCREEN_KEY === "play") ? "spGrow .36s cubic-bezier(.2,.8,.2,1) both" : "spInR .3s cubic-bezier(.2,.8,.2,1) both";
+        else if (secIdx >= 0 && prevSec < 0 && SHELL_LAST.key) anim = "spInL .3s cubic-bezier(.2,.8,.2,1) both";
+        SHELL_LAST = { key: SCREEN_KEY, anim, sec: secIdx };
+    }
+    const unread = g ? (g.mailbox || []).filter((m) => !m.read).length : 0;
+    const xpReady = g && (g.xp || 0) >= 40;
+    const go = (sec) => { if (sec.go !== SCREEN_KEY) NAV.go(sec.go); };
+    const sec = secIdx >= 0 ? secs[secIdx] : null;
+    const subs = sec && sec.subs && sec.subs.length > 1 ? sec.subs : null;
+    const content = React.createElement("div", { key: SCREEN_KEY, className: "sp-anim", style: { animation: SHELL_LAST.anim } },
+        subs && React.createElement("div", { className: "sp-subnav" }, subs.map(([scr, label]) => React.createElement("button", { key: scr, className: SCREEN_KEY === scr ? "on" : "", onClick: () => SCREEN_KEY !== scr && NAV.go(scr) }, label))),
+        children);
+    if (!shown)
+        return (React.createElement("div", { className: "min-h-screen", style: { background: t.bg, transition: "background 0.4s ease" } },
+            React.createElement("div", { className: "sp-main sp-solo" }, content)));
+    return (React.createElement("div", { className: "sp-app sp-nav", style: { background: t.bg, transition: "background 0.4s ease" } },
+        React.createElement("nav", { className: "sp-side", "aria-label": "Main menu" },
+            React.createElement("div", { className: "sp-brand" }, "Sunday Pins"),
+            secs.map((x, i) => React.createElement("button", { key: x.id, className: i === secIdx ? "on" : "", onClick: () => go(x) },
+                React.createElement(Icon, { name: x.icon }), x.label,
+                x.id === "mail" && unread > 0 && React.createElement("span", { className: "sp-count" }, unread),
+                x.id === "develop" && xpReady && React.createElement("span", { className: "sp-count xp" }, `${g.xp} XP`))),
+            React.createElement("div", { style: { flex: 1 } }),
+            React.createElement("button", { onClick: () => NAV.go("landing") }, React.createElement(Icon, { name: "trophy" }), "Main menu")),
+        React.createElement("main", { className: "sp-main" }, content),
+        React.createElement("nav", { className: "sp-tabbar", "aria-label": "Main menu" },
+            PHONE_TABS.map((id) => { const x = secs.find((y) => y.id === id), i = secs.indexOf(x);
+                return React.createElement("button", { key: id, className: "sp-tab" + (i === secIdx ? " on" : ""), onClick: () => go(x), "aria-label": x.label },
+                    React.createElement(Icon, { name: x.icon, size: 22 }), x.short || x.label,
+                    id === "mail" && unread > 0 && React.createElement("span", { className: "sp-badge" }, unread),
+                    id === "develop" && xpReady && React.createElement("span", { className: "sp-dot" })); }))));
 };
 const ELITE = PLAYERS.filter((p) => p.rank <= 100);
 const OWGR_SEED = Object.fromEntries(PLAYERS.map((p) => [p.name, p.rank <= 100 ? (101 - p.rank) * 20 : Math.max(2, Math.round(12 + (200 - p.rank) * 1.5))]));
@@ -3125,6 +3258,7 @@ function GolfCareerSim() {
         }
         ACTIVE_THEME = th;
         SCREEN_KEY = screen;
+        NAV.g = g; NAV.screen = screen; NAV.go = setScreen;
     }
     const [mode, setMode] = useState("standard");
     const [name, setName] = useState("");
@@ -3374,7 +3508,7 @@ function GolfCareerSim() {
         }
         const t = setTimeout(() => {
             setTour((tt) => (tt === null || tt === void 0 ? void 0 : tt.live) ? { ...tt, live: { ...tt.live, revealed: Math.min(18, tt.live.revealed + 1) } } : tt);
-        }, dramaNow(tour) ? 2400 : 420);
+        }, (dramaNow(tour) ? 2400 : 420) * SIM_SPEEDS[simSpeed()].mult);
         return () => clearTimeout(t);
     }, [autoPlay, (_a = tour === null || tour === void 0 ? void 0 : tour.live) === null || _a === void 0 ? void 0 : _a.revealed]);
     const gRef = g;
@@ -7310,17 +7444,11 @@ function GolfCareerSim() {
                 })(),
                 React.createElement("div", { className: "mt-2" },
                     React.createElement(Btn, { onClick: startEvent }, LIFE(g) && g.injury && (g.injury.out > 0 || g.injury.decide) ? (g.injury.decide ? "🤕 DECIDE ON YOUR INJURY FIRST" : "📺 WATCH THIS WEEK FROM HOME") : ev.type === "team" ? "FIND A PARTNER" : (g.isFreeAgent || ((ev.type === "major" || ev.type === "signature") && !qualifiedCheck(ev)(g.pro.name))) ? "PLAY THE OPPOSITE EVENT" : "HIT THE RANGE")))),
-            React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2" },
-                React.createElement(Btn, { small: true, onClick: () => setScreen("develop") },
-                    "\uD83D\uDCAA DEVELOP",
-                    (g.xp || 0) > 0 ? ` · ${g.xp} XP` : ""),
-                React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("mailbox") },
-                    "\uD83D\uDCEC MAILBOX",
-                    (() => { const u = (g.mailbox || []).filter((m) => !m.read).length; return u ? ` · ${u}` : ""; })())),
-            React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2" }, [["career", "👤 MY CAREER"], ["club", "🏟️ MY CLUB"], ["tour", "🌐 THE TOUR"], ["setup", "🛠️ SETUP"]].map(([k, label]) => (React.createElement(Btn, { key: k, small: true, kind: hubMenu === k ? "gold" : "panel", onClick: () => setHubMenu(hubMenu === k ? null : k) },
+            // Develop, Mailbox, Tour and Career live in the menu (tab bar / side menu); the club and setup pages stay one tap from home on phones
+            React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2 lg:hidden" }, [["club", g.mode === "league" ? "MY CLUB" : "CUPS"], ["setup", "SETUP"]].map(([k, label]) => (React.createElement(Btn, { key: k, small: true, kind: hubMenu === k ? "gold" : "panel", onClick: () => setHubMenu(hubMenu === k ? null : k) },
                 label,
-                hubMenu === k ? " ▴" : " ▾")))),
-            hubMenu && (React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3 p-2 rounded-xl", style: { background: "rgba(20,61,41,0.4)" } },
+                hubMenu === k ? " \u25B4" : " \u25BE")))),
+            hubMenu && (React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3 p-2 rounded-xl lg:hidden", style: { background: "rgba(20,61,41,0.4)" } },
                 hubMenu === "career" && React.createElement(React.Fragment, null,
                     React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setRecTab("wins"); setScreen("records"); } }, "\uD83D\uDCCA RECORDS"),
                     React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("mystats") }, "\u26F3 NUMBERS"),
@@ -9876,6 +10004,7 @@ function GolfCareerSim() {
                             h + 1),
                         React.createElement(Btn, { small: true, kind: autoPlay ? "red" : "green", onClick: () => setAutoPlay(!autoPlay) }, autoPlay ? "⏸ PAUSE" : "▶ AUTO"),
                         React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setAutoPlay(false); advanceHoles(18); } }, "SKIP \u23ED"))),
+                    h < 18 && React.createElement(SpeedPicker, null),
                     React.createElement(StoryModal, null),
                     fullBoard && (React.createElement("div", { className: "fixed inset-0 overflow-y-auto p-4", style: { background: "rgba(14,42,28,0.95)" }, onClick: () => setFullBoard(false) },
                         React.createElement("div", { className: "max-w-sm mx-auto my-4 p-4 rounded-xl", style: { background: C.card, border: `1.5px solid ${C.gold}` }, onClick: (e) => e.stopPropagation() },
