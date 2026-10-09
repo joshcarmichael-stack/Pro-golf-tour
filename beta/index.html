@@ -6871,12 +6871,16 @@ function GolfCareerSim() {
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: C.blue, letterSpacing: 2 } }, "🔓 OTHER SIDE UNLOCKED"),
                     React.createElement("p", { className: "text-xs my-1", style: { color: C.chalk } }, `Now play it as ${chFlip(sc.id).you.name}: "${chFlip(sc.id).title}"`),
                     React.createElement(Btn, { onClick: () => { const fl = chFlip(sc.id); track("challenge/start/" + fl.id); setCh({ ...chStart(fl), daily: false, test: !!ch.test }); } }, "🔄 PLAY THE OTHER SIDE")),
-                React.createElement(Btn, { onClick: share }, "📤 SHARE YOUR RESULT"),
+                // the end of the result: streak, then the one big action, then the quieter options side by side
                 streakNow && React.createElement("div", { className: "p-3 rounded-xl mb-3 text-center", style: { background: "rgba(232,195,90,0.08)", border: `1px solid ${C.gold}` } },
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.gold } }, `🔥 ${streakNow.now}-DAY STREAK`),
-                    React.createElement("div", { className: "text-xs", style: { color: C.muted } }, `Best: ${streakNow.best} days · Daily Challenge #${today.n + 1} unlocks tomorrow`)),
-                !(sc.rare && !ch.test) && React.createElement(Btn, { onClick: () => { if (!ch.test) track("challenge/retry/" + sc.id); setCh({ ...chStart(sc), daily: false, test: !!ch.test }); }, kind: "panel" }, ch.daily ? "🔁 PRACTISE IT (DOESN'T COUNT)" : "🔁 TRY AGAIN"),
-                React.createElement(Btn, { onClick: () => setScreen(chBack), kind: "panel" }, ch.test ? "🧪 BACK TO TEST MODE" : "ALL CHALLENGES")));
+                    React.createElement("div", { className: "text-xs", style: { color: C.muted } }, `Best: ${streakNow.best} day${streakNow.best === 1 ? "" : "s"} · Daily Challenge #${today.n + 1} unlocks tomorrow`)),
+                React.createElement("div", { className: "mb-3" }, React.createElement(Btn, { onClick: share }, "📤 SHARE YOUR RESULT")),
+                React.createElement("div", { className: "grid gap-2 mb-2", style: { gridTemplateColumns: !(sc.rare && !ch.test) ? "1fr 1fr" : "1fr" } },
+                    !(sc.rare && !ch.test) && React.createElement(Btn, { small: true, onClick: () => { if (!ch.test) track("challenge/retry/" + sc.id); setCh({ ...chStart(sc), daily: false, test: !!ch.test }); }, kind: "panel" }, ch.daily ? "PRACTISE IT" : "TRY AGAIN"),
+                    React.createElement(Btn, { small: true, onClick: () => setScreen(chBack), kind: "panel" }, ch.test ? "TEST MODE" : "ALL CHALLENGES")),
+                ch.daily && !ch.test && !sc.rare && React.createElement("p", { className: "text-[11px] text-center mb-6", style: { color: C.muted } }, "Practice rounds don't count towards medals or your streak."),
+                !(ch.daily && !ch.test && !sc.rare) && React.createElement("div", { className: "mb-6" })));
         }
         if (ch.phase === "brief") {
             const rec = (chLoad().by || {})[sc.id] || {};
