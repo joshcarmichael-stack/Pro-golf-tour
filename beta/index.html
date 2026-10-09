@@ -3095,6 +3095,7 @@ const chStars = (sc, res) => { const f = chGoals(sc, res), miss = f.findIndex((x
 const chEmoji = (d) => d <= -2 ? "🟨" : d === -1 ? "🟩" : d === 0 ? "⬜" : d === 1 ? "🟧" : "🟥";
 const CH_MEDAL = ["", "🥉", "🥈", "🥇"];
 const CH_TEST = SAVE_KEY.includes("beta");
+const CH_ON = SAVE_KEY.includes("beta"); // Challenge mode is still being tuned: beta only until it is signed off
 // a challenge in progress is saved after every shot, so you can leave and carry on later
 const CH_LIVE_KEY = CH_KEY + "-live";
 // test mode keeps its own log of every run, so you can see how hard each challenge really is for you
@@ -6383,8 +6384,8 @@ function GolfCareerSim() {
         NAV.wide = "page"; // desktop: the three careers side by side
         return (React.createElement(Shell, null,
             React.createElement(HomeHero, null),
-            React.createElement(ChResume, { onResume: resumeCh }),
-            React.createElement("button", { onClick: () => { track("challenges/open"); setScreen("challenges"); }, className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+            CH_ON && React.createElement(ChResume, { onResume: resumeCh }),
+            CH_ON && React.createElement("button", { onClick: () => { track("challenges/open"); setScreen("challenges"); }, className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 17, color: C.gold } }, "\uD83C\uDFC6 NEW: CHALLENGES \u00B7 REWRITE HISTORY"),
                 (() => { const sk = chStreak(chLoad().daily); return sk.now > 0 ? React.createElement("div", { className: "text-[11px]", style: { color: sk.today ? C.green : C.bogey } }, sk.today ? `🔥 ${sk.now}-day streak · see you tomorrow` : `🔥 ${sk.now}-day streak · play today to keep it alive`) : null; })(),
                 React.createElement("div", { className: "text-[11px]", style: { color: C.chalk } }, `Daily Challenge #${chToday().n}: ${chToday().sc.you.name}, ${chToday().sc.year} ${chToday().sc.event}. "${chToday().sc.title}"`),
@@ -6610,7 +6611,7 @@ function GolfCareerSim() {
             React.createElement(Btn, { onClick: () => { if (window.confirm("Clear all your challenge medals and daily results? (For testing the medal flow.)")) { chStore({}); setScreen("chtest"); window.alert("Challenge progress cleared."); } }, kind: "panel" }, "🗑️ CLEAR MY CHALLENGE MEDALS"),
             React.createElement(Btn, { onClick: () => setScreen(g && g.pro ? "hub" : "landing"), kind: "panel" }, "BACK")));
     }
-    if (screen === "challenges") {
+    if (CH_ON && screen === "challenges") {
         const st = chLoad(), by = st.by || {}, today = chToday();
         const totalStars = CHALLENGES.reduce((t, c) => t + ((by[c.id] || {}).stars || 0), 0);
         const medals = [3, 2, 1].map((m) => CHALLENGES.filter((c) => ((by[c.id] || {}).stars || 0) === m).length);
@@ -6663,7 +6664,7 @@ function GolfCareerSim() {
             }),
             React.createElement(Btn, { onClick: () => setScreen(g && g.pro ? "hub" : "landing"), kind: "panel" }, "BACK")));
     }
-    if (screen === "challenge" && ch) {
+    if (CH_ON && screen === "challenge" && ch) {
         const sc = ch.sc, course = ch.course, total = 19 - sc.from, chBack = ch.test ? "chtest" : "challenges";
         const board = chBoard(ch);
         const me = board.find((r) => r.you);

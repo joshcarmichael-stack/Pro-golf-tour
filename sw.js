@@ -1,14 +1,14 @@
 // Sunday Pins service worker: the game opens instantly and keeps working offline.
 // The page and the game's own data files are fetched network-first (so updates arrive as soon as you're online);
 // libraries, fonts and icons are cache-first (they never change for a given URL).
-const CACHE = "sunday-pins-v3";
+const CACHE = "sunday-pins-v4";
 const CORE = ["./", "./index.html", "./courses-geo.js", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
 // the game can't start without these, so fetch them at install time rather than waiting for first use
 const LIBS = [
   "https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js",
   "https://cdn.tailwindcss.com",
-  "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono:wght@400;600&display=swap",
+  "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap",
 ];
 
 self.addEventListener("install", (e) => {
