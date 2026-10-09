@@ -2209,12 +2209,30 @@ const typeStyle = (st) => {
     React.createElement = function (type, props) {
         if (props && props.style && props.style.fontFamily === FONT) {
             const args = Array.prototype.slice.call(arguments);
-            args[1] = { ...props, style: typeStyle(props.style) };
+            const st = props.style, ls = typeof st.letterSpacing === "number" ? st.letterSpacing : 0;
+            args[1] = { ...props, style: typeStyle(st) };
+            // serif headings read as words, not shouting: "DRIVING ACCURACY" -> "Driving Accuracy"; big page titles drop their emoji
+            if (ls < 1) for (let i = 2; i < args.length; i++) args[i] = headingCase(args[i], (st.fontSize || 0) >= 24 && i === 2);
             return ce.apply(React, args);
         }
         return ce.apply(React, arguments);
     };
 }
+// all-caps words in serif headings become title case; acronyms and anything with a digit stay as written
+const KEEP_CAPS = new Set(["HQ", "XP", "OVR", "PGA", "US", "USA", "DP", "LIV", "TV", "II", "III", "IV", "GOAT", "FEDEX", "OWGR", "PGA", "RBC", "CJ", "BMW", "AT&T", "3M", "ZOZO", "VS", "AI", "R1", "R2", "R3", "R4", "UK", "EU"]);
+const SMALL_WORDS = new Set(["of", "the", "and", "to", "a", "an", "in", "on", "at", "for", "by", "or", "vs"]);
+const headingCase = (c, dropEmoji) => {
+    if (typeof c !== "string" || !/[A-Z]{2}/.test(c) || /[a-z]/.test(c)) return dropEmoji && typeof c === "string" ? stripEmoji(c) : c;
+    let first = true;
+    const out = c.replace(/[A-Z][A-Z'&]*/g, (w) => {
+        const isFirst = first; first = false;
+        if (KEEP_CAPS.has(w)) return w === "FEDEX" ? "FedEx" : w;
+        const low = w.toLowerCase();
+        if (!isFirst && SMALL_WORDS.has(low)) return low;
+        return w[0] + low.slice(1);
+    });
+    return dropEmoji ? stripEmoji(out) : out;
+};
 // leading emoji on buttons ("💪 DEVELOP") go: icons live in the menus, labels stay text
 const stripEmoji = (c) => typeof c === "string" ? c.replace(/^(?:[\u2190-\u2BFF\u2600-\u27BF\uFE0F\u200D]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|\uD83E[\uDC00-\uDFFF])+\s*/, "") : c;
 const tint = (v) => v >= 90 ? C.gold : v >= 85 ? C.green : C.chalk; // low isn't an error: no red
@@ -2402,6 +2420,7 @@ function Btn({ children, onClick, disabled, kind = "gold", small }) {
     const bg = gold ? C.gold : kind === "green" ? "#2E7D4F" : kind === "red" ? "#B84A33" : "rgba(244,247,242,0.06)";
     const fg = gold ? "#1A1405" : C.chalk;
     const kids = React.Children.map(children, (c, i) => i === 0 ? stripEmoji(c) : c);
+    if (NAV.shown && NAV.root && typeof kids[0] === "string" && /^\W*BACK(\s+TO\s+[A-Z ]+)?\W*$/i.test(kids[0])) return null; // the menu does this job
     return (React.createElement("button", { onClick: onClick, disabled: disabled, className: `w-full rounded-xl active:scale-[0.97] transition-transform ${small ? "py-3" : "py-4"} ${disabled ? "opacity-40" : ""}`, style: { background: bg, color: fg, fontFamily: UI, fontWeight: 700, fontSize: small ? 14 : 16, letterSpacing: "0.04em", border: solid ? "none" : "1px solid rgba(244,247,242,0.14)", minHeight: small ? 44 : 52 } }, kids));
 }
 // how fast AUTO plays through holes; kept on this device, changeable mid-round
@@ -9364,7 +9383,7 @@ function GolfCareerSim() {
                     React.createElement("div", { className: "mb-1", style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } }, "📅 WORKLOAD"),
                     React.createElement("div", { className: "grid grid-cols-3 gap-1.5" }, Object.entries(WORKLOADS).map(([id, w]) => React.createElement("button", { key: id, onClick: async () => { const st = { ...g, workload: id }; setG(st); await save(st); }, className: "p-2 rounded-lg active:scale-95 text-[11px]", style: { background: (g.workload || "balanced") === id ? C.gold : C.card, color: (g.workload || "balanced") === id ? C.bg : C.chalk } }, `${w.icon} ${w.label}`))),
                     React.createElement("p", { className: "text-[11px] mt-1", style: { color: C.muted } }, workloadOf(g).desc))),
-            React.createElement("div", { className: "grid gap-2" }, SLOTS.map((s) => {
+            React.createElement("div", { className: "grid gap-2 lg:grid-cols-2" }, SLOTS.map((s) => {
                 const base = g.pro.attrs[s.key] != null ? g.pro.attrs[s.key] : 70;
                 const eff = cur[s.key] != null ? cur[s.key] : base;
                 const cost = trainCostFor(g, s.key);
