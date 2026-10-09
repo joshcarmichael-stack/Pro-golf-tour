@@ -2892,11 +2892,17 @@ const chStreak = (daily) => {
     return { now: n, best: Math.max(best, n), today: !!d[chDayKey(0)] };
 }; // the originals; each one's other side is unlocked by winning it
 const chFlip = (id) => CHALLENGES.find((c) => c.flipOf === id);
+// the daily rotation: every original and every other side, 26 days before one repeats.
+// Originals and other sides take turns, and each other side comes round about a fortnight away from its original.
+const CH_DAILY = CH_MAIN.flatMap((c, k) => [c, chFlip(CH_MAIN[(k + 6) % CH_MAIN.length].id)]).filter(Boolean);
+// hours until the next daily (they change at midnight UK winter time, i.e. midnight UTC)
+const chNextHrs = () => Math.max(1, Math.ceil((864e5 - (Date.now() % 864e5)) / 36e5));
 const chToday = () => {
-    const n = Math.floor((Date.now() - CH_LAUNCH) / 864e5), i = ((n % CH_MAIN.length) + CH_MAIN.length) % CH_MAIN.length, d = new Date();
+    // the +4 lines the switch to the longer rotation up so the day it went live kept the same challenge
+    const n = Math.floor((Date.now() - CH_LAUNCH) / 864e5), i = (((n + 4) % CH_DAILY.length) + CH_DAILY.length) % CH_DAILY.length, d = new Date();
     // the rare one: every 13 April, plus roughly one other day a month
     const rare = CHALLENGES.find((c) => c.rare), isRare = rare && ((d.getMonth() === 3 && d.getDate() === 13) || ((n * 7919) % 29) === 11);
-    return { n: Math.max(1, n + 1), sc: isRare ? rare : CH_MAIN[i], rare: !!isRare, key: d.toISOString().slice(0, 10) };
+    return { n: Math.max(1, n + 1), sc: isRare ? rare : CH_DAILY[i], rare: !!isRare, key: d.toISOString().slice(0, 10) };
 };
 const chCourse = (sc) => COURSES.find((c) => c.name === sc.course);
 const chWx = { wind: 1, rain: 0, cold: 0 };
@@ -3176,6 +3182,40 @@ const chTestSummary = (rows) => {
 };
 const chLive = () => { try { const s = JSON.parse(localStorage.getItem(CH_LIVE_KEY) || "null"); const sc = s && CHALLENGES.find((c) => c.id === s.id); return sc ? { ...s, sc, course: chCourse(sc) } : null; } catch (e) { return null; } };
 const chLiveSave = (c) => { try { if (!c || c.phase === "brief") return; if (c.phase === "done") localStorage.removeItem(CH_LIVE_KEY); else localStorage.setItem(CH_LIVE_KEY, JSON.stringify({ ...c, sc: undefined, course: undefined, id: c.sc.id })); } catch (e) { /* storage blocked: the run just can't be resumed */ } };
+// "Remind me every day": a repeating calendar reminder. No server needed, and it works on every phone.
+function ChRemind() {
+    const [open, setOpen] = useState(false), [hr, setHr] = useState(19);
+    const url = CH_TEST ? SITE_URL + "/beta/" : SITE_URL, title = "⛳ Sunday Pins daily challenge", note = "Today's daily challenge is live. One attempt: keep your streak going! " + url;
+    const pad = (x) => String(x).padStart(2, "0");
+    const first = () => { const d = new Date(); d.setHours(hr, 0, 0, 0); if (d <= new Date()) d.setDate(d.getDate() + 1); return d; };
+    // local "floating" times, so the reminder stays at the same clock time wherever they are
+    const stamp = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+    const ics = () => {
+        const d = first(), text = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Sunday Pins//Daily Challenge//EN", "BEGIN:VEVENT", "UID:sunday-pins-daily-" + Date.now() + "@sunday-pins.com",
+            "DTSTAMP:" + new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z", "DTSTART:" + stamp(d), "DURATION:PT10M", "RRULE:FREQ=DAILY", "SUMMARY:" + title,
+            "DESCRIPTION:" + note.replace(/[,;]/g, (m) => "\\" + m), "URL:" + url, "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + title, "TRIGGER:PT0M", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+        track("challenge/remind/ics");
+        // iPhones open a calendar file straight into "Add to Calendar"; everything else downloads it
+        if (/iPhone|iPad|iPod/.test(navigator.userAgent)) { window.location.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(text); return; }
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([text], { type: "text/calendar" }));
+        a.download = "sunday-pins-daily.ics";
+        document.body.appendChild(a); a.click(); a.remove();
+    };
+    const google = () => {
+        const d = first(), e = new Date(d.getTime() + 6e5);
+        track("challenge/remind/google");
+        window.open("https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(title) + "&details=" + encodeURIComponent(note) + "&dates=" + stamp(d) + "/" + stamp(e) + "&recur=" + encodeURIComponent("RRULE:FREQ=DAILY"), "_blank", "noopener");
+    };
+    if (!open) return React.createElement("button", { onClick: () => setOpen(true), className: "w-full mt-2 text-xs py-1.5", style: { color: C.gold, textDecoration: "underline", textUnderlineOffset: 3 } }, "⏰ Remind me every day");
+    return React.createElement("div", { className: "mt-3 p-3 rounded-xl text-left", style: { background: "rgba(0,0,0,0.25)" } },
+        React.createElement("div", { className: "text-xs mb-2", style: { color: C.chalk } }, "Add a daily reminder to your calendar. What time suits you?"),
+        React.createElement("div", { className: "grid grid-cols-4 gap-1.5 mb-2" }, [[8, "8am"], [12, "Noon"], [18, "6pm"], [21, "9pm"]].map(([h, l]) => React.createElement("button", { key: h, onClick: () => setHr(h), className: "py-1.5 rounded-md text-xs font-semibold", style: { background: hr === h ? C.gold : "rgba(244,247,242,0.08)", color: hr === h ? "#1A1405" : C.chalk } }, l))),
+        React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+            React.createElement(Btn, { small: true, kind: "panel", onClick: ics }, "📅 iPhone / Outlook"),
+            React.createElement(Btn, { small: true, kind: "panel", onClick: google }, "📅 Google")),
+        React.createElement("div", { className: "text-[11px] mt-2", style: { color: C.muted } }, "It repeats every day. Delete it from your calendar whenever you like."));
+}
 function ChResume({ onResume }) {
     const [, redraw] = useState(0);
     const live = chLive();
@@ -6453,14 +6493,14 @@ function GolfCareerSim() {
             // today's daily: the one thing to do right now, so it sits at the top
             CH_ON && (() => {
                 const td = chToday(), sc = td.sc, st = chLoad(), played = (st.daily || {})[td.key], sk = chStreak(st.daily);
-                const hrs = Math.max(1, Math.ceil((new Date(td.key + "T00:00:00Z").getTime() + 864e5 - Date.now()) / 36e5));
+                const hrs = chNextHrs();
                 const start = () => { track("challenge/daily-home/" + sc.id); const stx = chLoad(); chStore({ ...stx, daily: { ...(stx.daily || {}), [td.key]: { id: sc.id, stars: 0, won: false, done: false } } }); setCh({ ...chStart(sc), daily: true }); setScreen("challenge"); };
                 return React.createElement("div", { className: "p-4 rounded-2xl mb-4 text-left relative overflow-hidden", style: { background: "linear-gradient(160deg, #2A2410, #163C28 70%)", border: `1.5px solid ${C.gold}`, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" } },
                     React.createElement("div", { className: "flex justify-between items-center gap-2" },
                         React.createElement("span", { style: { fontFamily: UI, fontSize: 12, fontWeight: 800, letterSpacing: "0.14em", color: C.gold } }, `${td.rare ? "⭐ RARE · " : ""}TODAY'S DAILY CHALLENGE #${td.n}`),
                         React.createElement("span", { className: "px-2 py-1 rounded-full text-[11px] font-semibold", style: { background: "rgba(0,0,0,0.25)", color: sk.now ? C.gold : C.muted } }, sk.now ? `🔥 ${sk.now}-day streak` : "🔥 Start a streak")),
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 28, fontWeight: 700, color: C.chalk, lineHeight: 1.1, marginTop: 8 } }, `"${sc.title}"`),
-                    React.createElement("div", { className: "text-sm mt-1", style: { color: C.gold } }, `${sc.you.name} · ${sc.year} ${sc.event}`),
+                    React.createElement("div", { className: "text-sm mt-1", style: { color: C.gold } }, `${sc.flipOf ? "🔄 The other side · " : ""}${sc.you.name} · ${sc.year} ${sc.event}`),
                     React.createElement("div", { className: "text-sm mt-2", style: { color: C.chalk } }, sc.blurb),
                     React.createElement("div", { className: "mt-3" }, played
                         ? (played.done
@@ -6469,7 +6509,8 @@ function GolfCareerSim() {
                                 React.createElement("div", { className: "text-xs mt-0.5", style: { color: C.muted } }, `A new daily in ${hrs} hour${hrs === 1 ? "" : "s"}. One attempt a day.`))
                             : React.createElement("div", { className: "text-xs", style: { color: C.chalk } }, "Today's attempt is under way: carry on from the card above."))
                         : React.createElement(Btn, { onClick: start }, "PLAY TODAY'S DAILY"),
-                    !played && React.createElement("div", { className: "text-[11px] mt-2 text-center", style: { color: C.muted } }, "One attempt. No restarts. Same challenge for everyone today.")));
+                    !played && React.createElement("div", { className: "text-[11px] mt-2 text-center", style: { color: C.muted } }, "One attempt. No restarts. Same challenge for everyone today."),
+                    React.createElement(ChRemind, null)));
             })(),
             React.createElement(HowItPlays, null),
             React.createElement("div", { className: "text-[10px] mb-2 text-center", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "CHOOSE YOUR WORLD"),
@@ -6707,7 +6748,7 @@ function GolfCareerSim() {
         const flipStrip = (c) => {
             const fl = chFlip(c.id);
             if (!fl) return null;
-            const open = ((by[c.id] || {}).wins || 0) > 0, fr = by[fl.id] || {};
+            const open = ((by[c.id] || {}).wins || 0) > 0 || !!by[fl.id], fr = by[fl.id] || {};
             return open ? React.createElement("button", { onClick: () => { track("challenge/start/" + fl.id); setCh({ ...chStart(fl), daily: false }); setScreen("challenge"); }, className: "w-full p-2.5 rounded-b-xl -mt-2 mb-2 text-left active:scale-[0.99]", style: { background: "#1B2A36", border: "1px solid rgba(127,183,217,0.5)", borderTop: "none" } },
                 React.createElement("div", { className: "flex justify-between items-baseline" },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 14, color: C.blue } }, `🔄 THE OTHER SIDE: ${fl.you.name.toUpperCase()}`),
@@ -6894,7 +6935,8 @@ function GolfCareerSim() {
                 // the end of the result: streak, then the one big action, then the quieter options side by side
                 streakNow && React.createElement("div", { className: "p-3 rounded-xl mb-3 text-center", style: { background: "rgba(232,195,90,0.08)", border: `1px solid ${C.gold}` } },
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.gold } }, `🔥 ${streakNow.now}-DAY STREAK`),
-                    React.createElement("div", { className: "text-xs", style: { color: C.muted } }, `Best: ${streakNow.best} day${streakNow.best === 1 ? "" : "s"} · Daily Challenge #${today.n + 1} unlocks tomorrow`)),
+                    React.createElement("div", { className: "text-xs", style: { color: C.muted } }, `Best: ${streakNow.best} day${streakNow.best === 1 ? "" : "s"} · Daily Challenge #${today.n + 1} in ${chNextHrs()} hour${chNextHrs() === 1 ? "" : "s"}`),
+                    React.createElement(ChRemind, null)),
                 React.createElement("div", { className: "mb-3" }, React.createElement(Btn, { onClick: share }, "📤 SHARE YOUR RESULT")),
                 React.createElement("div", { className: "grid gap-2 mb-2", style: { gridTemplateColumns: !(sc.rare && !ch.test) ? "1fr 1fr" : "1fr" } },
                     !(sc.rare && !ch.test) && React.createElement(Btn, { small: true, onClick: () => { if (!ch.test) track("challenge/retry/" + sc.id); setCh({ ...chStart(sc), daily: false, test: !!ch.test }); }, kind: "panel" }, ch.daily ? "PRACTISE IT" : "TRY AGAIN"),
