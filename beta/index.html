@@ -68,6 +68,7 @@ button{-webkit-tap-highlight-color:transparent}
   .sp-main.sp-wide{max-width:34rem}
   .sp-nav .sp-main.sp-hubwide{max-width:74rem}
   .sp-main.sp-playwide{max-width:76rem;padding:24px 32px 40px}
+  .sp-main.sp-pagewide{max-width:66rem;padding:32px 32px 48px}
   .sp-round{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}
   .sp-round-main,.sp-round-rail{display:flex;flex-direction:column}
   .sp-round-rail{position:sticky;top:16px}
@@ -88,6 +89,7 @@ button{-webkit-tap-highlight-color:transparent}
 @keyframes spRow{0%{transform:translateY(var(--from));box-shadow:0 0 0 1px rgba(232,195,90,.7),0 6px 14px rgba(0,0,0,.35)}75%{box-shadow:0 0 0 1px rgba(232,195,90,.25),0 2px 6px rgba(0,0,0,.2)}100%{transform:translateY(0);box-shadow:none}}
 @keyframes spFlash{0%,100%{opacity:1}25%,75%{opacity:.25}50%{opacity:1;transform:scale(1.35)}}
 @keyframes spEnter{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
+@keyframes spBeat{0%,100%{transform:scale(1)}40%{transform:scale(1.08)}}
 @keyframes spPulse{0%{transform:scale(1)}40%{transform:scale(1.25);color:#9FD98B}100%{transform:scale(1)}}
 @keyframes spDraw{to{stroke-dashoffset:0}}
 @keyframes spWave{0%,100%{transform:scaleX(1) skewY(0)}50%{transform:scaleX(.86) skewY(5deg)}}
@@ -2507,7 +2509,7 @@ const Shell = ({ children, theme }) => {
         children);
     if (!shown)
         return (React.createElement("div", { className: "min-h-screen", style: { background: t.bg, transition: "background 0.4s ease" } },
-            React.createElement("div", { className: "sp-main sp-solo" + (NAV.wide ? " sp-playwide" : "") }, content)));
+            React.createElement("div", { className: "sp-main sp-solo" + (NAV.wide === "page" ? " sp-pagewide" : NAV.wide ? " sp-playwide" : "") }, content)));
     return (React.createElement("div", { className: "sp-app sp-nav", style: { background: t.bg, transition: "background 0.4s ease" } },
         React.createElement("nav", { className: "sp-side", "aria-label": "Main menu" },
             React.createElement("div", { className: "sp-brand" }, "Sunday Pins"),
@@ -6372,6 +6374,7 @@ function GolfCareerSim() {
     if (screen === "landing") {
         const modeLabel = (id) => id === "alltime" ? "All-Time Greats" : id === "team" ? "Team Tour" : id === "league" ? "League System" : "Tour Career";
         const startFresh = (id) => { setConfirmEraseId(null); setMode(id); setAttrs({}); setPair(null); setName(""); setNation(""); setLastTake(null); setScreen("identity"); };
+        NAV.wide = "page"; // desktop: the three careers side by side
         return (React.createElement(Shell, null,
             React.createElement(HomeHero, null),
             React.createElement(ChResume, { onResume: resumeCh }),
@@ -6385,7 +6388,7 @@ function GolfCareerSim() {
                 React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Pick any challenge and play it. Nothing is saved: no medals, no daily result.")),
             React.createElement(HowItPlays, null),
             React.createElement("div", { className: "text-[10px] mb-2 text-center", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "CHOOSE YOUR WORLD"),
-            React.createElement("div", { className: "px-1" }, GAME_MODES.map((md) => {
+            React.createElement("div", { className: "px-1 lg:grid lg:grid-cols-3 lg:gap-4 lg:px-0" }, GAME_MODES.map((md) => {
                 const isActive = g && g.pro && g.mode === md.id;
                 // belt-and-braces: if the scan is stale, the mode you're playing still shows its live save
                 const slot = slots[md.id] || (isActive ? { name: g.pro.name, season: g.season, retired: !!g.retired } : null);
@@ -6403,8 +6406,8 @@ function GolfCareerSim() {
                             md.emoji,
                             " ",
                             md.name),
-                        isActive ? React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded shrink-0", style: { background: C.gold, color: C.bg, fontFamily: FONT, letterSpacing: 1 } }, "\u25CF PLAYING")
-                            : md.starter && !anySave ? React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded shrink-0", style: { background: C.gold, color: C.bg, fontFamily: FONT, letterSpacing: 1, animation: "spPulse 2.4s ease-in-out infinite" } }, "START HERE") : null),
+                        isActive ? React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded shrink-0", style: { background: C.gold, color: "#1A1405", fontFamily: FONT, fontSize: 11, letterSpacing: 1 } }, "\u25CF PLAYING")
+                            : md.starter && !anySave ? React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded shrink-0", style: { background: C.gold, color: "#1A1405", fontFamily: FONT, fontSize: 11, letterSpacing: 1, animation: "spBeat 2.4s ease-in-out infinite" } }, "START HERE") : null),
                     React.createElement("p", { className: "text-sm mt-1", style: { color: md.accent, fontWeight: 600 } }, md.tagline),
                     slot ? (React.createElement("div", { className: "mt-2 p-2 rounded-lg", style: { background: "rgba(0,0,0,.25)" } },
                         React.createElement("div", { style: { color: C.chalk, fontSize: 13, fontWeight: 700 } }, slot.name),
@@ -6629,6 +6632,7 @@ function GolfCareerSim() {
                 React.createElement("div", { className: "text-xs mt-1", style: { color: C.muted } }, c.blurb),
                 React.createElement("div", { className: "text-[11px] mt-1", style: { color: C.chalk } }, [1, 2, 3].map((i) => (i <= (rec.stars || 0) ? CH_MEDAL[i] : "○")).join(" "), rec.tries ? `  · ${rec.wins || 0}/${rec.tries} won` : "")));
         };
+        NAV.wide = "page";
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
             React.createElement("div", { className: "text-center mb-3" },
@@ -6649,7 +6653,7 @@ function GolfCareerSim() {
                 const list = CH_MAIN.filter((c) => c.cat === cat);
                 return list.length ? (React.createElement("div", { key: cat, className: "mt-3" },
                     React.createElement("div", { className: "text-[10px] mb-1", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, label.toUpperCase()),
-                    list.map((c) => React.createElement("div", { key: c.id }, card(c, false), flipStrip(c))))) : null;
+                    React.createElement("div", { className: "lg:grid lg:grid-cols-2 lg:gap-x-4" }, list.map((c) => React.createElement("div", { key: c.id }, card(c, false), flipStrip(c)))))) : null;
             }),
             React.createElement(Btn, { onClick: () => setScreen(g && g.pro ? "hub" : "landing"), kind: "panel" }, "BACK")));
     }
