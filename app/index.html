@@ -121,7 +121,13 @@ const featFromHz = (h) => { const [par, , hz = 1] = h; // estimate for holes nob
             c.realCard = true;
         }
         c.holes.forEach((h, i) => {
-            const e = gd && gd.h && gd.h[i];
+            let e = gd && gd.h && gd.h[i];
+            // only trust the map if it is plainly this hole: about the right length, and a par 3 only where the card says par 3.
+            // Where the mapped course and the tournament card disagree, draw the hole from the card instead.
+            if (e && e.f && e.f.y && !c.realCard) {
+                const r = e.f.y / h[1];
+                if (r < 0.75 || r > 1.3 || (e.f.y < 260) !== (h[0] === 3)) e = null;
+            }
             h[4] = e ? { ...e.f } : featFromHz(h);
             h[5] = e ? e.g : null;
             const coast = COAST[c.name] && COAST[c.name][i + 1];
