@@ -41,6 +41,10 @@ button{-webkit-tap-highlight-color:transparent}
 .sp-app{min-height:100vh}
 .sp-main{max-width:28rem;margin:0 auto;padding:1rem 1rem 6.5rem}
 .sp-main.sp-solo{padding-bottom:2.5rem}
+.sp-hub{display:flex;flex-direction:column}
+.sp-hub-rail{display:flex;flex-direction:column}
+.sp-round{display:flex;flex-direction:column}
+.sp-round-main,.sp-round-rail{display:contents}
 .sp-side{display:none}
 .sp-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:space-around;padding:6px 4px calc(10px + env(safe-area-inset-bottom));background:rgba(11,35,24,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid rgba(244,247,242,.1)}
 .sp-tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:60px;min-height:46px;padding-top:4px;border:0;background:none;font:600 11px 'Source Sans 3',sans-serif;color:#8FAA98;cursor:pointer}
@@ -62,6 +66,14 @@ button{-webkit-tap-highlight-color:transparent}
   .sp-tabbar{display:none}
   .sp-nav .sp-main{max-width:46rem;padding:28px 32px 48px}
   .sp-main.sp-wide{max-width:34rem}
+  .sp-nav .sp-main.sp-hubwide{max-width:74rem}
+  .sp-main.sp-playwide{max-width:76rem;padding:24px 32px 40px}
+  .sp-round{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}
+  .sp-round-main,.sp-round-rail{display:flex;flex-direction:column}
+  .sp-round-rail{position:sticky;top:16px}
+  .sp-round-rail>div{order:0!important} /* desktop: leaderboard first in the side column */
+  .sp-hub{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:28px;align-items:start}
+  .sp-hub-rail{position:sticky;top:28px;max-height:calc(100vh - 56px);overflow-y:auto;scrollbar-width:thin}
 }
 @keyframes spInR{0%{opacity:0;transform:translateX(44px)}100%{opacity:1;transform:none}}
 @keyframes spInL{0%{opacity:0;transform:translateX(-44px)}100%{opacity:1;transform:none}}
@@ -2291,7 +2303,7 @@ function RealHoleMap({ hole, seed, attrs, from = 0 }) {
     const stops = plan.pts.map((y) => alongLine(c, y / yds));
     const flight = `M ${X(start).toFixed(1)} ${Yy(start).toFixed(1)} ` + stops.map((p, i) => hop(i ? stops[i - 1] : start, p)).join(" ");
     const label = planLabel(hole, plan, from);
-    return (React.createElement("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", height: H, className: "mt-2 rounded-lg block", style: { background: HOLE_INK.rough }, role: "img", "aria-label": `Hole map, ${yds} yards` },
+    return (React.createElement("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", className: "mt-2 rounded-lg block", style: { background: HOLE_INK.rough, height: "auto", aspectRatio: `292 / ${H}`, maxHeight: 300 }, role: "img", "aria-label": `Hole map, ${yds} yards` },
         (g.f || []).map((d, i) => React.createElement("path", { key: "f" + i, d: path(d), fill: HOLE_INK.fairway })),
         (g.w || []).map((d, i) => React.createElement("path", { key: "w" + i, d: path(d), fill: HOLE_INK.water, opacity: 0.9 })),
         (g.t || []).map((d, i) => React.createElement("path", { key: "t" + i, d: path(d), fill: HOLE_INK.tee })),
@@ -2338,7 +2350,7 @@ function HoleMap({ hole, seed, attrs, from = 0 }) {
     const at = (y) => { const f = y / yds; return [tx + (gx + 2 - tx) * f, mid + (gy - mid) * f + bend * Math.sin(Math.PI * f) * 0.8]; };
     const start = at(from), stops = plan.pts.map(at);
     const flight = `M ${start[0]} ${start[1]} ` + stops.map((p, i) => hop(...(i ? stops[i - 1] : start), p[0], p[1])).join(" ");
-    return (React.createElement("svg", { viewBox: `0 0 292 ${H}`, width: "100%", height: H, className: "mt-2 rounded-lg block", style: { background: HOLE_INK.rough }, role: "img", "aria-label": `Hole layout: par ${par}, ${yds} yards` },
+    return (React.createElement("svg", { viewBox: `0 0 292 ${H}`, width: "100%", className: "mt-2 rounded-lg block", style: { background: HOLE_INK.rough, height: "auto", aspectRatio: `292 / ${H}`, maxHeight: 300 }, role: "img", "aria-label": `Hole layout: par ${par}, ${yds} yards` },
         fairway && React.createElement("path", { d: fairway, fill: "none", stroke: HOLE_INK.fairway, strokeWidth: 15, strokeLinecap: "round", strokeLinejoin: "round" }),
         apron && React.createElement("path", { d: apron, stroke: HOLE_INK.fairway, strokeWidth: 11, strokeLinecap: "round" }),
         water && React.createElement("path", { d: water, fill: HOLE_INK.water, opacity: 0.85 }),
@@ -2403,6 +2415,15 @@ function SpeedPicker() {
         React.createElement("div", { className: "flex rounded-full p-0.5", style: { background: "rgba(244,247,242,0.06)" }, role: "group", "aria-label": "Play-through speed" },
             Object.entries(SIM_SPEEDS).map(([k, sp]) => React.createElement("button", { key: k, onClick: () => pick(k), "aria-pressed": v === k, className: "rounded-full px-3 py-1.5", style: { background: v === k ? C.gold : "transparent", color: v === k ? "#1A1405" : C.chalk, fontWeight: 600, fontSize: 13, minHeight: 34 } }, sp.label))));
 }
+// the live leaderboard during a round remembers its order after each hole, so rows can slide to their new places
+const LIVE_HIST = {};
+const liveMoves = (key, h, names) => {
+    const k = LIVE_HIST[key] || (LIVE_HIST[key] = {});
+    k[h] = names;
+    const prev = k[h - 1];
+    return (name, i) => { if (!prev) return 0; const j = prev.indexOf(name); return j < 0 ? 0 : j - i; };
+};
+const liveSlide = (mv) => mv ? { "--from": `${clampN(mv, -5, 5) * 18}px`, animation: "spRow .8s .15s cubic-bezier(.3,.7,.2,1) both", position: "relative", zIndex: 1 + Math.abs(mv), background: C.panel } : {};
 function BackTop({ onClick }) {
     if (NAV.shown && NAV.root) return null; // the menu is the way around on section pages
     return (React.createElement("button", { onClick: onClick, className: "mb-3 px-3 py-2 rounded-lg active:scale-95 flex items-center gap-1", style: { background: "transparent", color: C.chalk, fontFamily: UI, fontWeight: 600, fontSize: 14, border: "1px solid rgba(244,247,242,0.16)", minHeight: 40 } }, "\u2039 Back"));
@@ -2432,6 +2453,12 @@ const navSections = (g) => {
     ];
 };
 const PHONE_TABS = ["home", "develop", "tour", "career", "mail"];
+if (typeof window !== "undefined") window.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) return;
+    const f = NAV.keys && NAV.keys[(e.key || "").toLowerCase()];
+    if (f) { e.preventDefault(); f(); }
+});
+const Kbd = ({ k }) => React.createElement("span", { className: "hidden lg:inline-block ml-2 px-1.5 rounded align-middle", style: { fontFamily: MONO, fontSize: 11, border: "1px solid rgba(244,247,242,0.25)", color: C.muted, lineHeight: "18px" } }, k);
 let SHELL_LAST = { key: "", anim: "spEnter .28s ease-out both", sec: -1 };
 const Shell = ({ children, theme }) => {
     const t = theme || ACTIVE_THEME || THEMES.home;
@@ -2461,7 +2488,7 @@ const Shell = ({ children, theme }) => {
         children);
     if (!shown)
         return (React.createElement("div", { className: "min-h-screen", style: { background: t.bg, transition: "background 0.4s ease" } },
-            React.createElement("div", { className: "sp-main sp-solo" }, content)));
+            React.createElement("div", { className: "sp-main sp-solo" + (NAV.wide ? " sp-playwide" : "") }, content)));
     return (React.createElement("div", { className: "sp-app sp-nav", style: { background: t.bg, transition: "background 0.4s ease" } },
         React.createElement("nav", { className: "sp-side", "aria-label": "Main menu" },
             React.createElement("div", { className: "sp-brand" }, "Sunday Pins"),
@@ -2471,7 +2498,7 @@ const Shell = ({ children, theme }) => {
                 x.id === "develop" && xpReady && React.createElement("span", { className: "sp-count xp" }, `${g.xp} XP`))),
             React.createElement("div", { style: { flex: 1 } }),
             React.createElement("button", { onClick: () => NAV.go("landing") }, React.createElement(Icon, { name: "trophy" }), "Main menu")),
-        React.createElement("main", { className: "sp-main" }, content),
+        React.createElement("main", { className: "sp-main" + (SCREEN_KEY === "hub" ? " sp-hubwide" : "") }, content),
         React.createElement("nav", { className: "sp-tabbar", "aria-label": "Main menu" },
             PHONE_TABS.map((id) => { const x = secs.find((y) => y.id === id), i = secs.indexOf(x);
                 return React.createElement("button", { key: id, className: "sp-tab" + (i === secIdx ? " on" : ""), onClick: () => go(x), "aria-label": x.label },
@@ -3260,7 +3287,7 @@ function GolfCareerSim() {
         }
         ACTIVE_THEME = th;
         SCREEN_KEY = screen;
-        NAV.g = g; NAV.screen = screen; NAV.go = setScreen;
+        NAV.g = g; NAV.screen = screen; NAV.go = setScreen; NAV.wide = false; NAV.keys = null;
     }
     const [mode, setMode] = useState("standard");
     const [name, setName] = useState("");
@@ -7162,32 +7189,88 @@ function GolfCareerSim() {
         const rookie = g.season === 1 && (g.myStats.events || 0) < 4;
         const myRecord = ev ? (((_b = g.eventHistory) === null || _b === void 0 ? void 0 : _b[ev.e]) || []) : [];
         return (React.createElement(Shell, null,
-            React.createElement("div", { className: "flex justify-between items-center mb-1" },
-                React.createElement("button", { onClick: goHome, className: "px-2.5 py-1 rounded-md active:scale-95", style: { background: C.panel, color: C.chalk, fontFamily: FONT, fontSize: 12, letterSpacing: 2, border: "1px solid rgba(244,247,242,0.2)" } }, "\u2302 HOME"),
-                React.createElement("button", { onClick: () => setScreen("guide"), className: "px-2.5 py-1 rounded-md active:scale-95", style: { background: C.panel, color: C.chalk, fontFamily: FONT, fontSize: 12, letterSpacing: 2, border: "1px solid rgba(244,247,242,0.2)" } }, "\u2753 GUIDE"),
-                React.createElement("span", { style: { fontFamily: FONT, fontSize: 26, color: tint(g.pro.overall) } },
-                    g.pro.overall,
-                    " OVR")),
-            React.createElement("h1", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, g.pro.name),
+            React.createElement("div", { className: "sp-hub" },
+            React.createElement("div", { className: "sp-hub-main" },
+            // header: who you are and where you stand, at a glance
+            React.createElement("div", { className: "flex justify-between items-start gap-3" },
+                React.createElement("div", { className: "min-w-0" },
+                    React.createElement("div", { style: { fontFamily: UI, fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted } },
+                        `${g.mode === "alltime" ? "All-time · " : ""}Season ${g.season} · Age ${g.pro.age != null ? g.pro.age : 22} · ${g.pro.nation}`),
+                    React.createElement("h1", { style: { fontFamily: FONT, fontSize: "clamp(26px, 7.5vw, 34px)", fontWeight: 700, color: C.chalk, lineHeight: 1.1, marginTop: 6 } }, g.pro.name),
+                    g.mode === "team" && myTeam() && React.createElement("div", { className: "text-sm", style: { color: C.muted } }, myTeam().name),
+                    g.mode === "league" && myLeagueTeam() && React.createElement("div", { className: "text-sm", style: { color: C.muted } }, myLeagueTeam().name)),
+                React.createElement("div", { className: "text-center rounded-xl px-3 py-2 flex-none", style: { border: "1px solid rgba(244,247,242,0.16)", background: C.panel } },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 28, fontWeight: 700, lineHeight: 1, color: tint(g.pro.overall) } }, g.pro.overall),
+                    React.createElement("div", { style: { fontFamily: UI, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: C.muted, marginTop: 3 } }, "OVR"))),
+            React.createElement("div", { className: "flex flex-wrap gap-x-4 gap-y-1 mt-2 mb-1 text-sm", style: { color: C.muted } },
+                React.createElement("span", null, "World ", React.createElement("b", { style: { fontFamily: MONO, color: C.chalk } }, `#${owgrList().findIndex((x) => x.name === g.pro.name) + 1}`)),
+                React.createElement("span", null, "FedEx ", React.createElement("b", { style: { fontFamily: MONO, color: C.chalk } }, `#${myPos}`)),
+                React.createElement("span", null, "This season ", React.createElement("b", { style: { fontFamily: MONO, color: C.chalk } }, fmtMoney((g.standings[g.pro.name] || {}).money || 0))),
+                React.createElement("span", { className: "ml-auto flex gap-3" },
+                    React.createElement("button", { onClick: () => setScreen("guide"), className: "hover:underline", style: { color: C.blue, fontWeight: 600 } }, "Guide"),
+                    React.createElement("button", { onClick: goHome, className: "lg:hidden hover:underline", style: { color: C.blue, fontWeight: 600 } }, "Main menu"))),
             g.pot && React.createElement("button", { onClick: () => setScreen("develop"), className: "text-[11px] mb-0.5 text-left", style: { color: C.gold } },
                 `🔭 Scouts: ${potLabel(g)}${potKnown(g) ? ` · ceiling ${potOvr(g) - 1}–${potOvr(g) + 1} OVR` : " (they'll know by 20)"}`),
             (g.myStats.careerWins || 0) > 0 && g.mode !== "league" && React.createElement("div", { className: "text-[11px] mb-0.5", style: { color: C.muted } },
                 `🏆 Chasing the greats: ${g.myStats.careerWins}/${RECORD_WINS} wins (Tiger) · ${g.myStats.careerMajors}/${RECORD_MAJORS} majors (Jack)`),
-            React.createElement("div", { className: "text-xs mb-2", style: { color: C.muted } },
-                g.mode === "alltime" ? "👑 ALL-TIME · " : "",
-                g.mode === "team" && myTeam() ? `🤝 ${myTeam().name} · ` : "",
-                g.mode === "league" && myLeagueTeam() ? `🏟️ ${myLeagueTeam().name} · ` : "",
-                g.pro.nation,
-                " \u00B7 Age ", (_c = g.pro.age) !== null && _c !== void 0 ? _c : 22,
-                " \u00B7 Season ",
-                g.season,
-                " \u00B7 FedEx #",
-                myPos,
-                " \u00B7 \uD83C\uDF10 World #",
-                owgrList().findIndex((x) => x.name === g.pro.name) + 1,
-                " \u00B7 ",
-                fmtMoney(((_d = g.standings[g.pro.name]) === null || _d === void 0 ? void 0 : _d.money) || 0),
-                " this season"),
+            LIFE(g) && g.injury && (() => {
+                const inj = g.injury, lab = lifeLab(inj.skill);
+                const upd = async (patch, icon, txt) => { const st = { ...g, injury: patch ? { ...inj, ...patch } : null }; if (txt) storyAdd(st, icon, txt); setG(st); await save(st); };
+                return React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(216,66,58,0.10)", border: `1.5px solid ${C.red}` } },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, letterSpacing: 1, color: C.red } }, inj.sev === "rest" ? "🏖️ TAKING A BREAK" : inj.decide ? `🤕 SERIOUS ${inj.part.toUpperCase()} INJURY: YOUR CALL` : `🤕 ${inj.part.toUpperCase()} INJURY`),
+                    inj.decide ? React.createElement("div", null,
+                        React.createElement("p", { className: "text-xs my-1", style: { color: C.chalk } }, `The doctors can't decide for you. Your ${lab} is affected either way.`),
+                        React.createElement("div", { className: "grid gap-2" },
+                            React.createElement("button", { onClick: () => upd({ decide: false, out: 0, pen: 4, penLeft: 10, chronicRisk: 0.35 }, "💪", `Played through a ${inj.part} injury`), className: "p-2.5 rounded-lg text-left active:scale-[0.99]", style: { background: C.card, border: `1px solid ${C.gold}` } },
+                                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, color: C.gold } }, "💪 PLAY THROUGH IT"),
+                                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, `Keep playing with ${lab} -4 for 10 events. About a 1 in 3 chance it never fully heals (ceiling -1 to -3).`)),
+                            React.createElement("button", { onClick: () => upd({ decide: false, out: ri(6, 10), pen: 2, penLeft: 6, chronicRisk: 0.08 }, "🏥", `Had surgery on ${inj.part}`), className: "p-2.5 rounded-lg text-left active:scale-[0.99]", style: { background: C.card, border: "1px solid rgba(127,183,217,0.5)" } },
+                                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, color: C.blue } }, "🏥 SURGERY AND REST"),
+                                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, `Miss 6 to 10 events, then ${lab} -2 for 6 more while you rebuild. The ceiling is almost always protected.`))))
+                    : React.createElement("p", { className: "text-xs mt-1", style: { color: C.chalk } }, inj.out > 0 ? `${inj.sev === "rest" ? "Resting" : "Out injured"}: ${inj.out} more event${inj.out === 1 ? "" : "s"}. You'll watch from home.` : `Back playing, but ${lab} is -${inj.pen} for ${inj.penLeft} more event${inj.penLeft === 1 ? "" : "s"}.${inj.chronicRisk >= 0.3 ? " Fingers crossed it heals properly." : ""}`));
+            })(),
+            ev && (React.createElement("div", { className: "p-5 rounded-2xl mb-3 mt-3", style: { background: C.card, border: `1px solid ${ev.type === "major" ? C.gold : "rgba(232,195,90,0.35)"}`, boxShadow: "0 8px 24px rgba(0,0,0,0.18)" } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } },
+                    "EVENT ",
+                    g.evIdx + 1,
+                    "/",
+                    SCHEDULE.length,
+                    " \u00B7 ",
+                    typeLabel[ev.type]),
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 30, fontWeight: 700, color: C.chalk, lineHeight: 1.1, marginTop: 6 } }, ev.e),
+                React.createElement("div", { className: "text-xs mt-0.5", style: { color: C.muted } },
+                    course.name,
+                    " \u00B7 Par ",
+                    course.par,
+                    " \u00B7 ",
+                    course.yards,
+                    "y \u00B7 Purse $",
+                    ev.purse,
+                    "M"),
+                React.createElement("p", { className: "text-xs italic mt-1", style: { color: C.chalk, opacity: 0.8 } }, course.style),
+                myRecord.length > 0 && (React.createElement("p", { className: "text-xs mt-1 mb-2", style: { color: C.blue } },
+                    "Your record here: ",
+                    myRecord.slice(-4).map((h) => `S${h.s}: ${h.r}`).join(" · "))),
+                (() => {
+                    if (g.isFreeAgent && ev.type !== "team") {
+                        return React.createElement("p", { className: "text-xs mt-1", style: { color: C.bogey } },
+                            "\uD83C\uDF92 FREE AGENT \u2014 you'll play the ",
+                            ALT_EVENTS[g.evIdx % ALT_EVENTS.length].e,
+                            " (opposite-field). Sign for a club to earn full tour status.");
+                    }
+                    if (ev.type !== "major" && ev.type !== "signature")
+                        return null;
+                    const youOk = qualifiedCheck(ev)(g.pro.name);
+                    return youOk ? (React.createElement("p", { className: "text-xs mt-1", style: { color: C.green } },
+                        "\u2713 QUALIFIED",
+                        ev.type === "major" ? " (world top 100, reigning champ, or a win this season)" : " (world top 50 or FedEx top 30)")) : (React.createElement("p", { className: "text-xs mt-1", style: { color: C.red } },
+                        "\u2717 NOT QUALIFIED \u2014 you'll play the ",
+                        ALT_EVENTS[g.evIdx % ALT_EVENTS.length].e,
+                        " instead. ",
+                        ev.type === "major" ? "Get inside the world top 100 (or win) to make these fields." : "World top 50 or FedEx top 30 gets you in."));
+                })(),
+                React.createElement("div", { className: "mt-2" },
+                    React.createElement(Btn, { onClick: startEvent }, LIFE(g) && g.injury && (g.injury.out > 0 || g.injury.decide) ? (g.injury.decide ? "🤕 DECIDE ON YOUR INJURY FIRST" : "📺 WATCH THIS WEEK FROM HOME") : ev.type === "team" ? "FIND A PARTNER" : (g.isFreeAgent || ((ev.type === "major" || ev.type === "signature") && !qualifiedCheck(ev)(g.pro.name))) ? "PLAY THE OPPOSITE EVENT" : "HIT THE RANGE")))),
             !ev && (React.createElement("div", { className: "p-4 rounded-xl mb-3", style: { background: "rgba(232,195,90,0.1)", border: `1.5px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 18, letterSpacing: 1, color: C.gold }, className: "mb-1" },
                     "SEASON ",
@@ -7200,8 +7283,8 @@ function GolfCareerSim() {
                     " \u25B8"))),
             rookie && React.createElement(Tip, { id: "hub-week", title: "HOW A WEEK WORKS" },
                 "Each week is one event. Tap ", React.createElement("b", null, g.isFreeAgent ? "PLAY THE OPPOSITE EVENT" : "HIT THE RANGE"),
-                " to pick a training focus, then play it hole by hole or sim it. Good results earn XP: spend it in ", React.createElement("b", null, "DEVELOP"),
-                " to raise your attributes. Lost? Tap ", React.createElement("b", null, "\u2753 GUIDE"), " any time."),
+                " to pick a training focus, then play it hole by hole or sim it. Good results earn XP: spend it in ", React.createElement("b", null, "Develop"),
+                " (in the menu) to raise your attributes. Lost? Tap ", React.createElement("b", null, "Guide"), " any time."),
             rookie && g.mode === "league" && React.createElement(Tip, { id: "hub-league", title: "HOW THE LEAGUE WORKS" },
                 "Clubs have five players and the best four count each week; their results make the team's points. Top two in each division go up, bottom two go down. ",
                 g.isFreeAgent ? "Right now nobody has signed you: play the opposite-field events, bank XP and results, and offers will come." : "Once you're at a club, use TRANSFERS and SCOUTING under MY CLUB to strengthen the squad."),
@@ -7215,6 +7298,149 @@ function GolfCareerSim() {
                     g.caddieLeftNote.special ? " — a legend doesn't carry a bag that isn't contending" : ", looking for a player who delivers",
                     ". Any chemistry you'd built is gone. Pick a new looper this pre-season."),
                 React.createElement("button", { onClick: async () => { const st = { ...g, caddieLeftNote: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))),
+            LIFE(g) && g.slump && (() => {
+                const sl = g.slump, lab = lifeLab(sl.skill), bank = g.bank != null ? g.bank : g.myStats.careerMoney, fee = sl.yips ? 1.2e6 : 0.6e6;
+                const fix = async (how) => {
+                    const st = { ...g, slump: { ...sl, tried: how } };
+                    if (how === "coach") { st.bank = bank - fee; st.slump.left = sl.yips ? Math.max(4, Math.ceil(sl.left / 2)) : Math.min(sl.left, 2); }
+                    if (how === "gear" && Math.random() < 0.5) st.slump.left = 1;
+                    if (how === "rest") { st.slump = null; st.injury = { part: "break", sev: "rest", skill: sl.skill, out: 2, pen: 0, penLeft: 0 }; }
+                    storyAdd(st, "🛠️", how === "coach" ? `Hired a specialist to fix the ${sl.yips ? "yips" : lab}` : how === "gear" ? "Changed equipment to break a slump" : how === "rest" ? "Took two weeks off to reset" : "Rode out a slump");
+                    setG(st); await save(st);
+                };
+                return React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(232,195,90,0.08)", border: `1.5px solid ${C.bogey}` } },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, letterSpacing: 1, color: C.bogey } }, sl.yips ? "😰 THE YIPS" : `📉 SLUMP: ${lab.toUpperCase()}`),
+                    React.createElement("p", { className: "text-xs my-1", style: { color: C.chalk } }, `${lab.charAt(0).toUpperCase() + lab.slice(1)} -${sl.pen} for about ${sl.left} more event${sl.left === 1 ? "" : "s"}.`),
+                    !sl.tried ? React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                        [["coach", `🧑‍🏫 Specialist (${fmtMoney(fee)})`, bank >= fee], ["gear", "🔄 Change equipment", true], ["rest", "🏖️ Two weeks off", true], ["ride", "🤷 Ride it out", true]].map(([id, label, ok]) =>
+                            React.createElement("button", { key: id, disabled: !ok, onClick: () => fix(id), className: `p-2 rounded-lg text-[11px] ${ok ? "active:scale-95" : "opacity-40"}`, style: { background: C.card, color: C.chalk } }, label)))
+                    : React.createElement("p", { className: "text-[11px]", style: { color: C.muted } }, sl.tried === "gear" ? "New gear in the bag. Let's see if it helps." : sl.tried === "coach" ? "Working with the specialist." : "Riding it out."));
+            })(),
+            g.xpBreakdown && g.xpBreakdown.length > 0 ? (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } },
+                        "\uD83D\uDCC8 EXPERIENCE \u00B7 +",
+                        React.createElement(CountUp, { to: g.xpGainLast || 0, ms: 800 }),
+                        " XP"),
+                    React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
+                        g.xp || 0,
+                        " XP banked")),
+                g.xpBreakdown.map((p, i) => (React.createElement("div", { key: i, className: "flex justify-between text-xs", style: { color: C.chalk } },
+                    React.createElement("span", null, p.label),
+                    React.createElement("span", { style: { color: C.green } },
+                        "+",
+                        p.amt)))),
+                React.createElement("button", { onClick: () => setScreen("develop"), className: "w-full mt-2 py-1.5 rounded-md active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 12, letterSpacing: 1 } }, "\uD83D\uDCAA SPEND XP TO DEVELOP \u25B8"),
+                React.createElement("button", { onClick: async () => { const st = { ...g, xpBreakdown: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))) : null,
+            (g.badgeNews || []).length > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(232,195,90,0.08)", border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\uD83C\uDF96\uFE0F MILESTONE UNLOCKED"),
+                g.badgeNews.map((b, i2) => (React.createElement("p", { key: i2, className: "text-xs mb-0.5", style: { color: C.chalk } },
+                    React.createElement("b", { style: { color: C.gold } }, b.name),
+                    " \u2014 ",
+                    b.desc,
+                    " \u00B7 permanent +1 ",
+                    PERK_LABEL[b.attr],
+                    g.pot ? " (and that ceiling rises too)" : ""))),
+                (() => { const big = (g.badgeNews || []).find((b) => BIG_MILESTONES[b.id]); return big ? React.createElement(ShareResult, { tag: "milestone-" + big.id, kicker: "MILESTONE", headline: BIG_MILESTONES[big.id],
+                    sub: `${g.myStats.careerWins} win${g.myStats.careerWins === 1 ? "" : "s"} · ${g.myStats.careerMajors} major${g.myStats.careerMajors === 1 ? "" : "s"} · ${calcOverall(effAttrs(g))} OVR`, name: `${g.pro.name} · ${g.pro.nation} · age ${g.pro.age != null ? g.pro.age : 22}` }) : null; })(),
+                React.createElement("button", { onClick: async () => { const st = { ...g, badgeNews: [] }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))),
+            g.isFreeAgent && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } }, "\uD83C\uDF92 FREE AGENT"),
+                    React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
+                        g.faEvents || 0,
+                        " events played")),
+                React.createElement("p", { className: "text-xs mb-1", style: { color: C.chalk } }, "Unsigned. Play the alternate events and develop your game \u2014 clubs are watching."),
+                React.createElement("div", { className: "h-1.5 rounded-full my-1.5 overflow-hidden", style: { background: "rgba(244,247,242,0.12)" } },
+                    React.createElement("div", { style: { width: `${Math.min(100, ((g.faProvenScore || 0) / 12) * 100)}%`, height: "100%", background: C.gold } })),
+                React.createElement("p", { className: "text-[10px] mb-2", style: { color: C.muted } },
+                    "Reputation ",
+                    Math.min(100, Math.round(((g.faProvenScore || 0) / 12) * 100)),
+                    "% \u2014 prove yourself to attract contract offers."),
+                g.faPracticedThisGap ? (React.createElement("div", { className: "w-full py-2 rounded-md text-center", style: { background: "rgba(244,247,242,0.08)", color: C.muted, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, "\u2713 PRACTICED \u2014 rest up for the next event")) : (React.createElement("button", { onClick: async () => {
+                        const xp = 9 + Math.floor(Math.random() * 6);
+                        const st = { ...g, xp: (g.xp || 0) + xp, xpGainLast: xp, xpBreakdown: [{ label: "Full-time practice (free agent)", amt: xp }], faPracticedThisGap: true };
+                        setG(st);
+                        await save(st);
+                    }, className: "w-full py-2 rounded-md active:scale-95", style: { background: C.green, color: C.bg, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, "\uD83C\uDFCC\uFE0F PRACTICE FOR XP (+9\u201314)")),
+                g.freeAgentOffers && g.freeAgentOffers.length > 0 && (React.createElement("button", { onClick: () => setScreen("freeAgency"), className: "w-full mt-2 py-2 rounded-md active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, "\uD83D\uDCDE VIEW CONTRACT OFFERS \u25B8")))),
+            g.signingNews && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\u270D\uFE0F NEW CLUB"),
+                React.createElement("p", { className: "text-sm", style: { color: C.chalk } },
+                    "You've signed for ",
+                    React.createElement("b", { style: { color: C.gold } }, g.signingNews.team),
+                    " (",
+                    divName(g.signingNews.division),
+                    ") for $",
+                    g.signingNews.fee,
+                    "m. A fresh challenge \u2014 go prove you belong."),
+                React.createElement("button", { onClick: async () => { const st = { ...g, signingNews: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))),
+            g.wxNote && g.wxNote.length > 0 && (React.createElement("div", { className: "px-3 py-2 rounded-lg mb-3", style: { background: "rgba(127,183,217,0.08)", border: "1px solid rgba(127,183,217,0.3)" } },
+                React.createElement("span", { className: "text-xs", style: { color: C.blue } },
+                    "\uD83C\uDF2C\uFE0F All those rough-weather reps are paying off \u2014 you feel sharper in the ",
+                    g.wxNote.join(" and "),
+                    "."))),
+            g.evIdx === 0 && g.coachNote && (React.createElement("div", { className: "px-3 py-2 rounded-lg mb-3", style: { background: "rgba(159,217,139,0.08)", border: "1px solid rgba(159,217,139,0.3)" } },
+                React.createElement("span", { className: "text-xs", style: { color: C.green } },
+                    "\uD83E\uDDD1\u200D\uD83C\uDFEB Winter work with ",
+                    g.coachNote.name,
+                    " paid off \u2014 permanent +",
+                    g.coachNote.amt || 1,
+                    " ",
+                    PERK_LABEL[g.coachNote.attr]))),
+            g.evIdx === 0 && (g.retiredNews || []).length > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(127,183,217,0.07)", border: "1px solid rgba(127,183,217,0.3)" } },
+                React.createElement("button", { onClick: () => setTurnoverOpen(!turnoverOpen), className: "w-full flex justify-between items-center mb-1" },
+                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.blue } }, "\uD83D\uDD04 TOUR TURNOVER"),
+                    React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
+                        g.retiredNews.length,
+                        " change",
+                        g.retiredNews.length !== 1 ? "s" : "",
+                        " \u00B7 ",
+                        turnoverOpen ? "hide ▴" : "view all ▾")),
+                React.createElement("div", { className: turnoverOpen ? "max-h-72 overflow-auto" : "" }, (turnoverOpen ? g.retiredNews : g.retiredNews.slice(0, 5)).map((n2, i2) => (React.createElement("p", { key: i2, className: "text-xs mb-0.5", style: { color: C.muted } },
+                    React.createElement("span", { style: { color: C.chalk } }, n2.out),
+                    " retires \u2014 ",
+                    n2.gen ? "⭐ GENERATIONAL TALENT" : "rookie",
+                    " ",
+                    React.createElement("span", { style: { color: n2.gen ? C.gold : C.green } }, n2.in),
+                    " (",
+                    n2.c,
+                    ") ",
+                    n2.gen ? "arrives — the next big thing" : "earns a tour card")))),
+                !turnoverOpen && g.retiredNews.length > 5 && React.createElement("button", { onClick: () => setTurnoverOpen(true), className: "text-[10px] mt-1", style: { color: C.blue } },
+                    "+",
+                    g.retiredNews.length - 5,
+                    " more \u2014 tap to see all"))),
+            (g.season > 1 || (g.myStats.careerWins || 0) > 0) && React.createElement(ShareResult, { tag: "career", kicker: `CAREER CARD \u00B7 SEASON ${g.season}`,
+                headline: `${g.myStats.careerWins || 0} win${g.myStats.careerWins === 1 ? "" : "s"} \u00B7 ${g.myStats.careerMajors || 0} major${g.myStats.careerMajors === 1 ? "" : "s"}`,
+                sub: `${calcOverall(effAttrs(g))} OVR${g.myStats.reachedNo1 ? " \u00B7 reached World No. 1" : ""}${g.pot && potKnown(g) ? ` \u00B7 ${potTier(g).name} talent` : ""}`,
+                name: `${g.pro.name} \u00B7 ${g.pro.nation} \u00B7 age ${g.pro.age != null ? g.pro.age : 22}`, label: "📸 SHARE MY CAREER CARD" }),
+            // Develop, Mailbox, Tour and Career live in the menu (tab bar / side menu); the club and setup pages stay one tap from home on phones,
+            React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2 lg:hidden" }, [["club", g.mode === "league" ? "MY CLUB" : "CUPS"], ["setup", "SETUP"]].map(([k, label]) => (React.createElement(Btn, { key: k, small: true, kind: hubMenu === k ? "gold" : "panel", onClick: () => setHubMenu(hubMenu === k ? null : k) },
+                label,
+                hubMenu === k ? " \u25B4" : " \u25BE")))),
+            hubMenu && (React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3 p-2 rounded-xl lg:hidden", style: { background: "rgba(20,61,41,0.4)" } },
+                hubMenu === "career" && React.createElement(React.Fragment, null,
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setRecTab("wins"); setScreen("records"); } }, "\uD83D\uDCCA RECORDS"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("mystats") }, "\u26F3 NUMBERS"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("cabinet") }, "\uD83C\uDFC6 CABINET"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("achievements") }, "\uD83C\uDF96\uFE0F ACHIEVEMENTS")),
+                hubMenu === "club" && React.createElement(React.Fragment, null,
+                    g.mode === "team" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("team") }, "\uD83E\uDD1D MY TEAM"),
+                    g.mode === "league" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("league") }, "\uD83C\uDFDF\uFE0F MY LEAGUE"),
+                    g.mode === "league" && !g.isFreeAgent && myLeagueTeam() && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("transferMarket") }, "\uD83D\uDCB0 TRANSFERS"),
+                    g.mode === "league" && !g.isFreeAgent && myLeagueTeam() && React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setScoutTab("filter"); setScreen("scoutMarket"); } }, "\uD83D\uDD0D SCOUTING"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("ryderHQ") }, "\uD83C\uDF0D CUPS HQ")),
+                hubMenu === "tour" && React.createElement(React.Fragment, null,
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setSelSched(null); setScreen("schedule"); } }, "\uD83D\uDCC5 SCHEDULE"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("world") }, "\uD83C\uDF10 WORLD RANKINGS"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("worldCupQual") }, "\uD83C\uDF0D WORLD CUP")),
+                hubMenu === "setup" && React.createElement(React.Fragment, null,
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("coaches") }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHES"),
+                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("equipment") }, "\uD83C\uDFCC\uFE0F EQUIPMENT"),
+                    EDITION === "app" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("names") }, "\u270F\uFE0F PLAYER NAMES")))),
+            ),
+            React.createElement("aside", { className: "sp-hub-rail" },
             g.caddie && (React.createElement("div", { className: "px-3 py-2 rounded-lg mb-3 flex items-center justify-between", style: { background: "rgba(232,195,90,0.08)", border: "1px solid rgba(232,195,90,0.3)" } },
                 React.createElement("span", { className: "text-xs", style: { color: C.chalk } },
                     "\uD83C\uDF92 ",
@@ -7271,205 +7497,6 @@ function GolfCareerSim() {
                         g.rival.sw || 0,
                         "–",
                         g.rival.sl || 0)))),
-            g.isFreeAgent && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: `1.5px solid ${C.gold}` } },
-                React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
-                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } }, "\uD83C\uDF92 FREE AGENT"),
-                    React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
-                        g.faEvents || 0,
-                        " events played")),
-                React.createElement("p", { className: "text-xs mb-1", style: { color: C.chalk } }, "Unsigned. Play the alternate events and develop your game \u2014 clubs are watching."),
-                React.createElement("div", { className: "h-1.5 rounded-full my-1.5 overflow-hidden", style: { background: "rgba(244,247,242,0.12)" } },
-                    React.createElement("div", { style: { width: `${Math.min(100, ((g.faProvenScore || 0) / 12) * 100)}%`, height: "100%", background: C.gold } })),
-                React.createElement("p", { className: "text-[10px] mb-2", style: { color: C.muted } },
-                    "Reputation ",
-                    Math.min(100, Math.round(((g.faProvenScore || 0) / 12) * 100)),
-                    "% \u2014 prove yourself to attract contract offers."),
-                g.faPracticedThisGap ? (React.createElement("div", { className: "w-full py-2 rounded-md text-center", style: { background: "rgba(244,247,242,0.08)", color: C.muted, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, "\u2713 PRACTICED \u2014 rest up for the next event")) : (React.createElement("button", { onClick: async () => {
-                        const xp = 9 + Math.floor(Math.random() * 6);
-                        const st = { ...g, xp: (g.xp || 0) + xp, xpGainLast: xp, xpBreakdown: [{ label: "Full-time practice (free agent)", amt: xp }], faPracticedThisGap: true };
-                        setG(st);
-                        await save(st);
-                    }, className: "w-full py-2 rounded-md active:scale-95", style: { background: C.green, color: C.bg, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, "\uD83C\uDFCC\uFE0F PRACTICE FOR XP (+9\u201314)")),
-                g.freeAgentOffers && g.freeAgentOffers.length > 0 && (React.createElement("button", { onClick: () => setScreen("freeAgency"), className: "w-full mt-2 py-2 rounded-md active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, "\uD83D\uDCDE VIEW CONTRACT OFFERS \u25B8")))),
-            g.signingNews && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\u270D\uFE0F NEW CLUB"),
-                React.createElement("p", { className: "text-sm", style: { color: C.chalk } },
-                    "You've signed for ",
-                    React.createElement("b", { style: { color: C.gold } }, g.signingNews.team),
-                    " (",
-                    divName(g.signingNews.division),
-                    ") for $",
-                    g.signingNews.fee,
-                    "m. A fresh challenge \u2014 go prove you belong."),
-                React.createElement("button", { onClick: async () => { const st = { ...g, signingNews: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))),
-            g.xpBreakdown && g.xpBreakdown.length > 0 ? (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
-                React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
-                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold } },
-                        "\uD83D\uDCC8 EXPERIENCE \u00B7 +",
-                        React.createElement(CountUp, { to: g.xpGainLast || 0, ms: 800 }),
-                        " XP"),
-                    React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
-                        g.xp || 0,
-                        " XP banked")),
-                g.xpBreakdown.map((p, i) => (React.createElement("div", { key: i, className: "flex justify-between text-xs", style: { color: C.chalk } },
-                    React.createElement("span", null, p.label),
-                    React.createElement("span", { style: { color: C.green } },
-                        "+",
-                        p.amt)))),
-                React.createElement("button", { onClick: () => setScreen("develop"), className: "w-full mt-2 py-1.5 rounded-md active:scale-95", style: { background: C.gold, color: C.bg, fontFamily: FONT, fontSize: 12, letterSpacing: 1 } }, "\uD83D\uDCAA SPEND XP TO DEVELOP \u25B8"),
-                React.createElement("button", { onClick: async () => { const st = { ...g, xpBreakdown: null }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))) : null,
-            LIFE(g) && g.injury && (() => {
-                const inj = g.injury, lab = lifeLab(inj.skill);
-                const upd = async (patch, icon, txt) => { const st = { ...g, injury: patch ? { ...inj, ...patch } : null }; if (txt) storyAdd(st, icon, txt); setG(st); await save(st); };
-                return React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(216,66,58,0.10)", border: `1.5px solid ${C.red}` } },
-                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, letterSpacing: 1, color: C.red } }, inj.sev === "rest" ? "🏖️ TAKING A BREAK" : inj.decide ? `🤕 SERIOUS ${inj.part.toUpperCase()} INJURY: YOUR CALL` : `🤕 ${inj.part.toUpperCase()} INJURY`),
-                    inj.decide ? React.createElement("div", null,
-                        React.createElement("p", { className: "text-xs my-1", style: { color: C.chalk } }, `The doctors can't decide for you. Your ${lab} is affected either way.`),
-                        React.createElement("div", { className: "grid gap-2" },
-                            React.createElement("button", { onClick: () => upd({ decide: false, out: 0, pen: 4, penLeft: 10, chronicRisk: 0.35 }, "💪", `Played through a ${inj.part} injury`), className: "p-2.5 rounded-lg text-left active:scale-[0.99]", style: { background: C.card, border: `1px solid ${C.gold}` } },
-                                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, color: C.gold } }, "💪 PLAY THROUGH IT"),
-                                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, `Keep playing with ${lab} -4 for 10 events. About a 1 in 3 chance it never fully heals (ceiling -1 to -3).`)),
-                            React.createElement("button", { onClick: () => upd({ decide: false, out: ri(6, 10), pen: 2, penLeft: 6, chronicRisk: 0.08 }, "🏥", `Had surgery on ${inj.part}`), className: "p-2.5 rounded-lg text-left active:scale-[0.99]", style: { background: C.card, border: "1px solid rgba(127,183,217,0.5)" } },
-                                React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, color: C.blue } }, "🏥 SURGERY AND REST"),
-                                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, `Miss 6 to 10 events, then ${lab} -2 for 6 more while you rebuild. The ceiling is almost always protected.`))))
-                    : React.createElement("p", { className: "text-xs mt-1", style: { color: C.chalk } }, inj.out > 0 ? `${inj.sev === "rest" ? "Resting" : "Out injured"}: ${inj.out} more event${inj.out === 1 ? "" : "s"}. You'll watch from home.` : `Back playing, but ${lab} is -${inj.pen} for ${inj.penLeft} more event${inj.penLeft === 1 ? "" : "s"}.${inj.chronicRisk >= 0.3 ? " Fingers crossed it heals properly." : ""}`));
-            })(),
-            LIFE(g) && g.slump && (() => {
-                const sl = g.slump, lab = lifeLab(sl.skill), bank = g.bank != null ? g.bank : g.myStats.careerMoney, fee = sl.yips ? 1.2e6 : 0.6e6;
-                const fix = async (how) => {
-                    const st = { ...g, slump: { ...sl, tried: how } };
-                    if (how === "coach") { st.bank = bank - fee; st.slump.left = sl.yips ? Math.max(4, Math.ceil(sl.left / 2)) : Math.min(sl.left, 2); }
-                    if (how === "gear" && Math.random() < 0.5) st.slump.left = 1;
-                    if (how === "rest") { st.slump = null; st.injury = { part: "break", sev: "rest", skill: sl.skill, out: 2, pen: 0, penLeft: 0 }; }
-                    storyAdd(st, "🛠️", how === "coach" ? `Hired a specialist to fix the ${sl.yips ? "yips" : lab}` : how === "gear" ? "Changed equipment to break a slump" : how === "rest" ? "Took two weeks off to reset" : "Rode out a slump");
-                    setG(st); await save(st);
-                };
-                return React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(232,195,90,0.08)", border: `1.5px solid ${C.bogey}` } },
-                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, letterSpacing: 1, color: C.bogey } }, sl.yips ? "😰 THE YIPS" : `📉 SLUMP: ${lab.toUpperCase()}`),
-                    React.createElement("p", { className: "text-xs my-1", style: { color: C.chalk } }, `${lab.charAt(0).toUpperCase() + lab.slice(1)} -${sl.pen} for about ${sl.left} more event${sl.left === 1 ? "" : "s"}.`),
-                    !sl.tried ? React.createElement("div", { className: "grid grid-cols-2 gap-2" },
-                        [["coach", `🧑‍🏫 Specialist (${fmtMoney(fee)})`, bank >= fee], ["gear", "🔄 Change equipment", true], ["rest", "🏖️ Two weeks off", true], ["ride", "🤷 Ride it out", true]].map(([id, label, ok]) =>
-                            React.createElement("button", { key: id, disabled: !ok, onClick: () => fix(id), className: `p-2 rounded-lg text-[11px] ${ok ? "active:scale-95" : "opacity-40"}`, style: { background: C.card, color: C.chalk } }, label)))
-                    : React.createElement("p", { className: "text-[11px]", style: { color: C.muted } }, sl.tried === "gear" ? "New gear in the bag. Let's see if it helps." : sl.tried === "coach" ? "Working with the specialist." : "Riding it out."));
-            })(),
-            (g.season > 1 || (g.myStats.careerWins || 0) > 0) && React.createElement(ShareResult, { tag: "career", kicker: `CAREER CARD \u00B7 SEASON ${g.season}`,
-                headline: `${g.myStats.careerWins || 0} win${g.myStats.careerWins === 1 ? "" : "s"} \u00B7 ${g.myStats.careerMajors || 0} major${g.myStats.careerMajors === 1 ? "" : "s"}`,
-                sub: `${calcOverall(effAttrs(g))} OVR${g.myStats.reachedNo1 ? " \u00B7 reached World No. 1" : ""}${g.pot && potKnown(g) ? ` \u00B7 ${potTier(g).name} talent` : ""}`,
-                name: `${g.pro.name} \u00B7 ${g.pro.nation} \u00B7 age ${g.pro.age != null ? g.pro.age : 22}`, label: "📸 SHARE MY CAREER CARD" }),
-            (g.badgeNews || []).length > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(232,195,90,0.08)", border: `1.5px solid ${C.gold}` } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "\uD83C\uDF96\uFE0F MILESTONE UNLOCKED"),
-                g.badgeNews.map((b, i2) => (React.createElement("p", { key: i2, className: "text-xs mb-0.5", style: { color: C.chalk } },
-                    React.createElement("b", { style: { color: C.gold } }, b.name),
-                    " \u2014 ",
-                    b.desc,
-                    " \u00B7 permanent +1 ",
-                    PERK_LABEL[b.attr],
-                    g.pot ? " (and that ceiling rises too)" : ""))),
-                (() => { const big = (g.badgeNews || []).find((b) => BIG_MILESTONES[b.id]); return big ? React.createElement(ShareResult, { tag: "milestone-" + big.id, kicker: "MILESTONE", headline: BIG_MILESTONES[big.id],
-                    sub: `${g.myStats.careerWins} win${g.myStats.careerWins === 1 ? "" : "s"} · ${g.myStats.careerMajors} major${g.myStats.careerMajors === 1 ? "" : "s"} · ${calcOverall(effAttrs(g))} OVR`, name: `${g.pro.name} · ${g.pro.nation} · age ${g.pro.age != null ? g.pro.age : 22}` }) : null; })(),
-                React.createElement("button", { onClick: async () => { const st = { ...g, badgeNews: [] }; setG(st); await save(st); }, className: "text-[10px] mt-1", style: { color: C.muted } }, "dismiss \u2715"))),
-            g.wxNote && g.wxNote.length > 0 && (React.createElement("div", { className: "px-3 py-2 rounded-lg mb-3", style: { background: "rgba(127,183,217,0.08)", border: "1px solid rgba(127,183,217,0.3)" } },
-                React.createElement("span", { className: "text-xs", style: { color: C.blue } },
-                    "\uD83C\uDF2C\uFE0F All those rough-weather reps are paying off \u2014 you feel sharper in the ",
-                    g.wxNote.join(" and "),
-                    "."))),
-            g.evIdx === 0 && g.coachNote && (React.createElement("div", { className: "px-3 py-2 rounded-lg mb-3", style: { background: "rgba(159,217,139,0.08)", border: "1px solid rgba(159,217,139,0.3)" } },
-                React.createElement("span", { className: "text-xs", style: { color: C.green } },
-                    "\uD83E\uDDD1\u200D\uD83C\uDFEB Winter work with ",
-                    g.coachNote.name,
-                    " paid off \u2014 permanent +",
-                    g.coachNote.amt || 1,
-                    " ",
-                    PERK_LABEL[g.coachNote.attr]))),
-            g.evIdx === 0 && (g.retiredNews || []).length > 0 && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(127,183,217,0.07)", border: "1px solid rgba(127,183,217,0.3)" } },
-                React.createElement("button", { onClick: () => setTurnoverOpen(!turnoverOpen), className: "w-full flex justify-between items-center mb-1" },
-                    React.createElement("span", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.blue } }, "\uD83D\uDD04 TOUR TURNOVER"),
-                    React.createElement("span", { className: "text-[10px]", style: { color: C.muted } },
-                        g.retiredNews.length,
-                        " change",
-                        g.retiredNews.length !== 1 ? "s" : "",
-                        " \u00B7 ",
-                        turnoverOpen ? "hide ▴" : "view all ▾")),
-                React.createElement("div", { className: turnoverOpen ? "max-h-72 overflow-auto" : "" }, (turnoverOpen ? g.retiredNews : g.retiredNews.slice(0, 5)).map((n2, i2) => (React.createElement("p", { key: i2, className: "text-xs mb-0.5", style: { color: C.muted } },
-                    React.createElement("span", { style: { color: C.chalk } }, n2.out),
-                    " retires \u2014 ",
-                    n2.gen ? "⭐ GENERATIONAL TALENT" : "rookie",
-                    " ",
-                    React.createElement("span", { style: { color: n2.gen ? C.gold : C.green } }, n2.in),
-                    " (",
-                    n2.c,
-                    ") ",
-                    n2.gen ? "arrives — the next big thing" : "earns a tour card")))),
-                !turnoverOpen && g.retiredNews.length > 5 && React.createElement("button", { onClick: () => setTurnoverOpen(true), className: "text-[10px] mt-1", style: { color: C.blue } },
-                    "+",
-                    g.retiredNews.length - 5,
-                    " more \u2014 tap to see all"))),
-            ev && (React.createElement("div", { className: "p-4 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: `1.5px solid ${ev.type === "major" ? C.gold : "rgba(244,247,242,0.2)"}` } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } },
-                    "EVENT ",
-                    g.evIdx + 1,
-                    "/",
-                    SCHEDULE.length,
-                    " \u00B7 ",
-                    typeLabel[ev.type]),
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 26, color: C.chalk, lineHeight: 1.05 } }, ev.e),
-                React.createElement("div", { className: "text-xs mt-0.5", style: { color: C.muted } },
-                    course.name,
-                    " \u00B7 Par ",
-                    course.par,
-                    " \u00B7 ",
-                    course.yards,
-                    "y \u00B7 Purse $",
-                    ev.purse,
-                    "M"),
-                React.createElement("p", { className: "text-xs italic mt-1", style: { color: C.chalk, opacity: 0.8 } }, course.style),
-                myRecord.length > 0 && (React.createElement("p", { className: "text-xs mt-1 mb-2", style: { color: C.blue } },
-                    "Your record here: ",
-                    myRecord.slice(-4).map((h) => `S${h.s}: ${h.r}`).join(" · "))),
-                (() => {
-                    if (g.isFreeAgent && ev.type !== "team") {
-                        return React.createElement("p", { className: "text-xs mt-1", style: { color: C.bogey } },
-                            "\uD83C\uDF92 FREE AGENT \u2014 you'll play the ",
-                            ALT_EVENTS[g.evIdx % ALT_EVENTS.length].e,
-                            " (opposite-field). Sign for a club to earn full tour status.");
-                    }
-                    if (ev.type !== "major" && ev.type !== "signature")
-                        return null;
-                    const youOk = qualifiedCheck(ev)(g.pro.name);
-                    return youOk ? (React.createElement("p", { className: "text-xs mt-1", style: { color: C.green } },
-                        "\u2713 QUALIFIED",
-                        ev.type === "major" ? " (world top 100, reigning champ, or a win this season)" : " (world top 50 or FedEx top 30)")) : (React.createElement("p", { className: "text-xs mt-1", style: { color: C.red } },
-                        "\u2717 NOT QUALIFIED \u2014 you'll play the ",
-                        ALT_EVENTS[g.evIdx % ALT_EVENTS.length].e,
-                        " instead. ",
-                        ev.type === "major" ? "Get inside the world top 100 (or win) to make these fields." : "World top 50 or FedEx top 30 gets you in."));
-                })(),
-                React.createElement("div", { className: "mt-2" },
-                    React.createElement(Btn, { onClick: startEvent }, LIFE(g) && g.injury && (g.injury.out > 0 || g.injury.decide) ? (g.injury.decide ? "🤕 DECIDE ON YOUR INJURY FIRST" : "📺 WATCH THIS WEEK FROM HOME") : ev.type === "team" ? "FIND A PARTNER" : (g.isFreeAgent || ((ev.type === "major" || ev.type === "signature") && !qualifiedCheck(ev)(g.pro.name))) ? "PLAY THE OPPOSITE EVENT" : "HIT THE RANGE")))),
-            // Develop, Mailbox, Tour and Career live in the menu (tab bar / side menu); the club and setup pages stay one tap from home on phones
-            React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2 lg:hidden" }, [["club", g.mode === "league" ? "MY CLUB" : "CUPS"], ["setup", "SETUP"]].map(([k, label]) => (React.createElement(Btn, { key: k, small: true, kind: hubMenu === k ? "gold" : "panel", onClick: () => setHubMenu(hubMenu === k ? null : k) },
-                label,
-                hubMenu === k ? " \u25B4" : " \u25BE")))),
-            hubMenu && (React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3 p-2 rounded-xl lg:hidden", style: { background: "rgba(20,61,41,0.4)" } },
-                hubMenu === "career" && React.createElement(React.Fragment, null,
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setRecTab("wins"); setScreen("records"); } }, "\uD83D\uDCCA RECORDS"),
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("mystats") }, "\u26F3 NUMBERS"),
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("cabinet") }, "\uD83C\uDFC6 CABINET"),
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("achievements") }, "\uD83C\uDF96\uFE0F ACHIEVEMENTS")),
-                hubMenu === "club" && React.createElement(React.Fragment, null,
-                    g.mode === "team" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("team") }, "\uD83E\uDD1D MY TEAM"),
-                    g.mode === "league" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("league") }, "\uD83C\uDFDF\uFE0F MY LEAGUE"),
-                    g.mode === "league" && !g.isFreeAgent && myLeagueTeam() && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("transferMarket") }, "\uD83D\uDCB0 TRANSFERS"),
-                    g.mode === "league" && !g.isFreeAgent && myLeagueTeam() && React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setScoutTab("filter"); setScreen("scoutMarket"); } }, "\uD83D\uDD0D SCOUTING"),
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("ryderHQ") }, "\uD83C\uDF0D CUPS HQ")),
-                hubMenu === "tour" && React.createElement(React.Fragment, null,
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setSelSched(null); setScreen("schedule"); } }, "\uD83D\uDCC5 SCHEDULE"),
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("world") }, "\uD83C\uDF10 WORLD RANKINGS"),
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("worldCupQual") }, "\uD83C\uDF0D WORLD CUP")),
-                hubMenu === "setup" && React.createElement(React.Fragment, null,
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("coaches") }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHES"),
-                    React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("equipment") }, "\uD83C\uDFCC\uFE0F EQUIPMENT"),
-                    EDITION === "app" && React.createElement(Btn, { small: true, kind: "panel", onClick: () => setScreen("names") }, "\u270F\uFE0F PLAYER NAMES")))),
             (() => {
                 const m = g.myStats;
                 const wIdx = owgrList().findIndex((x) => x.name === g.pro.name) + 1;
@@ -7546,6 +7573,7 @@ function GolfCareerSim() {
                     h.score,
                     ") \u00B7 You: ",
                     React.createElement("span", { style: { color: h.you === "MC" || h.you === "DNQ" ? C.red : C.green } }, h.you)))))),
+            )),
             React.createElement("button", { onClick: resetAll, className: "w-full text-xs mt-2", style: { color: C.muted } }, "Delete career & start over")));
     }
     // ---------- Ryder HQ ----------
@@ -9868,12 +9896,20 @@ function GolfCareerSim() {
             if (h < 18 && !myCut) {
                 const nextHole = course.holes[h];
                 const justPlayed = h > 0 ? { hole: h, par: course.holes[h - 1][0], sc: live.holes[meIdx][h - 1] } : null;
+                NAV.wide = true; // the hole-by-hole screen spreads into two columns on desktop
+                // keyboard on desktop: 1 / 2 pick the shot, A starts or pauses auto-play
+                NAV.keys = !autoPlay ? { "1": () => chooseHole(HOLE_CHOICES(nextHole)[0].id), "2": () => HOLE_CHOICES(nextHole)[1] && chooseHole(HOLE_CHOICES(nextHole)[1].id), "a": () => setAutoPlay(true) } : { "a": () => setAutoPlay(false) };
                 return (React.createElement(Shell, null,
+                    React.createElement("div", { className: "sp-round" },
+                    React.createElement("div", { className: "sp-round-main" },
+                    React.createElement("div", { style: { order: 0 } },
                     React.createElement("div", { className: "text-center", style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } },
                         ev.type === "major" ? "★ " : "",
                         ev.e.toUpperCase(),
                         ev.type === "major" ? " ★" : "",
-                        tour.team ? ` · w/ ${tour.partner.split(" ").slice(-1)[0].toUpperCase()}` : ""),
+                        tour.team ? ` · w/ ${tour.partner.split(" ").slice(-1)[0].toUpperCase()}` : "")
+                    ),
+                    React.createElement("div", { style: { order: 1 } },
                     React.createElement("div", { className: "flex justify-between items-baseline" },
                         React.createElement("h2", { style: { fontFamily: FONT, fontSize: 20, color: C.chalk } },
                             "R",
@@ -9887,36 +9923,26 @@ function GolfCareerSim() {
                         React.createElement("span", { style: { fontFamily: FONT, fontSize: 18, color: myRoundDelta <= 0 ? C.green : C.bogey } },
                             thruPar(myRoundDelta),
                             " thru ",
-                            h)),
+                            h))
+                    ),
+                    React.createElement("div", { style: { order: 2 } },
                     React.createElement("div", { className: "grid grid-cols-9 gap-0.5 my-2" }, course.holes.map((hh, i) => {
                         const sc = i < h ? live.holes[meIdx][i] : null;
                         return (React.createElement("button", { key: i, onClick: () => sc && setStoryHole(i), className: "text-center py-1 rounded", style: { background: i === h ? "rgba(232,195,90,0.25)" : "rgba(244,247,242,0.06)", border: i === h ? `1px solid ${C.gold}` : "1px solid transparent" } },
                             React.createElement("div", { style: { color: C.muted, fontSize: 8 } }, i + 1),
-                            sc ? React.createElement(ScoreMark, { sc, par: hh[0] }) : React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, lineHeight: "24px", color: "rgba(244,247,242,0.25)" } }, "·")));
-                    })),
-                    justPlayed && (React.createElement("button", { onClick: () => setStoryHole(h - 1), className: "w-full text-center mb-1" },
+                            sc ? React.createElement("span", { key: "m" + sc, className: "sp-anim inline-block", style: { animation: i === h - 1 ? "spPop .45s ease-out both" : undefined } }, React.createElement(ScoreMark, { sc, par: hh[0] })) : React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, lineHeight: "24px", color: "rgba(244,247,242,0.25)" } }, "·")));
+                    }))
+                    ),
+                    React.createElement("div", { style: { order: 4 } },
+                    justPlayed && (React.createElement("button", { key: "jp" + h, onClick: () => setStoryHole(h - 1), className: "w-full text-center mb-1 sp-anim", style: { animation: "spPop .4s ease-out both" } },
                         React.createElement("span", { style: { fontFamily: FONT, fontSize: 22, color: scoreColor(justPlayed.sc, justPlayed.par), letterSpacing: 1 } }, scoreName(justPlayed.sc, justPlayed.par)),
                         React.createElement("span", { className: "text-xs ml-2", style: { color: C.muted } },
                             "on ",
                             justPlayed.hole,
                             " \u00B7 tap for detail \u00B7 ",
-                            myPosLabel))),
-                    fieldHoleStat && (React.createElement("div", { className: "text-center text-xs mb-1", style: { color: C.muted } },
-                        "Hole ",
-                        h,
-                        " field: avg ",
-                        fieldHoleStat.avg,
-                        " (par ",
-                        fieldHoleStat.parH,
-                        ") \u00B7 ",
-                        fieldHoleStat.bPct,
-                        "% under par")),
-                    (ticker.length > 0 || feed.length > 0) && (React.createElement("div", { className: "p-2.5 rounded-xl mb-2", style: { background: "rgba(10,20,14,0.55)", border: `1px solid ${ticker.some((t) => t.pri >= 5) ? C.gold : "rgba(244,247,242,0.15)"}` } },
-                        React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
-                            React.createElement("span", { style: { fontFamily: FONT, fontSize: 11, letterSpacing: 3, color: C.gold } }, "\uD83D\uDCE3 LIVE FROM THE COURSE"),
-                            board.length > 0 && React.createElement("span", { className: "text-[10px]", style: { color: C.muted } }, `Leader ${board[0].isYou ? "YOU" : board[0].name.split(" ").slice(-1)[0]} ${thruPar(board[0].totalDelta)}`)),
-                        ticker.map((t, i) => React.createElement("div", { key: "n" + i, className: `text-xs mb-0.5 ${i === 0 ? "sp-anim" : ""}`, style: { color: t.you ? C.green : t.pri >= 5 ? C.gold : C.chalk, fontWeight: t.pri >= 5 ? 700 : 400, animation: i === 0 ? "spPop .35s both" : undefined } }, t.txt)),
-                        feed.map((t, i) => React.createElement("div", { key: "f" + i, className: "text-[10px]", style: { color: C.muted } }, `H${t.hole} \u00B7 ${t.txt}`)))),
+                            myPosLabel)))
+                    ),
+                    React.createElement("div", { style: { order: 7 } },
                     dramaNow(tour) && (React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: "linear-gradient(160deg,#3A2B12,#143D29)", border: `1.5px solid ${C.gold}` } },
                         React.createElement("div", { style: { fontFamily: FONT, fontSize: 14, letterSpacing: 3, color: C.gold } }, "\uD83D\uDD25 THE FINAL STRETCH"),
                         React.createElement("p", { className: "text-xs", style: { color: C.chalk } }, myBoardPos === 1
@@ -9924,7 +9950,9 @@ function GolfCareerSim() {
                             : `${leadGap === 0 ? "Tied for the lead" : `${leadGap} off the lead`} with ${18 - h} to play. Time to pounce.`),
                         h > 0 && live.stories && live.stories[h - 1] && live.stories[h - 1].map((l, i) => (React.createElement("p", { key: i, className: "text-xs mt-1", style: { color: C.gold } },
                             "\u25B8 ",
-                            l))))),
+                            l)))))
+                    ),
+                    React.createElement("div", { style: { order: 8 } },
                     React.createElement("div", { className: "p-3 rounded-xl mb-2", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: "1px solid rgba(244,247,242,0.2)" } },
                         React.createElement("div", { className: "flex justify-between items-baseline" },
                             React.createElement("span", { style: { fontFamily: FONT, fontSize: 28, color: C.chalk } },
@@ -9943,16 +9971,47 @@ function GolfCareerSim() {
                             ordinal(rankOf(h)),
                             " hardest on the course",
                             rankOf(h) <= 4 ? " — survive it" : rankOf(h) >= 15 ? " — scoring chance" : ""),
-                        React.createElement(HoleMap, { hole: nextHole, seed: course.name + "#" + h, attrs: effAttrs(g) })),
+                        React.createElement(HoleMap, { hole: nextHole, seed: course.name + "#" + h, attrs: effAttrs(g) }))
+                    ),
+                    React.createElement("div", { style: { order: 11 } },
+                    !myCut && h < 18 && !autoPlay ? (React.createElement(React.Fragment, null,
+                        lastChoiceResult && lastChoiceResult.hole === h - 1 && (React.createElement("div", { className: "text-center text-xs mb-2", style: { color: lastChoiceResult.swing === "good" ? C.green : lastChoiceResult.swing === "bad" ? C.red : C.muted } },
+                            lastChoiceResult.label,
+                            " \u2192 ",
+                            scoreName(lastChoiceResult.score, lastChoiceResult.par),
+                            lastChoiceResult.putt ? ` \u00B7 ${lastChoiceResult.putt.replace("\u26F3 ", "")}` : "",
+                            lastChoiceResult.swing === "good" ? " — the gamble paid off!" : lastChoiceResult.swing === "bad" ? " — that one bit back." : "")),
+                        g.season === 1 && (g.myStats.events || 0) < 3 && React.createElement(Tip, { id: "hole-choice", title: "ONE CALL PER HOLE" },
+                            React.createElement("b", { style: { color: C.gold } }, "Gold"), " options attack: more birdies and eagles, but more bogeys too, and they pay off best when the skills involved are strong. ",
+                            React.createElement("b", { style: { color: C.blue } }, "Blue"), " options play safe and keep the card clean. Protecting a lead? Go blue. Chasing? Go gold. ",
+                            "AUTO REST sims the rest of the round for you."),
+                        React.createElement("div", { className: "grid gap-2 mb-2" }, HOLE_CHOICES(nextHole).map((c, ci) => (React.createElement("button", { key: c.id, onClick: () => chooseHole(c.id), className: "w-full text-left p-2.5 rounded-xl active:scale-[0.98]", style: { background: C.card, border: `1px solid ${c.id === "attack" ? "rgba(232,195,90,0.4)" : "rgba(244,247,242,0.15)"}` } },
+                            React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: c.id === "attack" ? C.gold : C.blue } }, c.label, React.createElement(Kbd, { k: ci + 1 })),
+                            React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, c.desc))))),
+                        React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                            React.createElement(Btn, { small: true, kind: "green", onClick: () => setAutoPlay(true) }, "\u25B6 AUTO REST", React.createElement(Kbd, { k: "A" })),
+                            React.createElement(Btn, { small: true, kind: "panel", onClick: () => advanceHoles(18) }, "SKIP TO END \u23ED")))) : (React.createElement("div", { className: "grid grid-cols-3 gap-2" },
+                        React.createElement(Btn, { small: true, onClick: () => advanceHoles(1), disabled: autoPlay },
+                            "PLAY ",
+                            h + 1),
+                        React.createElement(Btn, { small: true, kind: autoPlay ? "red" : "green", onClick: () => setAutoPlay(!autoPlay) }, autoPlay ? "⏸ PAUSE" : "▶ AUTO", React.createElement(Kbd, { k: "A" })),
+                        React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setAutoPlay(false); advanceHoles(18); } }, "SKIP \u23ED")))
+                    ),
+                    React.createElement("div", { style: { order: 12 } },
+                    h < 18 && React.createElement(SpeedPicker, null)
+                    ),
+                    ),
+                    React.createElement("div", { className: "sp-round-rail" },
+                    React.createElement("div", { style: { order: 9 } },
                     React.createElement("div", { className: "p-2.5 rounded-xl mb-2", style: { background: C.panel } },
-                        board.slice(0, 5).map((b, i) => (React.createElement("div", { key: b.name, className: "flex justify-between text-xs mb-0.5", style: { color: b.isYou ? C.gold : isRv(b.name) ? C.bogey : C.chalk } },
+                        ((mvOf) => board.slice(0, 5).map((b, i) => (React.createElement("div", { key: `${b.name}:${h}`, className: "flex justify-between text-xs mb-0.5 sp-anim", style: { ...liveSlide(mvOf(b.name, i)), color: b.isYou ? C.gold : isRv(b.name) ? C.bogey : C.chalk } },
                             React.createElement("span", { className: "truncate pr-2" },
                                 boardPos[i],
                                 ". ",
                                 isRv(b.name) ? RV : "",
                                 b.name,
                                 b.isYou ? " (YOU)" : ""),
-                            React.createElement("span", null, thruPar(b.totalDelta))))),
+                            React.createElement("span", null, thruPar(b.totalDelta))))))(liveMoves(ev.e + ":" + round, h, board.map((x) => x.name))),
                         myBoardPos > 5 && (React.createElement("div", { className: "flex justify-between text-xs mt-1 pt-1", style: { color: C.gold, borderTop: "1px solid rgba(244,247,242,0.15)" } },
                             React.createElement("span", null,
                                 myPosLabel,
@@ -9966,7 +10025,9 @@ function GolfCareerSim() {
                                 React.createElement("span", { className: "truncate pr-2" }, `${boardPos[ri]}. ${RV}${board[ri].name}`),
                                 React.createElement("span", null, thruPar(board[ri].totalDelta)))) : null;
                         })(),
-                        React.createElement("button", { onClick: () => setFullBoard(true), className: "w-full text-center text-xs mt-1 pt-1", style: { color: C.blue, borderTop: "1px solid rgba(244,247,242,0.1)" } }, "VIEW FULL LEADERBOARD \u25B8")),
+                        React.createElement("button", { onClick: () => setFullBoard(true), className: "w-full text-center text-xs mt-1 pt-1", style: { color: C.blue, borderTop: "1px solid rgba(244,247,242,0.1)" } }, "VIEW FULL LEADERBOARD \u25B8"))
+                    ),
+                    React.createElement("div", { style: { order: 10 } },
                     React.createElement("div", { className: "p-2.5 rounded-xl mb-2 grid grid-cols-3 gap-1 text-center", style: { background: "rgba(20,61,41,0.6)" } },
                         React.createElement("div", null,
                             React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: myBoardPos === 1 ? C.gold : C.chalk } }, myBoardPos === 1 ? "LEADING" : `+${leadGap}`),
@@ -9983,30 +10044,29 @@ function GolfCareerSim() {
                             React.createElement("div", { className: "text-[9px]", style: { color: C.muted } },
                                 "PROJ \u00B7 ",
                                 projPts,
-                                " PTS"))),
-                    !myCut && h < 18 && !autoPlay ? (React.createElement(React.Fragment, null,
-                        lastChoiceResult && lastChoiceResult.hole === h - 1 && (React.createElement("div", { className: "text-center text-xs mb-2", style: { color: lastChoiceResult.swing === "good" ? C.green : lastChoiceResult.swing === "bad" ? C.red : C.muted } },
-                            lastChoiceResult.label,
-                            " \u2192 ",
-                            scoreName(lastChoiceResult.score, lastChoiceResult.par),
-                            lastChoiceResult.putt ? ` \u00B7 ${lastChoiceResult.putt.replace("\u26F3 ", "")}` : "",
-                            lastChoiceResult.swing === "good" ? " — the gamble paid off!" : lastChoiceResult.swing === "bad" ? " — that one bit back." : "")),
-                        g.season === 1 && (g.myStats.events || 0) < 3 && React.createElement(Tip, { id: "hole-choice", title: "ONE CALL PER HOLE" },
-                            React.createElement("b", { style: { color: C.gold } }, "Gold"), " options attack: more birdies and eagles, but more bogeys too, and they pay off best when the skills involved are strong. ",
-                            React.createElement("b", { style: { color: C.blue } }, "Blue"), " options play safe and keep the card clean. Protecting a lead? Go blue. Chasing? Go gold. ",
-                            "AUTO REST sims the rest of the round for you."),
-                        React.createElement("div", { className: "grid gap-2 mb-2" }, HOLE_CHOICES(nextHole).map((c) => (React.createElement("button", { key: c.id, onClick: () => chooseHole(c.id), className: "w-full text-left p-2.5 rounded-xl active:scale-[0.98]", style: { background: C.card, border: `1px solid ${c.id === "attack" ? "rgba(232,195,90,0.4)" : "rgba(244,247,242,0.15)"}` } },
-                            React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: c.id === "attack" ? C.gold : C.blue } }, c.label),
-                            React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, c.desc))))),
-                        React.createElement("div", { className: "grid grid-cols-2 gap-2" },
-                            React.createElement(Btn, { small: true, kind: "green", onClick: () => setAutoPlay(true) }, "\u25B6 AUTO REST"),
-                            React.createElement(Btn, { small: true, kind: "panel", onClick: () => advanceHoles(18) }, "SKIP TO END \u23ED")))) : (React.createElement("div", { className: "grid grid-cols-3 gap-2" },
-                        React.createElement(Btn, { small: true, onClick: () => advanceHoles(1), disabled: autoPlay },
-                            "PLAY ",
-                            h + 1),
-                        React.createElement(Btn, { small: true, kind: autoPlay ? "red" : "green", onClick: () => setAutoPlay(!autoPlay) }, autoPlay ? "⏸ PAUSE" : "▶ AUTO"),
-                        React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setAutoPlay(false); advanceHoles(18); } }, "SKIP \u23ED"))),
-                    h < 18 && React.createElement(SpeedPicker, null),
+                                " PTS")))
+                    ),
+                    React.createElement("div", { style: { order: 6 } },
+                    (ticker.length > 0 || feed.length > 0) && (React.createElement("div", { className: "p-2.5 rounded-xl mb-2", style: { background: "rgba(10,20,14,0.55)", border: `1px solid ${ticker.some((t) => t.pri >= 5) ? C.gold : "rgba(244,247,242,0.15)"}` } },
+                        React.createElement("div", { className: "flex justify-between items-baseline mb-1" },
+                            React.createElement("span", { style: { fontFamily: FONT, fontSize: 11, letterSpacing: 3, color: C.gold } }, "\uD83D\uDCE3 LIVE FROM THE COURSE"),
+                            board.length > 0 && React.createElement("span", { className: "text-[10px]", style: { color: C.muted } }, `Leader ${board[0].isYou ? "YOU" : board[0].name.split(" ").slice(-1)[0]} ${thruPar(board[0].totalDelta)}`)),
+                        ticker.map((t, i) => React.createElement("div", { key: "n" + i, className: `text-xs mb-0.5 ${i === 0 ? "sp-anim" : ""}`, style: { color: t.you ? C.green : t.pri >= 5 ? C.gold : C.chalk, fontWeight: t.pri >= 5 ? 700 : 400, animation: i === 0 ? "spPop .35s both" : undefined } }, t.txt)),
+                        feed.map((t, i) => React.createElement("div", { key: "f" + i, className: "text-[10px]", style: { color: C.muted } }, `H${t.hole} \u00B7 ${t.txt}`))))
+                    ),
+                    React.createElement("div", { style: { order: 5 } },
+                    fieldHoleStat && (React.createElement("div", { className: "text-center text-xs mb-1", style: { color: C.muted } },
+                        "Hole ",
+                        h,
+                        " field: avg ",
+                        fieldHoleStat.avg,
+                        " (par ",
+                        fieldHoleStat.parH,
+                        ") \u00B7 ",
+                        fieldHoleStat.bPct,
+                        "% under par"))
+                    ),
+                    )),
                     React.createElement(StoryModal, null),
                     fullBoard && (React.createElement("div", { className: "fixed inset-0 overflow-y-auto p-4", style: { background: "rgba(14,42,28,0.95)" }, onClick: () => setFullBoard(false) },
                         React.createElement("div", { className: "max-w-sm mx-auto my-4 p-4 rounded-xl", style: { background: C.card, border: `1.5px solid ${C.gold}` }, onClick: (e) => e.stopPropagation() },
