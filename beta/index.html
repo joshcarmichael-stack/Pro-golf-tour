@@ -5916,7 +5916,7 @@ function GolfCareerSim() {
             st.retired = true;
         if (st.lastBag)
             st.mailbox = [{ id: `bag-${g.season}`, season: g.season + 1, kind: "sponsor", title: "Your clubs are back to stock",
-                    body: "Gear is fitted for one season. Refit your bag in SETUP → EQUIPMENT, paid from what you've banked.", read: false }, ...st.mailbox].slice(0, 41);
+                    body: "Gear is fitted for one season. Refit your bag in Setup → Equipment, paid from what you've banked.", read: false }, ...st.mailbox].slice(0, 41);
         // ===== CADDIE: morale (did you deliver?) and whether they re-sign =====
         if (g.caddie) {
             const seasonMoney = ((_b = g.standings[g.pro.name]) === null || _b === void 0 ? void 0 : _b.money) || 0;
@@ -7145,60 +7145,79 @@ function GolfCareerSim() {
     if (screen === "guide" && g) {
         const lg = g.mode === "league", at = g.mode === "alltime";
         const sec = (icon, title, body) => (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: C.card, border: "1px solid rgba(244,247,242,0.15)" } },
-            React.createElement("div", { className: "mb-1.5", style: { fontFamily: FONT, fontSize: 16, letterSpacing: 1, color: C.gold } }, icon, " ", title),
+            React.createElement("div", { className: "mb-1.5", style: { fontFamily: FONT, fontSize: 16, letterSpacing: 1, color: C.gold } }, icon ? icon + " " : "", title),
             React.createElement("div", { className: "text-xs", style: { color: C.chalk, lineHeight: 1.5 } }, body)));
         const rows = (list) => list.map(([k, v]) => (React.createElement("div", { key: k, className: "flex gap-2 mb-1" },
             React.createElement("span", { className: "shrink-0", style: { color: C.gold, width: 108, fontSize: 11 } }, k),
             React.createElement("span", { style: { color: C.chalk } }, v))));
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
-            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1 } }, "❓ PLAYER GUIDE"),
+            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1 } }, "PLAYER GUIDE"),
             React.createElement("p", { className: "text-xs mb-3 mt-1", style: { color: C.muted } }, "Everything the game doesn't stop to explain."),
-            sec("📅", "HOW A WEEK WORKS", rows([
-                ["1 · Range", "Pick one attribute to train for the week. The caddie's course notes hint which one this course rewards."],
+            sec("", "FINDING YOUR WAY", rows([
+                ["The menu", "On a phone it's the bar along the bottom: Home, Develop, Tour, Career and Mail. On a computer it runs down the left-hand side."],
+                ["Tour", "The schedule, world rankings and World Cup qualifying. Switch between them with the buttons along the top."],
+                ["Career", "Records (including the GOAT index), your numbers, trophy cabinet and achievements."],
+                [lg ? "My club" : "Cups", lg ? "Your league, transfers, scouting and Cups HQ. On a phone, tap My Club on the Home screen." : "Cups HQ: team cup qualifying and history. On a phone, tap Cups on the Home screen."],
+                ["Setup", "Coaches and equipment. On a phone, tap Setup on the Home screen."],
+                ["Mail", "News, offers and sponsor updates. The red number is how many you haven't read."]])),
+            sec("", "HOW A WEEK WORKS", rows([
+                ["1 · Range", "Hit the range on the Home screen and pick one attribute to train for the week. The caddie's course notes hint which one this course rewards."],
                 ["2 · Play", "Four rounds. Play hole by hole (one call per hole) or sim straight to the weekend or the finish."],
                 ["3 · Big moments", "When a putt decides something, the sim stops and hands you the putter."],
                 ["4 · Rewards", "Prize money, ranking points and XP. Then on to next week."]])),
-            sec("🎯", "ATTACK OR PLAY SAFE", "On each hole you get one decision. Gold options attack: more birdies and eagles, more bogeys too, and they pay off best when the skills involved are strong. Blue options play safe and keep the card clean. Protect a lead with blue, chase with gold."),
-            sec("📊", "YOUR ATTRIBUTES", React.createElement(React.Fragment, null,
+            sec("", "PLAYING A ROUND", rows([
+                ["Your call", "One decision per hole. Gold options attack: more birdies and eagles, more bogeys too, and they pay off best when the skills involved are strong. Blue options play safe. Protect a lead with blue, chase with gold."],
+                ["Auto", "Auto plays the holes for you. Scores fill in and the leaderboard moves as each hole finishes, with no tapping. It stops for any putt that matters."],
+                ["Speed", "Slow, Normal or Fast, under the round buttons. Your choice is remembered on this device."],
+                ["Keyboard", "On a computer: 1 and 2 pick the shot, A starts or pauses Auto."],
+                ["Scorecard", "Circles are birdies (double circle for an eagle), squares are bogeys. Tap a played hole for what happened."]])),
+            sec("", "YOUR ATTRIBUTES", React.createElement(React.Fragment, null,
                 rows([["Driving accuracy", "Finding fairways."], ["Driving distance", "Length off the tee: shorter approaches, par 5s in two."],
                     ["Long approach", "Irons from long range."], ["Short approach", "Wedges from 120 yards and in."],
-                    ["Chipping", "Getting up and down around the green."], ["Putting", "Reading lines and holing out. Sets the LINE target on clutch putts."],
-                    ["Pace control", "Putt weight: fewer three-putts. Sets the PACE target on clutch putts."],
+                    ["Chipping", "Getting up and down around the green."], ["Putting", "Reading lines and holing out. Sets the line target on clutch putts."],
+                    ["Pace control", "Putt weight: fewer three-putts. Sets the pace target on clutch putts."],
                     ["Shot shaping", "Working the ball both ways into tucked pins and round corners."],
                     ["Course management", "Taking your medicine: fewer doubles when it goes wrong."],
                     ["Recovery", "Escaping trees, rough and trouble."], ["Bunker play", "Sand saves."],
                     ["Composure", "Bouncing back after a bad hole, and nerves on the big putts: low composure shrinks the targets and speeds up the meter."]]),
-                React.createElement("p", { className: "mt-1", style: { color: C.muted } }, "OVR is your overall rating, built from all nine."))),
-            sec("📈", "GETTING BETTER", rows([
-                ["DEVELOP", "Spend XP from results to raise an attribute. Higher attributes cost more."],
-                ["Coaches", "SETUP → COACHES. A specialist adds +2 in one area; the elite programme +1 everywhere."],
-                ["Equipment", "SETUP → EQUIPMENT. Gear is fitted for one season and paid from your winnings, then goes back to stock. Almost every piece is a trade-off."],
+                React.createElement("p", { className: "mt-1", style: { color: C.muted } }, "OVR is your overall rating, built from your attributes."))),
+            sec("", "POTENTIAL", rows([
+                ["Your ceiling", "Every pro has a potential: Journeyman, Tour regular, Star or Generational. Each skill has a ceiling it can't be trained past."],
+                ["The scouts", "They'll guess early, and know for sure by the time you're 20. Your ceilings show on Develop."],
+                ["Cost", "The last few points before a ceiling cost two or three times as much XP. Not everyone reaches their potential."],
+                ["Raising it", "Big breakthroughs and the elite coaching programme can each lift a ceiling a little." + (LIFE(g) ? " So can college, a mentor and a successful swing rebuild." : "")]])),
+            sec("", "GETTING BETTER", rows([
+                ["Develop", "Spend XP from results to raise an attribute."],
+                ["Coaches", "In Setup. A specialist adds +2 in one area at season's end; the elite programme +1 everywhere."],
+                ["Equipment", "In Setup. Gear is fitted for one season and paid from your winnings, then goes back to stock. Almost every piece is a trade-off."],
                 ["Sponsors", "Each pre-season. An equipment deal pays more, but you play that brand's bag all season."],
                 ["Winter cards", "At the end of each season you're dealt four cards, each -2 to +6 on one attribute. What you trained that season and your weaker attributes come up most."],
-                ["Age", "From 29, experience adds composure and course management. From 32, you lose a little distance each year."],
                 ["Caddie", "Picked each pre-season. Each one sharpens part of your game."],
                 ["Achievements", "Milestones (first win, first top 10…) each give a permanent attribute boost."],
-                ["Camp", "Before the big events, pay for a camp: +1 everywhere that week, +3 on your focus, +25 XP."]])),
-            !lg && sec("🗓️", "THE SEASON", rows([
+                ["Camp", "Before the big events, pay for a camp: +1 everywhere that week, +3 on your focus, +25 XP."],
+                ["Age", LIFE(g) ? "From 29, experience adds composure and course management. Distance starts to fade from 34, long irons and scrambling from 36, putting from 38, and everything a little from 40." : "From 29, experience adds composure and course management. From 32, you lose a little distance each year."]])),
+            LIFE(g) && sec("", "YOUR CAREER, YOUR CHOICES", rows([
+                ["College", "At the start: turn pro at 17, or go to college and start at 20 with higher ceilings."],
+                ["Workload", "Chosen each winter. Grind earns 25% more XP but risks more injuries; Protect the body is the opposite."],
+                ["Injuries", "Rare, and mostly a week or two out. A serious one asks you to play through it or have surgery."],
+                ["Slumps", "Cold spells and, later on, the yips. The Home screen offers ways out: a coach, new gear, time off or riding it out."],
+                ["Swing rebuild", "Optional, in the winter between 21 and 34. A season of worse ball-striking for a chance at higher ceilings."],
+                ["Mentor", "Young players may be offered a veteran mentor: ceiling and composure gains for two seasons."],
+                ["Retirement", "Retire any time from 38; you're forced out at 45. Retire earlier and your next pro starts with a bigger legacy boost."]])),
+            !lg && sec("", "THE SEASON", rows([
                 ["Events", `${SCHEDULE.length} a season, from regular events to the four majors.`],
                 ["Signature events", "Need world top 50 or FedEx top 30. Otherwise you play the opposite-field event that week."],
                 ["Majors", "Need world top 100, a win this season, or to be the defending champion."],
                 ["FedEx Cup", "Points all season, then the playoffs. Only the top 30 reach the Tour Championship."],
                 ["Team cups", "After the season: the Ryder Cup, Presidents Cup or Europe v International, in rotation. The World Cup of Golf comes round every four seasons."]])),
-            lg && sec("🏟️", "THE LEAGUE", rows([
+            lg && sec("", "THE LEAGUE", rows([
                 ["Divisions", "40 clubs across four divisions: Premier, Championship, Division One and Division Two."],
                 ["Team points", "Each club has five players. The best four feature each week and their finishes score the team's points."],
                 ["Promotion", "Top two in each division go up; bottom two go down."],
                 ["Free agent", "No club yet? Play the opposite-field events and bank results. Offers follow good form."],
-                ["Transfers", "MY CLUB → TRANSFERS and SCOUTING. Budgets depend on your division and how the club finished."]])),
-            at && sec("👑", "THE ALL-TIME FIELD", "Every rival is a legend at their peak, so results come slower than on the modern tour. Early on, a made cut is a good week. Keep banking XP: the GOAT index (MY CAREER → RECORDS) shows where you stand among the greats."),
-            sec("🧭", "WHERE THINGS ARE", rows([
-                ["MY CAREER", "Records (including the GOAT index), your numbers, trophy cabinet, achievements."],
-                ["MY CLUB", lg ? "Your league, transfers, scouting and Cups HQ." : "Cups HQ: team cup qualifying and history."],
-                ["THE TOUR", "Schedule, world rankings and World Cup qualifying."],
-                ["SETUP", "Coaches and equipment."],
-                ["MAILBOX", "News, offers and sponsor updates."]])),
+                ["Transfers", "In My club: transfers and scouting. Budgets depend on your division and how the club finished."]])),
+            at && sec("", "THE ALL-TIME FIELD", "Every rival is a legend at their peak, so results come slower than on the modern tour. Early on, a made cut is a good week. Keep banking XP: the GOAT index (Career → Records) shows where you stand among the greats."),
             React.createElement("p", { className: "text-[10px] mb-3", style: { color: C.muted } }, "Real hole layouts: map data \u00A9 OpenStreetMap contributors (ODbL)."),
             React.createElement("div", { className: "mb-6" },
                 React.createElement(Btn, { onClick: () => setScreen("hub") }, "BACK TO MY CAREER"))));
@@ -7304,13 +7323,15 @@ function GolfCareerSim() {
                     "START SEASON ",
                     g.season + 1,
                     " \u25B8"))),
+            !rookie && React.createElement(Tip, { id: "new-menu-v1", title: "THE MENU HAS MOVED" },
+                "Develop, Tour, Career and Mail now live in the bar at the bottom of the screen (down the left on a computer). Setup and Cups are just below this week's event. The Guide explains everything new, including potential, injuries and retirement."),
             rookie && React.createElement(Tip, { id: "hub-week", title: "HOW A WEEK WORKS" },
                 "Each week is one event. Tap ", React.createElement("b", null, g.isFreeAgent ? "PLAY THE OPPOSITE EVENT" : "HIT THE RANGE"),
                 " to pick a training focus, then play it hole by hole or sim it. Good results earn XP: spend it in ", React.createElement("b", null, "Develop"),
                 " (in the menu) to raise your attributes. Lost? Tap ", React.createElement("b", null, "Guide"), " any time."),
             rookie && g.mode === "league" && React.createElement(Tip, { id: "hub-league", title: "HOW THE LEAGUE WORKS" },
                 "Clubs have five players and the best four count each week; their results make the team's points. Top two in each division go up, bottom two go down. ",
-                g.isFreeAgent ? "Right now nobody has signed you: play the opposite-field events, bank XP and results, and offers will come." : "Once you're at a club, use TRANSFERS and SCOUTING under MY CLUB to strengthen the squad."),
+                g.isFreeAgent ? "Right now nobody has signed you: play the opposite-field events, bank XP and results, and offers will come." : "Once you're at a club, use Transfers and Scouting in My club to strengthen the squad."),
             rookie && g.mode === "alltime" && React.createElement(Tip, { id: "hub-alltime", title: "WELCOME TO THE HARDEST FIELD" },
                 "Every name here is a legend at their peak. Early on, a made cut is a good week. Bank the XP, build your game, and the wins will come."),
                         false && g.caddieLeftNote && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(217,108,79,0.1)", border: `1.5px solid ${C.red}` } },
