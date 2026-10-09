@@ -3162,7 +3162,7 @@ const chMedalOf = (sc, i) => sc.goals.length === 2 ? i + 2 : i + 1;
 const chEmoji = (d) => d <= -2 ? "🟨" : d === -1 ? "🟩" : d === 0 ? "⬜" : d === 1 ? "🟧" : "🟥";
 const CH_MEDAL = ["", "🥉", "🥈", "🥇"];
 const CH_TEST = SAVE_KEY.includes("beta");
-const CH_ON = SAVE_KEY.includes("beta"); // Challenge mode is still being tuned: beta only until it is signed off
+const CH_ON = EDITION !== "app"; // on the website; the app swaps real names out, and the challenges are real history
 // a challenge in progress is saved after every shot, so you can leave and carry on later
 const CH_LIVE_KEY = CH_KEY + "-live";
 // test mode keeps its own log of every run, so you can see how hard each challenge really is for you
@@ -6452,14 +6452,27 @@ function GolfCareerSim() {
         return (React.createElement(Shell, null,
             React.createElement(HomeHero, null),
             CH_ON && React.createElement(ChResume, { onResume: resumeCh }),
-            CH_ON && React.createElement("button", { onClick: () => { track("challenges/open"); setScreen("challenges"); }, className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: `linear-gradient(160deg, ${C.card}, #2A2410)`, border: `1.5px solid ${C.gold}` } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 17, color: C.gold } }, "\uD83C\uDFC6 NEW: CHALLENGES \u00B7 REWRITE HISTORY"),
-                (() => { const sk = chStreak(chLoad().daily); return sk.now > 0 ? React.createElement("div", { className: "text-[11px]", style: { color: sk.today ? C.green : C.bogey } }, sk.today ? `🔥 ${sk.now}-day streak · see you tomorrow` : `🔥 ${sk.now}-day streak · play today to keep it alive`) : null; })(),
-                React.createElement("div", { className: "text-[11px]", style: { color: C.chalk } }, `${chToday().rare ? "⭐ RARE · " : ""}Daily Challenge #${chToday().n}: ${chToday().sc.you.name}, ${chToday().sc.year} ${chToday().sc.event}. "${chToday().sc.title}"`),
-                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Golf's greatest final rounds, from the real position. Can you change how it ended?")),
-            CH_TEST && React.createElement("button", { onClick: () => setScreen("chtest"), className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: C.panel, border: "1px dashed rgba(127,183,217,0.7)" } },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: C.blue } }, "🧪 CHALLENGE TEST MODE (BETA)"),
-                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Pick any challenge and play it. Nothing is saved: no medals, no daily result.")),
+            // today's daily: the one thing to do right now, so it sits at the top
+            CH_ON && (() => {
+                const td = chToday(), sc = td.sc, st = chLoad(), played = (st.daily || {})[td.key], sk = chStreak(st.daily);
+                const hrs = Math.max(1, Math.ceil((new Date(td.key + "T00:00:00Z").getTime() + 864e5 - Date.now()) / 36e5));
+                const start = () => { track("challenge/daily-home/" + sc.id); const stx = chLoad(); chStore({ ...stx, daily: { ...(stx.daily || {}), [td.key]: { id: sc.id, stars: 0, won: false, done: false } } }); setCh({ ...chStart(sc), daily: true }); setScreen("challenge"); };
+                return React.createElement("div", { className: "p-4 rounded-2xl mb-4 text-left relative overflow-hidden", style: { background: "linear-gradient(160deg, #2A2410, #163C28 70%)", border: `1.5px solid ${C.gold}`, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" } },
+                    React.createElement("div", { className: "flex justify-between items-center gap-2" },
+                        React.createElement("span", { style: { fontFamily: UI, fontSize: 12, fontWeight: 800, letterSpacing: "0.14em", color: C.gold } }, `${td.rare ? "⭐ RARE · " : ""}TODAY'S DAILY CHALLENGE #${td.n}`),
+                        React.createElement("span", { className: "px-2 py-1 rounded-full text-[11px] font-semibold", style: { background: "rgba(0,0,0,0.25)", color: sk.now ? C.gold : C.muted } }, sk.now ? `🔥 ${sk.now}-day streak` : "🔥 Start a streak")),
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 28, fontWeight: 700, color: C.chalk, lineHeight: 1.1, marginTop: 8 } }, `"${sc.title}"`),
+                    React.createElement("div", { className: "text-sm mt-1", style: { color: C.gold } }, `${sc.you.name} · ${sc.year} ${sc.event}`),
+                    React.createElement("div", { className: "text-sm mt-2", style: { color: C.chalk } }, sc.blurb),
+                    React.createElement("div", { className: "mt-3" }, played
+                        ? (played.done
+                            ? React.createElement("div", { className: "p-3 rounded-xl text-center", style: { background: "rgba(0,0,0,0.25)" } },
+                                React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: C.gold } }, played.stars ? `${CH_MEDAL[played.stars]} ${CH_MEDAL_NAME[played.stars].charAt(0) + CH_MEDAL_NAME[played.stars].slice(1).toLowerCase()} today` : played.won ? "Won, no medal today" : "No medal today"),
+                                React.createElement("div", { className: "text-xs mt-0.5", style: { color: C.muted } }, `A new daily in ${hrs} hour${hrs === 1 ? "" : "s"}. One attempt a day.`))
+                            : React.createElement("div", { className: "text-xs", style: { color: C.chalk } }, "Today's attempt is under way: carry on from the card above."))
+                        : React.createElement(Btn, { onClick: start }, "PLAY TODAY'S DAILY"),
+                    !played && React.createElement("div", { className: "text-[11px] mt-2 text-center", style: { color: C.muted } }, "One attempt. No restarts. Same challenge for everyone today.")));
+            })(),
             React.createElement(HowItPlays, null),
             React.createElement("div", { className: "text-[10px] mb-2 text-center", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "CHOOSE YOUR WORLD"),
             React.createElement("div", { className: "px-1 lg:grid lg:grid-cols-3 lg:gap-4 lg:px-0" }, GAME_MODES.map((md) => {
@@ -6509,6 +6522,15 @@ function GolfCareerSim() {
                             React.createElement(Btn, { small: true, kind: "red", onClick: async () => { await eraseSlot(md.id); startFresh(md.id); } }, "YES, ERASE"),
                             React.createElement(Btn, { small: true, kind: "panel", onClick: () => setConfirmEraseId(null) }, "CANCEL"))))));
             })),
+            CH_ON && React.createElement("div", { className: "w-full mb-3 p-4 rounded-xl text-left relative overflow-hidden", style: { background: "linear-gradient(160deg, #2A2410, #10301F)", border: "1px solid rgba(232,195,90,0.4)" } },
+                React.createElement("div", { className: "absolute", style: { left: 0, top: 0, bottom: 0, width: 4, background: C.gold } }),
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk, lineHeight: 1.1 } }, "🏆 Challenges"),
+                React.createElement("p", { className: "text-sm mt-1", style: { color: C.gold, fontWeight: 600 } }, "Golf's greatest final rounds. Repeat history, or rewrite it."),
+                React.createElement("div", { className: "flex flex-wrap gap-1 mt-2" }, [`${CH_MAIN.length} legends`, "Bronze, silver, gold", "Read the green", "Unlock the other side"].map((f) => React.createElement("span", { key: f, className: "text-[10px] px-1.5 py-0.5 rounded", style: { background: "rgba(244,247,242,0.08)", color: C.chalk } }, f))),
+                React.createElement("div", { className: "mt-3" }, React.createElement(Btn, { small: true, onClick: () => { track("challenges/open"); setScreen("challenges"); } }, "BROWSE CHALLENGES"))),
+            CH_TEST && React.createElement("button", { onClick: () => setScreen("chtest"), className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: C.panel, border: "1px dashed rgba(127,183,217,0.7)" } },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: C.blue } }, "🧪 CHALLENGE TEST MODE (BETA)"),
+                React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, "Pick any challenge and play it. Nothing is saved: no medals, no daily result.")),
             React.createElement("p", { className: "text-[10px] text-center mb-3", style: { color: C.muted } }, "Every mode keeps its own save \u2014 jump between careers whenever you like."),
             React.createElement("button", { onClick: openHof, className: "w-full p-3 rounded-xl mb-3 text-left active:scale-[0.99]", style: { background: C.panel, border: `1px solid ${C.gold}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } }, "\uD83C\uDFDB\uFE0F HALL OF FAME"),
