@@ -2969,8 +2969,50 @@ const CHALLENGES = [
 // tuned with a simulation of the real challenge code so a sensible player with average putting medals about
 // 65% (tier 1, easy), 55% (tier 2) or 45% (tier 3, hard) of the time; gold stays at the real record
 const CH_TIER_LABEL = ["", "⛳ EASY", "⛳⛳ MEDIUM", "⛳⛳⛳ HARD"];
-const CH_CAL = {"tiger97":{"tier":3,"pz":1},"spieth15":{"tier":1,"diff":0.39,"pz":0.62},"payne99":{"tier":1,"diff":-0.28,"pz":1},"rory25":{"tier":1,"diff":0.39,"pz":0.62},"norman96_flip":{"tier":2,"diff":0,"pz":1},"jack86_flip":{"tier":2,"diff":-0.27,"pz":1},"tiger08_flip":{"tier":1,"diff":0.39,"pz":0.62},"tiger19":{"tier":2,"diff":-0.06,"pz":1},"spieth16":{"tier":3,"diff":0.39,"pz":0.87},"scott12":{"tier":1,"diff":0.39,"pz":0.62},"rahm21":{"tier":1,"diff":-0.49,"pz":1},"rory11_flip":{"tier":2,"diff":-0.77,"pz":1},"phil06_flip":{"tier":1,"diff":0.03,"pz":1},"rory24_flip":{"tier":2,"diff":0.09,"pz":1},"norman96":{"tier":3,"diff":-0.12,"pz":1},"jack86":{"tier":3,"diff":-0.79,"pz":1.58},"tiger08":{"tier":1,"diff":-0.1,"pz":1},"tiger97_flip":{"tier":2,"diff":0.37,"pz":1},"spieth15_flip":{"tier":2,"diff":-0.79,"pz":1.37},"payne99_flip":{"tier":1,"diff":-0.13,"pz":1},"rahm21_flip":{"tier":1,"diff":-0.25,"pz":1},"rory11":{"tier":3,"diff":-0.73,"pz":1},"phil06":{"tier":1,"diff":0.39,"pz":0.62},"rory24":{"tier":2,"diff":0.37,"pz":1},"tiger19_flip":{"tier":2,"diff":-0.23,"pz":0.83},"spieth16_flip":{"tier":2,"diff":-0.21,"pz":1},"scott12_flip":{"tier":1,"diff":-0.19,"pz":1}};
+const CH_CAL = {"tiger97":{"tier":3,"pz":1},"spieth15":{"tier":1,"diff":0.39,"pz":0.62},"payne99":{"tier":1,"diff":-0.21,"pz":1},"rory25":{"tier":1,"diff":0.39,"pz":0.62},"norman96_flip":{"tier":1,"diff":0.39,"pz":0.62},"jack86_flip":{"tier":3,"diff":-0.79,"pz":1.58},"tiger08_flip":{"tier":1,"diff":0.09,"pz":1},"tiger19":{"tier":2,"diff":0.39,"pz":1},"spieth16":{"tier":2,"diff":0.2,"pz":1},"scott12":{"tier":1,"diff":0.39,"pz":0.62},"rahm21":{"tier":1,"diff":-0.79,"pz":1.37},"rory11_flip":{"tier":2,"diff":-0.79,"pz":1.58},"phil06_flip":{"tier":1,"diff":0.33,"pz":1},"rory24_flip":{"tier":1,"diff":0.39,"pz":0.62},"norman96":{"tier":3,"diff":-0.19,"pz":1},"jack86":{"tier":3,"diff":-0.79,"pz":1.58},"tiger08":{"tier":1,"diff":-0.28,"pz":1},"tiger97_flip":{"tier":2,"diff":0.39,"pz":1},"spieth15_flip":{"tier":2,"diff":-0.79,"pz":1.21},"payne99_flip":{"tier":1,"diff":-0.13,"pz":1},"rahm21_flip":{"tier":1,"diff":-0.32,"pz":1},"rory11":{"tier":2,"diff":-0.75,"pz":1},"phil06":{"tier":1,"diff":0.39,"pz":0.62},"rory24":{"tier":2,"diff":0.39,"pz":1},"tiger19_flip":{"tier":2,"diff":0.11,"pz":1},"spieth16_flip":{"tier":2,"diff":0.32,"pz":1},"scott12_flip":{"tier":1,"diff":-0.12,"pz":1}};
 CHALLENGES.forEach((c) => { if (CH_CAL[c.id]) Object.assign(c, CH_CAL[c.id]); });
+// REAL HOLE-BY-HOLE HISTORY. Cumulative scores to par after each hole of the final round (source: the final-round scorecards on each
+// event's Wikipedia page, which cite ESPN / the official leaderboards). Rivals now play exactly the holes they really played.
+const CH_CUM = {"1986":{"Jack Nicklin":[-2,-3,-3,-2,-2,-2,-2,-2,-3,-4,-5,-4,-5,-5,-7,-8,-9,-9],"Tom Kyte":[-3,-4,-3,-3,-3,-3,-3,-5,-5,-5,-6,-6,-7,-7,-8,-8,-8,-8],"Greg Normand":[-6,-6,-6,-6,-6,-7,-7,-7,-7,-5,-5,-5,-5,-6,-7,-8,-9,-8],"Seve Ballestero":[-5,-5,-5,-5,-5,-5,-6,-8,-7,-7,-7,-7,-9,-9,-8,-8,-7,-7]},"1996":{"Greg Normand":[-12,-13,-13,-12,-12,-12,-12,-12,-11,-10,-9,-7,-8,-8,-9,-7,-7,-7],"Nick Faldon":[-7,-8,-8,-8,-7,-8,-8,-9,-9,-9,-9,-9,-10,-10,-11,-11,-11,-12]},"1997":{"Tyger Woodes":[-15,-16,-16,-16,-15,-15,-14,-15,-15,-15,-16,-16,-17,-18,-18,-18,-18,-18],"Tom Kyte":[-4,-5,-5,-4,-4,-3,-4,-5,-5,-5,-5,-5,-6,-6,-5,-5,-6,-6],"Costantino Rocco":[-6,-7,-7,-7,-7,-6,-6,-6,-6,-6,-5,-5,-5,-5,-5,-5,-4,-3]},"2011":{"Charl Schwarzel":[-9,-9,-11,-10,-10,-10,-10,-10,-10,-10,-10,-10,-10,-10,-11,-12,-13,-14],"Jason Daye":[-7,-8,-8,-8,-8,-8,-7,-8,-8,-8,-8,-9,-10,-10,-10,-10,-11,-12],"Adam Scotts":[-7,-8,-8,-8,-7,-8,-8,-9,-9,-9,-10,-10,-10,-11,-11,-12,-12,-12],"Tyger Woodes":[-5,-6,-7,-6,-6,-7,-8,-10,-10,-10,-10,-9,-9,-9,-10,-10,-10,-10],"Rory McIlvane":[-11,-11,-11,-11,-10,-10,-11,-11,-11,-8,-7,-5,-5,-5,-4,-4,-4,-4]},"2015":{"Jordan Speight":[-17,-17,-18,-18,-17,-17,-16,-17,-17,-18,-18,-17,-18,-18,-19,-19,-19,-18],"Phil Mickleson":[-11,-12,-12,-12,-11,-11,-11,-12,-11,-12,-12,-12,-13,-12,-14,-14,-14,-14],"Justin Rosen":[-13,-14,-14,-14,-14,-13,-13,-13,-12,-12,-12,-12,-13,-14,-15,-15,-15,-14]},"2016":{"Danny Willetts":[0,0,0,0,0,-1,-1,-2,-2,-2,-2,-2,-3,-4,-4,-5,-5,-5],"Jordan Speight":[-3,-4,-4,-4,-3,-4,-5,-6,-7,-6,-5,-1,-2,-2,-3,-3,-2,-2],"Lee Westwood":[2,2,2,2,2,1,0,0,-1,0,0,0,-1,-1,-3,-2,-2,-2],"Paul Casey":[4,3,3,3,3,3,2,2,2,2,2,2,1,1,0,0,0,-1],"Dustin Johnstone":[0,0,0,0,2,1,1,0,-1,-1,-1,-1,-2,-2,-3,-3,-1,-1]},"2019":{"Tyger Woodes":[-11,-11,-12,-11,-10,-10,-11,-12,-12,-11,-11,-11,-12,-12,-13,-14,-14,-13],"Dustin Johnstone":[-8,-8,-7,-7,-7,-7,-7,-8,-8,-8,-8,-8,-9,-9,-10,-11,-12,-12],"Brooks Koepke":[-10,-11,-11,-11,-11,-10,-10,-11,-11,-11,-11,-9,-11,-11,-12,-12,-12,-12],"Xander Schaufeld":[-9,-10,-9,-9,-8,-8,-7,-8,-9,-9,-10,-10,-11,-12,-12,-12,-12,-12],"Tony Finao":[-11,-11,-11,-11,-10,-10,-10,-11,-11,-10,-10,-8,-9,-9,-10,-11,-11,-11],"Francesco Molinaro":[-13,-13,-13,-13,-13,-13,-12,-13,-13,-13,-13,-11,-12,-12,-10,-10,-11,-11]},"2012":{"Ernie Elsen":[-5,-4,-4,-4,-4,-4,-4,-4,-3,-4,-4,-5,-5,-6,-6,-6,-6,-7],"Adam Scotts":[-10,-11,-10,-10,-10,-9,-9,-9,-9,-9,-9,-9,-9,-10,-9,-8,-7,-6]},"2024":{"Bryson DuChamp":[-7,-7,-7,-6,-6,-6,-6,-6,-6,-7,-7,-6,-7,-7,-6,-6,-6,-6],"Rory McIlvane":[-5,-5,-5,-5,-4,-4,-4,-4,-5,-6,-6,-7,-8,-8,-7,-6,-6,-5],"Patrick Cantwell":[-4,-4,-4,-3,-3,-3,-4,-4,-4,-5,-5,-4,-5,-5,-5,-4,-4,-4]},"2006":{"Geoff Ogilvie":[3,3,3,3,2,1,1,2,3,3,4,4,4,5,5,5,5,5],"Phil Mickleson":[2,2,2,1,2,2,3,3,4,4,3,3,4,3,3,4,4,6],"Colin Montgomerie":[5,5,5,4,3,3,3,3,3,4,4,4,4,5,5,5,4,6]}};
+// HOT-MOMENT STARTS: each challenge starts on the hole where the real collapse or charge began, from the real scores at that point.
+// `comp` lowers a golfer's composure a little where he really did collapse.
+const CH_HOT = {
+    tiger19: { y: "2019", from: 15, you: "Tyger Woodes", rivals: [["Francesco Molinaro", "Francesco Molinaro"], ["Xander Schaufeld", "Xander Schaufeld"], ["Brooks Koepke", "Brooks Koepke"], ["Dustin Johnstone", "Dustin Johnstone"], ["Tony Finao", "Tony Finao"]],
+        blurb: "15th tee, final round. The leader's ball is at the bottom of Rae's Creek, and four of you are tied at -12 with Koepka one back. Four holes for a fifth green jacket." },
+    tiger19_flip: { y: "2019", from: 12, you: "Francesco Molinaro", comp: -5, rivals: [["Tyger Woodes", "Tyger Woodes"], ["Brooks Koepke", "Brooks Koepke"], ["Xander Schaufeld", "Xander Schaufeld"], ["Tony Finao", "Tony Finao"], ["Dustin Johnstone", "Dustin Johnstone"]],
+        blurb: "Two clear on the 12th tee, the wind swirling over Rae's Creek. Tiger is two back. Hit the middle of the green and this is still yours." },
+    norman96: { y: "1996", from: 10, you: "Greg Normand", comp: -8, rivals: [["Nick Faldon", "Nick Faldon"]] },
+    norman96_flip: { y: "1996", from: 12, you: "Nick Faldon", rivals: [["Greg Normand", "Greg Normand"]],
+        blurb: "Six behind this morning. Norman has bogeyed 9, 10 and 11 and you are level at -9 on the 12th tee. Seven holes for the green jacket." },
+    rory11: { y: "2011", from: 10, you: "Rory McIlvane", comp: -8, rivals: [["Charl Schwarzel", "Charl Schwarzel"], ["Tyger Woodes", "Tyger Woodes"], ["Adam Scotts", "Adam Scotts"], ["Jason Daye", "Jason Daye"]] },
+    rory11_flip: { y: "2011", from: 15, you: "Charl Schwarzel", rivals: [["Adam Scotts", "Adam Scotts"], ["Jason Daye", "Jason Daye"], ["Tyger Woodes", "Tyger Woodes"], ["Rory McIlvane", "Rory McIlvane"]],
+        blurb: "Rory has fallen apart. Adam Scotts leads at -11, and you, Day and Tiger are a shot back. Four holes left, and nobody has ever finished the Masters with four straight birdies." },
+    spieth16: { y: "2016", from: 12, you: "Jordan Speight", comp: -6, rivals: [["Danny Willetts", "Danny Willetts"], ["Dustin Johnstone", "Dustin Johnstone"], ["Lee Westwood", "Lee Westwood"], ["Paul Casey", "Paul Casey"]],
+        blurb: "Bogeys at 10 and 11, but still three clear on the 12th tee: 155 yards over Rae's Creek. Just find the green." },
+    spieth16_flip: { y: "2016", from: 14, you: "Danny Willetts", rivals: [["Jordan Speight", "Jordan Speight"], ["Dustin Johnstone", "Dustin Johnstone"], ["Lee Westwood", "Lee Westwood"]],
+        blurb: "The defending champion just made seven at the 12th. You lead the Masters by one with five to play. Keep it clean." },
+    jack86: { y: "1986", from: 15, you: "Jack Nicklin", rivals: [["Seve Ballestero", "Seve Ballestero"], ["Tom Kyte", "Tom Kyte"], ["Greg Normand", "Greg Normand"]],
+        blurb: "15th tee, four behind Seve with four to play, aged 46. The par-5 15th is reachable. The roar starts here." },
+    jack86_flip: { y: "1986", from: 15, you: "Greg Normand", rivals: [["Seve Ballestero", "Seve Ballestero"], ["Tom Kyte", "Tom Kyte"], ["Jack Nicklin", "Jack Nicklin"]],
+        blurb: "Three behind Seve with four to play, and a 46-year-old is stirring ahead of you. You'll need birdies." },
+    rory24: { y: "2024", from: 14, you: "Rory McIlvane", comp: -6, rivals: [["Bryson DuChamp", "Bryson DuChamp"], ["Patrick Cantwell", "Patrick Cantwell"]],
+        blurb: "One clear of Bryson with five to play at Pinehurst, after a birdie at 13. Two-putt your way home and the The National Open is yours." },
+    rory24_flip: { y: "2024", from: 14, you: "Bryson DuChamp", rivals: [["Rory McIlvane", "Rory McIlvane"], ["Patrick Cantwell", "Patrick Cantwell"]],
+        blurb: "One behind Rory with five to play. Stay patient, keep making pars, and see if he cracks." },
+    scott12: { y: "2012", from: 15, you: "Adam Scotts", comp: -6, rivals: [["Ernie Elsen", "Ernie Elsen"]] },
+    tiger97: { y: "1997", from: 10, you: "Tyger Woodes", rivals: [["Tom Kyte", "Tom Kyte"], ["Costantino Rocco", "Costantino Rocco"]] },
+    tiger97_flip: { y: "1997", from: 10, you: "Tom Kyte", rivals: [["Tyger Woodes", "Tyger Woodes"], ["Costantino Rocco", "Costantino Rocco"]] },
+    spieth15: { y: "2015", from: 10, you: "Jordan Speight", rivals: [["Justin Rosen", "Justin Rosen"], ["Phil Mickleson", "Phil Mickleson"]] },
+    spieth15_flip: { y: "2015", from: 10, you: "Justin Rosen", rivals: [["Jordan Speight", "Jordan Speight"], ["Phil Mickleson", "Phil Mickleson"]] },
+    phil06: { y: "2006", from: 18, you: "Phil Mickleson", comp: -6, rivals: [["Geoff Ogilvie", "Geoff Ogilvie", true], ["Colin Montgomerie", "Colin Montgomerie"]] },
+    phil06_flip: { y: "2006", from: 18, you: "Colin Montgomerie", rivals: [["Geoff Ogilvie", "Geoff Ogilvie", true], ["Phil Mickleson", "Phil Mickleson"]] },
+};
+Object.entries(CH_HOT).forEach(([id, h]) => { const c = CHALLENGES.find((x) => x.id === id), T = CH_CUM[h.y]; if (!c || !T || !T[h.you]) return;
+    const at = (k) => h.from >= 2 ? T[k][h.from - 2] : 0;
+    c.from = h.from; c.you = { ...c.you, start: at(h.you), comp: (c.you.comp || 85) + (h.comp || 0) }; if (h.comp) c.collapse = true;
+    const keep = Object.fromEntries((c.rivals || []).map((r) => [r.name, r]));
+    c.rivals = h.rivals.filter(([, k]) => T[k]).map(([name, k, done]) => done ? { name, start: T[k][17], final: T[k][17], done: true } : ({ ...(keep[name] && keep[name].from ? { from: keep[name].from } : {}), name, start: at(k), final: T[k][17], cum: T[k] }));
+    if (h.title) c.title = h.title; if (h.blurb) c.blurb = h.blurb; });
 // Woods '97: the medal is for winning; his real score and the record are the higher medals
 { const t97 = CHALLENGES.find((c) => c.id === "tiger97"); if (t97) t97.goals = [{ t: "Win the Masters", k: "win" }, { t: "Finish at -18 or better (his real score)", k: "par", v: -18 }, { t: "Finish at -19 or better (beat his real score)", k: "par", v: -19 }]; }
 const CH_FIELD = withNewAttrs({ drivingAccuracy: 87, drivingDistance: 87, longApproach: 87, shortApproach: 87, chipping: 87, putting: 87, recovery: 87, bunker: 87, composure: 84 }, "");
@@ -3022,12 +3064,16 @@ const chRival = (r, sc, course) => {
     if (r.done) return { ...r, first: 18, holes: [] };
     const first = (r.from || sc.from) - 1;
     const holes = [];
+    if (r.cum) { // the holes they really played
+        for (let j = first; j < 18; j++) holes.push(Math.max(1, course.holes[j][0] + r.cum[j] - (j ? r.cum[j - 1] : 0)));
+        return { ...r, start: first ? r.cum[first - 1] : 0, first, holes };
+    }
     for (let j = first; j < 18; j++) holes.push(playHole(CH_FIELD, course.holes[j], wxAdjFor(chWx, [82, 82, 82]), false, 0));
     if (r.final != null) {
         const sd = holes.length <= 3 ? 0.55 : holes.length <= 9 ? 0.9 : 1.3;
         // sometimes a chaser catches fire: no lead is ever completely safe
-        const hot = holes.length >= 6 && Math.random() < CH_TUNE.charge ? ri(2, 4) : 0;
-        const want = r.final + Math.round(gauss() * sd) - hot;
+        const hot = 0; // history is not randomised: they finish exactly where they really did
+        const want = r.final + 0 * sd;
         if (hot) r = { ...r, hot };
         let cur = r.start + holes.reduce((t, s, k) => t + s - course.holes[first + k][0], 0);
         for (let guard = 0; cur !== want && guard < 80; guard++) {
@@ -3044,7 +3090,7 @@ const chStart = (sc) => {
 };
 // every hole ends on the green. The closer you get to the end of the challenge, the smaller the green zone and the faster the needle:
 // big and steady on your first hole, tiny and quick on your last, worse still in a playoff
-const CH_TUNE = { autoSd: 0.15, autoMul: 0.85, readFix: 1, ironFw: 0.2, ironShort: 25, midPutt: 1.1, charge: 0.15, z0: 1.0, z1: 0.7, zPlayoff: 0.6, s0: 0.85, s1: 1.3, sPlayoff: 1.4, adjSkill: 40, holeOut: 0.004, chipIn: 0.05, ftHalf: 5, lagOk: 0.2, prox: 0.11, drvFw: 0.15, flagGir: 0.8, midGir: 1.15, flagClose: 0.34, midClose: 0.06, gir: 0.74, chip: 9 };
+const CH_TUNE = { pFlag: 0.25, pSafe: 0.08, autoSd: 0.15, autoMul: 0.85, readFix: 1, ironFw: 0.2, ironShort: 25, midPutt: 1.1, charge: 0.15, z0: 1.0, z1: 0.7, zPlayoff: 0.6, s0: 0.85, s1: 1.3, sPlayoff: 1.4, adjSkill: 40, holeOut: 0.004, chipIn: 0.05, ftHalf: 5, lagOk: 0.2, prox: 0.11, drvFw: 0.15, flagGir: 0.8, midGir: 1.15, flagClose: 0.34, midClose: 0.06, gir: 0.74, chip: 9 };
 // (zone size and needle speed at the start, the finish and in a playoff; how many skill points a stroke of pressure costs;
 // the chance of holing an approach at the flag from the fairway, and of holing an attacking chip; longer putts get a narrower zone,
 // halving it at `ftHalf` feet, so a 20-footer drops about as often as it does on tour)
@@ -3060,6 +3106,25 @@ const chAround = (lie) => lie === "fringe" || lie === "gbunker" || lie === "deep
 // a skill on this shot, dragged down by the round's pressure and the scenario's difficulty
 const chSk = (a, k, adj) => (a[k] != null ? a[k] : 80) - adj * CH_TUNE.adjSkill;
 // the calls on offer from where the ball is now
+// THE PRESSURE WHEEL: leading in the final stretch (the last four holes or a playoff), the good slices shrink and the disaster
+// slices grow, more so for a golfer with less composure. Built on lead, holes left and composure only, so the career final round
+// of a major can use the same call later.
+const chPressK = (lead, left, comp, playoff) => (lead < 1 && !playoff) || (left > 4 && !playoff) ? 0
+    : (playoff ? 1 : [0, 1, 0.85, 0.7, 0.55][left]) * clampN((96 - (comp || 80)) / 20, 0.15, 1.3);
+const chLeft = (ch) => (19 - ch.sc.from) - ch.my.length;
+const chLead = (ch) => { const b = chBoard(ch), me = b.find((r) => r.you).toPar; return Math.min(...b.filter((r) => !r.you).map((r) => r.toPar)) - me; };
+const chYou = (ch, playoff) => { const k = chPressK(chLead(ch), chLeft(ch), ch.you.composure, playoff); return k > 0 ? { ...ch.you, press: k } : ch.you; };
+// what you need, against history's number: the best real final among the rivals
+const chNeed = (ch, playoff) => {
+    if (playoff || ch.sc.oneputt) return null;
+    const left = chLeft(ch); if (left < 1) return null;
+    const me = (chBoard(ch).find((r) => r.you) || {}).toPar, best = Math.min(...ch.rivals.map((r) => r.final != null ? r.final : (chBoard(ch).find((x) => x.name === r.name) || {}).toPar));
+    if (me == null || !isFinite(best)) return null;
+    const spare = best - 1 - me; // shots over par you can afford over the holes left and still win outright
+    const par = ch.course.holes[ch.idx][0];
+    if (left === 1) return spare <= -par + 1 ? `🎯 You need a ${Math.max(1, par + spare)} to win, a ${par + spare + 1} for a playoff.` : `🎯 You need a ${par + spare} to win, a ${par + spare + 1} for a playoff.`;
+    return spare > 0 ? `🎯 ${left} to play: you can drop ${spare} and still win (${best} is the number).` : spare === 0 ? `🎯 ${left} to play: par in to win (${best} is the number).` : `🎯 ${left} to play: you need ${-spare} under par to win (${best} is the number).`;
+};
 const chShotChoices = (h, hole) => {
     const par = hole[0], f = hole[4] || {};
     if (h.lie === "tee" && par > 3) return [
@@ -3138,16 +3203,17 @@ const chOutcomes = (a, hole, h, cid, adj) => {
     const lm = { tee: 1.04, fairway: 1, rough: 0.76, bunker: 0.62 }[L] || 0.8;
     const base = clampN((d < 100 ? CH_TUNE.gir + (100 - d) * 0.0012 : CH_TUNE.gir - (d - 100) * 0.0032) + (S - 80) * 0.009, 0.05, 0.96) * lm;
     const clean = L === "tee" || L === "fairway";
-    const pH = clean && fl ? clampN(CH_TUNE.holeOut + (S - 80) * 0.0003, 0.002, 0.012) * (d <= 180 ? 1 : 0.4) : 0;
+    const pH = clean && fl ? clampN(CH_TUNE.holeOut + (S - 80) * 0.0003, 0.002, 0.012) * (d <= 180 ? 1 : 0.4) * (1 - 0.5 * (a.press || 0)) : 0;
     // power: a long hitter goes at a long hole with a shorter, higher club; shaping (accuracy) keeps the misses on the safe side
     const pw = fl && d >= 175 ? ((a.drivingDistance != null ? a.drivingDistance : 80) - 80) * 0.004 : 0;
     const sh = clampN(1 - ((a.shotShaping != null ? a.shotShaping : 80) - 80) * 0.015, 0.6, 1.4);
-    const pOn = clampN(base * (fl ? CH_TUNE.flagGir : CH_TUNE.midGir) + pw, 0.03, 0.97);
-    const closeShare = fl ? clampN(CH_TUNE.flagClose + (S - 80) * 0.01, 0.12, 0.5) * (clean ? 1 : 0.55) * (d <= 150 ? 1 : 0.75) : CH_TUNE.midClose;
+    const k = a.press || 0; // the pressure wheel (see chPressK)
+    const pOn = clampN((base * (fl ? CH_TUNE.flagGir : CH_TUNE.midGir) + pw) * (1 - k * (fl ? CH_TUNE.pFlag * clampN((d - 40) / 120, 0.2, 1.3) : CH_TUNE.pSafe * clampN(d / 150, 0.5, 1.5))), 0.03, 0.97); // a wedge holds its nerve better than a long iron
+    const closeShare = fl ? clampN(CH_TUNE.flagClose + (S - 80) * 0.01, 0.12, 0.5) * (clean ? 1 : 0.55) * (d <= 150 ? 1 : 0.75) * (1 - 0.35 * k) : CH_TUNE.midClose * (1 - 0.35 * k);
     const pC = pOn * closeShare, pG = pOn - pC - pH;
     const m = Math.max(0, 1 - pOn);
-    const pW = f.w >= 3 ? clampN(m * (f.w === 4 ? (fl ? 0.6 : 0.3) : (fl ? 0.35 : 0.15)) * sh, 0, m) : 0;
-    const pGB = (m - pW) * (f.gb >= 3 ? 0.4 : 0.25), pDeep = (m - pW - pGB) * clampN((fl ? 0.55 : 0.1) * sh, 0, 0.9);
+    const pW = f.w >= 3 ? clampN(m * (f.w === 4 ? (fl ? 0.6 : 0.3) : (fl ? 0.35 : 0.15)) * sh * (1 + 0.8 * k), 0, m) : 0;
+    const pGB = (m - pW) * (f.gb >= 3 ? 0.4 : 0.25), pDeep = (m - pW - pGB) * clampN((fl ? 0.55 : 0.1) * sh + k * (fl ? 0.2 : 0.12), 0, 0.9);
     const rf = ({ rough: 1.2, bunker: 1.3 }[L] || 1), cHi = 5 + Math.round(d / 50);
     const gLo = fl ? cHi + 1 : Math.round((14 + d * 0.03) * rf), gHi = Math.round((fl ? 18 + d * 0.08 : (24 + d * 0.1) * clampN(1 - (S - 80) * 0.008, 0.8, 1.2)) * rf);
     add(pH, { holed: true, slice: "holed", txt: par === 3 && L === "tee" ? "🎯 HOLE IN ONE!!!" : "🎯 HOLED IT FROM THE FAIRWAY!" });
@@ -3380,8 +3446,10 @@ const chTestSummary = (rows) => {
         bogeys: n ? rows.reduce((t, r) => t + (r.bogeys || 0), 0) / n : 0, birdies: n ? rows.reduce((t, r) => t + (r.birdies || 0), 0) / n : 0,
         putts: rows.reduce((t, r) => [t[0] + ((r.pm || {}).m || 0), t[1] + ((r.pm || {}).a || 0)], [0, 0]) };
 };
-const chLive = () => { try { const s = JSON.parse(localStorage.getItem(CH_LIVE_KEY) || "null"); const sc = s && CHALLENGES.find((c) => c.id === s.id); return sc ? { ...s, sc, course: chCourse(sc) } : null; } catch (e) { return null; } };
-const chLiveSave = (c) => { try { if (!c || c.phase === "brief") return; if (c.phase === "done") localStorage.removeItem(CH_LIVE_KEY); else localStorage.setItem(CH_LIVE_KEY, JSON.stringify({ ...c, sc: undefined, course: undefined, id: c.sc.id })); } catch (e) { /* storage blocked: the run just can't be resumed */ } };
+const chLive = () => { try { const s = JSON.parse(localStorage.getItem(CH_LIVE_KEY) || "null"); const sc = s && CHALLENGES.find((c) => c.id === s.id); // a run saved before its start hole moved can't resume
+    if (sc && ((s.from != null && s.from !== sc.from) || (s.from == null && (s.idx < sc.from - 1 || s.my.length > 19 - sc.from)))) return null;
+    return sc ? { ...s, sc, course: chCourse(sc) } : null; } catch (e) { return null; } };
+const chLiveSave = (c) => { try { if (!c || c.phase === "brief") return; if (c.phase === "done") localStorage.removeItem(CH_LIVE_KEY); else localStorage.setItem(CH_LIVE_KEY, JSON.stringify({ ...c, sc: undefined, course: undefined, id: c.sc.id, from: c.sc.from })); } catch (e) { /* storage blocked: the run just can't be resumed */ } };
 // "Remind me every day": a repeating calendar reminder. No server needed, and it works on every phone.
 function ChRemind() {
     const [open, setOpen] = useState(false), [hr, setHr] = useState(19);
@@ -7156,7 +7224,7 @@ function GolfCareerSim() {
         const choose = (choiceId) => {
             const best = Math.min(...board.filter((r) => !r.you).map((r) => r.toPar));
             // one shot: it either leaves you somewhere new to decide again, finishes the hole, or puts you on the green
-            const rs = chShot(ch.you, hole, h, choiceId, adjNow);
+            const rs = chShot(chYou(ch, playoffNow), hole, h, choiceId, adjNow);
             if (rs.wheel) return setCh({ ...ch, spin: { rs, label: (choices.find((c) => c.id === choiceId) || {}).label || "" } });
             applyShot(rs);
         };
@@ -7298,11 +7366,14 @@ function GolfCareerSim() {
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } }, `SHOT ${h.strokes + 1}`),
                     React.createElement("span", { className: "text-sm", style: { color: C.chalk } }, `${CH_LIE[h.lie]} · ${h.d} yds`))),
             ch.spin ? React.createElement(ShotWheel, { key: `${holeIdx}-${h.strokes}-${ch.my.length}`, wheel: ch.spin.rs.wheel, label: ch.spin.label, onDone: () => applyShot(ch.spin.rs) }) :
+            (() => { const nd = chNeed(ch, playoffNow), pk = chYou(ch, playoffNow).press; return (nd || pk) && React.createElement("div", { className: "p-2 rounded-xl mb-2 text-center", style: { background: C.panel, border: `1px solid ${C.gold}` } },
+                nd && React.createElement("div", { className: "text-sm", style: { color: C.gold, fontFamily: FONT } }, nd),
+                pk && React.createElement("div", { className: "text-[11px]", style: { color: C.bogey } }, `😰 Leading down the stretch: the wheel tightens${ch.sc.collapse ? " (and you know what happened here)" : ""}.`)); })(),
             choices.map((c, ci) => { const att = ci === 0; return React.createElement("button", { key: c.id, onClick: () => choose(c.id), className: "w-full p-3 rounded-xl mb-2 text-left active:scale-[0.99]", style: { background: att ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card, border: `1px solid ${att ? C.gold : "rgba(127,183,217,0.5)"}` } },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: att ? C.gold : C.blue } }, c.label),
                 React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, c.desc),
                 React.createElement("div", { className: "text-[11px] mt-1 flex flex-wrap gap-x-3", style: { fontFamily: MONO, color: C.chalk } },
-                    chShotOdds(ch.you, hole, h, c.id, adjNow).map(([k, v]) => React.createElement("span", { key: k }, v == null ? k : `${k} ${v}%`)))); }),
+                    chShotOdds(chYou(ch, playoffNow), hole, h, c.id, adjNow).map(([k, v]) => React.createElement("span", { key: k }, v == null ? k : `${k} ${v}%`)))); }),
             React.createElement("div", { className: "p-2.5 rounded-xl mt-1", style: { background: C.panel } },
                 React.createElement("div", { className: "text-[10px] text-center", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, nowMedal ? `IF IT ENDED NOW: ${CH_MEDAL[nowMedal]} ${CH_MEDAL_NAME[nowMedal]}` : "IF IT ENDED NOW: NO MEDAL"),
                 sc.goals.map((gl, i) => React.createElement("div", { key: i, className: "text-xs flex justify-between", style: { color: nowFlags[i] ? C.green : C.muted } },
