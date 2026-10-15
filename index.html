@@ -3127,7 +3127,10 @@ const chNeed = (ch, playoff) => {
     if (me == null || !isFinite(best)) return null;
     const spare = best - 1 - me; // shots over par you can afford over the holes left and still win outright
     const par = ch.course.holes[ch.idx][0];
-    if (left === 1) return spare <= -par + 1 ? `🎯 You need a ${Math.max(1, par + spare)} to win, a ${par + spare + 1} for a playoff.` : `🎯 You need a ${par + spare} to win, a ${par + spare + 1} for a playoff.`;
+    if (left === 1) { const win = par + spare; // a hole-in-one is the best anyone can make
+        if (win + 1 < par - 2) return "🎯 Out of reach: finish as high as you can.";
+        return win >= 1 ? `🎯 You need a ${win} to win, a ${win + 1} for a playoff.` : `🎯 Only a ${win + 1} gets you into a playoff.`; }
+    if (spare < -2 * left) return "🎯 Out of reach: finish as high as you can.";
     return spare > 0 ? `🎯 ${left} to play: you can drop ${spare} and still win (${best} is the number).` : spare === 0 ? `🎯 ${left} to play: par in to win (${best} is the number).` : `🎯 ${left} to play: you need ${-spare} under par to win (${best} is the number).`;
 };
 const chShotChoices = (h, hole) => {
