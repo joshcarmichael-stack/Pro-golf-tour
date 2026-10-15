@@ -116,11 +116,14 @@ if (GC_ON) {
     document.head.appendChild(sc);
 }
 // track("win/major") -> shows up as an event called win/major in the dashboard; never throws
+// the beta never counts (it's you testing); the app edition's events are kept apart under "app/"
+const GC_PREFIX = /\/beta\//.test(location.pathname) ? null : window.SP_EDITION === "app" ? "app/" : "";
 const track = (name) => {
     try {
-        if (!GC_ON)
+        if (!GC_ON || GC_PREFIX === null)
             return;
-        const go = () => window.goatcounter.count({ path: String(name), title: String(name), event: true });
+        const ev = GC_PREFIX + String(name);
+        const go = () => window.goatcounter.count({ path: ev, title: ev, event: true });
         if (window.goatcounter && window.goatcounter.count)
             go();
         else
@@ -128,6 +131,91 @@ const track = (name) => {
     }
     catch (e) { }
 };
+// a brand-new player on this device (nothing saved yet), and visitors who arrived from a shared link (?ref=...)
+try {
+    if (!localStorage.getItem("sunday-pins-seen")) {
+        const has = Object.keys(localStorage).some((k) => /^(golf-career-sim|sunday-pins)/.test(k));
+        localStorage.setItem("sunday-pins-seen", String(Date.now()));
+        if (!has) track("first-visit");
+    }
+} catch (e) { /* storage blocked */ }
+try {
+    const ref = new URLSearchParams(location.search).get("ref");
+    if (ref) {
+        track("ref/" + ref.replace(/[^a-z0-9-]/gi, "").slice(0, 40));
+        history.replaceState(null, "", location.pathname + location.hash); // don't count it again on reload, or let it travel in copied links
+    }
+} catch (e) { }
+// ---------- SAVE PROBLEMS, BACKUP AND RESTORE ----------
+// a failed save fires "sp-save-failed" so the game can tell the player (counted once per session)
+let SAVE_FAIL_SEEN = false;
+const saveFailed = (e) => { if (!SAVE_FAIL_SEEN) { SAVE_FAIL_SEEN = true; track("save-failed/" + ((e && e.name) || "error")); } window.dispatchEvent(new Event("sp-save-failed")); };
+// every key this game (website, app and beta) writes
+const isGameKey = (k) => /^(golf-career-sim|sunday-pins)/.test(k);
+const exportSaves = () => {
+    try {
+        const data = {};
+        Object.keys(localStorage).filter(isGameKey).forEach((k) => { data[k] = localStorage.getItem(k); });
+        const blob = new Blob([JSON.stringify({ game: "sunday-pins", exported: new Date().toISOString(), data })], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "sunday-pins-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        track("save/export");
+    } catch (e) { window.alert("Couldn't make a backup in this browser."); }
+};
+// restore ADDS the backup's keys over what's here; nothing that isn't in the backup is deleted
+const importSaves = () => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "application/json,.json";
+    inp.onchange = () => {
+        const file = inp.files && inp.files[0];
+        if (!file) return;
+        file.text().then((txt) => {
+            const j = JSON.parse(txt), data = j && j.game === "sunday-pins" && j.data;
+            if (!data || typeof data !== "object") throw new Error("not a Sunday Pins backup");
+            const keys = Object.keys(data).filter((k) => isGameKey(k) && typeof data[k] === "string");
+            if (!keys.length) throw new Error("empty backup");
+            if (!window.confirm(`Restore ${keys.length} saved item${keys.length > 1 ? "s" : ""} from this backup? Careers in the backup replace the ones on this device.`)) return;
+            keys.forEach((k) => localStorage.setItem(k, data[k]));
+            track("save/import");
+            location.reload();
+        }).catch((e) => window.alert("That file couldn't be restored: " + (e && e.message ? e.message : "unknown error")));
+    };
+    inp.click();
+};
+// shown at the top of the screen when a save didn't go through
+function SaveWarning() {
+    const [on, setOn] = useState(false);
+    useEffect(() => { const f = () => setOn(true); window.addEventListener("sp-save-failed", f); return () => window.removeEventListener("sp-save-failed", f); }, []);
+    if (!on) return null;
+    return React.createElement("div", { role: "alert", style: { position: "fixed", top: 0, left: 0, right: 0, zIndex: 60, background: "#D9573C", color: "#fff", padding: "10px 14px", fontSize: 13, lineHeight: 1.35, textAlign: "center" } },
+        "\u26A0\uFE0F Your progress isn't being saved in this browser (storage is full or blocked). Try Safari or Chrome, not an in-app browser. ",
+        React.createElement("button", { onClick: exportSaves, style: { textDecoration: "underline", background: "none", border: 0, color: "#fff", font: "inherit", cursor: "pointer" } }, "Back up now"),
+        " \u00B7 ",
+        React.createElement("button", { onClick: () => setOn(false), style: { textDecoration: "underline", background: "none", border: 0, color: "#fff", font: "inherit", cursor: "pointer" } }, "Dismiss"));
+}
+// if anything crashes while drawing the game, show a way out instead of a blank page. It never deletes a save:
+// "back to home" just skips the automatic resume once, so a career that won't open can be backed up first
+const SKIP_RESUME_KEY = "sunday-pins-skip-resume";
+class CrashGuard extends React.Component {
+    constructor(p) { super(p); this.state = { err: null }; }
+    static getDerivedStateFromError(err) { return { err }; }
+    componentDidCatch(err) { track("crash/" + String((err && err.message) || err).replace(/[^a-z0-9 ]/gi, "").slice(0, 60)); }
+    render() {
+        if (!this.state.err) return this.props.children;
+        const b = (label, onClick, gold) => React.createElement("button", { onClick, style: { display: "block", width: "100%", margin: "0 0 10px", padding: "12px", borderRadius: 8, border: gold ? 0 : "1px solid rgba(244,247,242,.25)", background: gold ? "#E8C35A" : "transparent", color: gold ? "#1A1405" : "#F4F7F2", font: "700 15px 'Source Sans 3',sans-serif", cursor: "pointer" } }, label);
+        return React.createElement("div", { style: { maxWidth: 420, margin: "0 auto", padding: "60px 20px", color: "#F4F7F2", fontFamily: "'Source Sans 3',sans-serif", textAlign: "center" } },
+            React.createElement("div", { style: { fontSize: 44 } }, "\u26F3"),
+            React.createElement("h2", { style: { font: "700 26px Fraunces,Georgia,serif", color: "#E8C35A", margin: "10px 0" } }, "Something went wrong"),
+            React.createElement("p", { style: { fontSize: 14, color: "#B9CFC0", margin: "0 0 22px" } }, "Your saves are safe: nothing has been deleted. Back up your saves, then try again."),
+            b("\uD83D\uDCBE BACK UP MY SAVES", exportSaves, true),
+            b("TRY AGAIN", () => location.reload()),
+            b("BACK TO THE HOME SCREEN", () => { try { sessionStorage.setItem(SKIP_RESUME_KEY, "1"); } catch (e) { } location.reload(); }),
+            React.createElement("p", { style: { fontSize: 11, color: "#8FAA98", marginTop: 14 } }, String((this.state.err && this.state.err.message) || this.state.err).slice(0, 160)));
+    }
+}
 // ---------- APP INSTALL (PWA) ----------
 // hold on to the browser's install prompt (Android/desktop Chrome) so a button can trigger it later
 let INSTALL_PROMPT = null;
@@ -3323,6 +3411,8 @@ function Tip({ id, title, children }) {
 }
 // ---------- SHARE A RESULT: draws a 1080x1350 card and hands it to the phone's share sheet ----------
 const SITE_URL = "https://sunday-pins.com";
+// every shared link says where it came from, so arrivals show up as ref/<tag> in the stats
+const shareUrl = (tag) => SITE_URL + (CH_TEST ? "/beta/" : "/") + "?ref=" + String(tag || "share").replace(/[^a-z0-9-]/gi, "-").slice(0, 40);
 const fmtPts = (x) => { const w = Math.floor(x); return (x - w >= 0.5 ? (w ? w + "½" : "½") : String(w)); };
 const drawShareCard = async ({ kicker, headline, sub, name }) => {
     try { await Promise.all([document.fonts.load("700 96px Fraunces"), document.fonts.load("500 40px Fraunces")]); } catch (e) { }
@@ -3358,27 +3448,33 @@ const drawShareCard = async ({ kicker, headline, sub, name }) => {
 };
 function ShareResult({ kicker, headline, sub, name, tag, label }) {
     const [note, setNote] = useState("");
-    const text = `🏆 ${headline}${sub ? " · " + sub : ""}${name ? "\n" + name : ""}\n\nPlay Sunday Pins free: ${SITE_URL}`;
+    const url = shareUrl(tag || "result");
+    const text = `🏆 ${headline}${sub ? " · " + sub : ""}${name ? "\n" + name : ""}\n\nPlay Sunday Pins free: ${url}`;
+    const done = (how) => track("share/" + (tag || "result") + "/" + how); // counted only once it actually went out
     const go = async () => {
-        track("share/" + (tag || "result"));
+        track("share-tap/" + (tag || "result"));
         try {
             const blob = await drawShareCard({ kicker, headline, sub, name });
             const file = blob && typeof File !== "undefined" ? new File([blob], "sunday-pins.png", { type: "image/png" }) : null;
             if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({ files: [file], text });
+                done("card");
                 return;
             }
-            if (navigator.share) { await navigator.share({ text, url: SITE_URL }); return; }
+            if (navigator.share) {
+                try { await navigator.share({ text }); done("native"); return; }
+                catch (e) { if (e && e.name === "AbortError") return; } // anything but a cancel: fall through to save + copy
+            }
             if (blob) { // desktop: save the card and copy the words
                 const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "sunday-pins.png"; a.click();
                 setTimeout(() => URL.revokeObjectURL(a.href), 4000);
             }
-            try { await navigator.clipboard.writeText(text); setNote("Card saved and text copied: paste it anywhere"); } catch (e) { setNote("Card saved"); }
+            try { await navigator.clipboard.writeText(text); done("copy"); setNote("Card saved and text copied: paste it anywhere"); } catch (e) { setNote("Card saved"); }
         }
         catch (e) { if (!(e && e.name === "AbortError")) setNote("Couldn't open sharing on this device"); }
     };
     return (React.createElement("div", { className: "my-3" },
-        React.createElement("button", { onClick: go, className: "w-full py-2.5 rounded-md active:scale-95", style: { background: "transparent", color: C.gold, border: `1.5px solid ${C.gold}`, fontFamily: FONT, fontSize: 16, letterSpacing: 2 } }, label || "📤 SHARE THIS"),
+        React.createElement("button", { onClick: go, className: "w-full py-3 rounded-md active:scale-95", style: { background: C.gold, color: "#1A1405", border: 0, fontFamily: FONT, fontSize: 17, letterSpacing: 2, boxShadow: "0 4px 14px rgba(232,195,90,.25)" } }, label || "📤 SHARE THIS"),
         note && React.createElement("p", { className: "text-[11px] mt-1 text-center", style: { color: C.muted } }, note)));
 }
 // three-step "how it plays" strip
@@ -3542,7 +3638,7 @@ function GolfCareerSim() {
         return found;
     };
     // load a specific mode's save into the active game state
-    const loadSlot = async (m) => {
+    const loadSlot = async (m, auto = false) => {
         try {
             const res = await window.storage.get(SLOT_KEY(m));
             if (res === null || res === void 0 ? void 0 : res.value) {
@@ -3551,8 +3647,18 @@ function GolfCareerSim() {
                     s = repairSave(s);
                     setG(s);
                     setMode(s.mode || "standard");
-                    track("career-continue/" + (s.mode || "standard"));
+                    // CONTINUE taps count as career-continue; the automatic resume on opening the game counts once per visit as career-return
+                    if (!auto) track("career-continue/" + (s.mode || "standard"));
+                    else { try { if (!sessionStorage.getItem("sunday-pins-returned")) { sessionStorage.setItem("sunday-pins-returned", "1"); track("career-return/" + (s.mode || "standard")); } } catch (e) { } }
                     await save(s);
+                    // RESUME a tournament in progress (a reload, or the phone closing the tab, no longer loses the week)
+                    const tr = readTourResume(s);
+                    if (tr) {
+                        setTour(tr);
+                        setAutoPlay(false);
+                        setScreen("event");
+                        return true;
+                    }
                     // RESUME a World Cup in progress rather than dropping back to hub (a crash/reload no longer loses the run)
                     const wr = s.wcResume;
                     if (wr && wr.worldCup) {
@@ -3594,7 +3700,9 @@ function GolfCareerSim() {
             setSlots(found);
             // resume whichever career was played most recently — Home is always one tap away to switch
             const active = Object.entries(found).filter(([, v]) => !v.retired).sort((a, b) => (b[1].savedAt || 0) - (a[1].savedAt || 0))[0];
-            if (active && (await loadSlot(active[0])))
+            let skip = false;
+            try { skip = sessionStorage.getItem(SKIP_RESUME_KEY) === "1"; sessionStorage.removeItem(SKIP_RESUME_KEY); } catch (e) { }
+            if (active && !skip && (await loadSlot(active[0], true)))
                 return;
             setScreen("landing");
         })();
@@ -3674,12 +3782,41 @@ function GolfCareerSim() {
         }, (dramaNow(tour) ? 2400 : 420) * SIM_SPEEDS[simSpeed()].mult);
         return () => clearTimeout(t);
     }, [autoPlay, (_a = tour === null || tour === void 0 ? void 0 : tour.live) === null || _a === void 0 ? void 0 : _a.revealed]);
+    // ---------- TOURNAMENT IN PROGRESS: kept in its own key next to the career, cleared when the event is done ----------
+    const TOUR_KEY = (m) => SLOT_KEY(m) + "-tour";
+    const hadTour = useRef(false);
+    useEffect(() => {
+        if (!g) return;
+        const k = TOUR_KEY(g.mode || "standard");
+        try {
+            if (tour) {
+                hadTour.current = true;
+                localStorage.setItem(k, JSON.stringify({ season: g.season, evIdx: g.evIdx, tour: { ...tour, course: tour.course && tour.course.name } }));
+            }
+            else if (hadTour.current) {
+                hadTour.current = false;
+                localStorage.removeItem(k);
+            }
+        }
+        catch (e) { saveFailed(e); }
+    }, [tour]);
+    const readTourResume = (s) => {
+        try {
+            const r = JSON.parse(localStorage.getItem(TOUR_KEY(s.mode || "standard")) || "null");
+            if (!r || !r.tour || r.season !== s.season || r.evIdx !== s.evIdx || s.retired) return null;
+            const course = COURSES.find((c) => c.name === r.tour.course);
+            if (!course) return null;
+            hadTour.current = true;
+            return { ...r.tour, course };
+        }
+        catch (e) { return null; }
+    };
     const gRef = g;
     const save = async (st) => { try {
         st.savedAt = Date.now();
         await window.storage.set(SLOT_KEY(st.mode || "standard"), JSON.stringify(st));
     }
-    catch (e) { } };
+    catch (e) { saveFailed(e); } };
     // ---------- effective (caddie-boosted) attrs ----------
     // chemistry adds a fraction of extra perk value: +1 per perk at chem>=3, +2 at chem>=5
     const caddieChemBonus = (chem) => (chem >= 5 ? 2 : chem >= 3 ? 1 : 0);
@@ -4450,7 +4587,8 @@ function GolfCareerSim() {
             field = field.filter((f) => f.isYou || pr.filterNames.includes(f.name));
         if (LIFE(g) && g.injury && (g.injury.out > 0 || g.injury.decide)) field = field.filter((f) => !f.isYou); // injured: watching from home
         const bank0 = g.bank != null ? g.bank : g.myStats.careerMoney;
-        const withCamp = camp && CAMP_EVENTS.includes(pr.ev.type) && !pr.ev.opposite && bank0 >= campCost(pr.ev);
+        const campKey = g.season + "-" + g.evIdx, campPaid = g.campPaidFor === campKey; // already paid for this week's camp
+        const withCamp = camp && CAMP_EVENTS.includes(pr.ev.type) && !pr.ev.opposite && (campPaid || bank0 >= campCost(pr.ev));
         let trained = null;
         const myIdx0 = field.findIndex((f) => f.isYou);
         if (trainKey) {
@@ -4461,14 +4599,21 @@ function GolfCareerSim() {
             }
             trained = { key: trainKey, good, camp: withCamp };
         }
-        if (withCamp) {
+        if (withCamp && campPaid) {
+            if (myIdx0 >= 0) {
+                const a = { ...field[myIdx0].attrs };
+                ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker", ...NEW_KEYS].forEach((k) => { if (a[k] != null) a[k] = Math.min(99, a[k] + 1); });
+                field = field.map((f, idx) => idx === myIdx0 ? { ...f, attrs: a } : f);
+            }
+        }
+        else if (withCamp) {
             // a week at camp: +1 to everything for this event, +25 XP, paid from the bank
             if (myIdx0 >= 0) {
                 const a = { ...field[myIdx0].attrs };
                 ["drivingAccuracy", "drivingDistance", "longApproach", "shortApproach", "chipping", "putting", "recovery", "bunker", ...NEW_KEYS].forEach((k) => { if (a[k] != null) a[k] = Math.min(99, a[k] + 1); });
                 field = field.map((f, idx) => idx === myIdx0 ? { ...f, attrs: a } : f);
             }
-            const st = { ...g, bank: bank0 - campCost(pr.ev), xp: (g.xp || 0) + 25, campsBooked: (g.campsBooked || 0) + 1 };
+            const st = { ...g, bank: bank0 - campCost(pr.ev), xp: (g.xp || 0) + 25, campsBooked: (g.campsBooked || 0) + 1, campPaidFor: campKey };
             setG(st);
             save(st);
         }
@@ -6545,8 +6690,10 @@ function GolfCareerSim() {
                         React.createElement("div", { className: "flex flex-wrap gap-1 mt-2" }, md.features.map((f) => (React.createElement("span", { key: f, className: "text-[10px] px-1.5 py-0.5 rounded", style: { background: "rgba(244,247,242,0.08)", color: C.chalk, border: "1px solid rgba(244,247,242,0.12)" } }, f)))),
                         React.createElement("div", { className: "flex flex-wrap gap-2 mt-2" }, md.tags.map((t) => (React.createElement("span", { key: t, className: "text-[10px]", style: { color: C.muted } }, t)))))),
                     !confirming ? (React.createElement("div", { className: "grid gap-2 mt-3", style: { gridTemplateColumns: slot ? "1fr auto" : "1fr" } }, slot ? (React.createElement(React.Fragment, null,
-                        React.createElement(Btn, { small: true, onClick: () => { if (isActive)
+                        React.createElement(Btn, { small: true, onClick: () => { if (isActive) {
+                                track("career-continue/" + md.id);
                                 setScreen(g.retired ? "retired" : "hub");
+                            }
                             else
                                 loadSlot(md.id); } }, "\u25B6 CONTINUE"),
                         React.createElement("button", { onClick: () => setConfirmEraseId(md.id), className: "px-3 rounded-md text-xs", style: { background: C.panel, color: C.muted, border: "1px solid rgba(244,247,242,0.2)" } }, "New"))) : (React.createElement(Btn, { small: true, onClick: () => startFresh(md.id) }, "\u25B6 START")))) : (React.createElement("div", { className: "p-2.5 rounded-lg mt-3", style: { background: C.panel, border: `1px solid ${C.red}` } },
@@ -6579,7 +6726,11 @@ function GolfCareerSim() {
             EDITION !== "app" && React.createElement(InstallApp, null),
             React.createElement("div", { className: "text-center mt-2" },
                 EDITION !== "app" && React.createElement("a", { href: "https://ko-fi.com/sundaypins", target: "_blank", rel: "noopener", className: "text-[11px]", style: { color: C.gold, textDecoration: "none" } }, "\u2615 Enjoying Sunday Pins? Support the game"),
-                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted, opacity: 0.6 } }, "v3 \u00B7 free & solo-built \u00B7 your progress saves automatically, per mode"))));
+                React.createElement("p", { className: "text-[10px] mt-1", style: { color: C.muted, opacity: 0.6 } }, "v3 \u00B7 free & solo-built \u00B7 your progress saves automatically, per mode"),
+                React.createElement("div", { className: "text-[11px] mt-2", style: { color: C.muted } },
+                    React.createElement("button", { onClick: exportSaves, style: { color: C.muted, textDecoration: "underline" } }, "\uD83D\uDCBE Back up saves"),
+                    " \u00B7 ",
+                    React.createElement("button", { onClick: importSaves, style: { color: C.muted, textDecoration: "underline" } }, "Restore a backup")))));
     }
     if (screen === "identity") {
         return (React.createElement(Shell, null,
@@ -6910,8 +7061,17 @@ function GolfCareerSim() {
             const row = ch.my.map((s, k) => chEmoji(s - course.holes[sc.from - 1 + k][0])).join("") + (ch.po ? " +" + ch.po.log.map((x) => chEmoji(x.me - course.holes[17][0])).join("") : "");
             const today = chToday();
             const streakNow = ch.daily && !ch.test ? chStreak(chLoad().daily) : null;
-            const shareText = `⛳ Sunday Pins ${ch.daily ? `${sc.rare ? "⭐ Rare " : ""}Daily Challenge #${today.n}${streakNow && streakNow.now > 1 ? ` · 🔥 ${streakNow.now}-day streak` : ""}` : "Challenge"}\n${sc.you.name}, ${sc.year} ${sc.event}: "${sc.title}"\n${chHeadline(sc, r.won).charAt(0) + chHeadline(sc, r.won).slice(1).toLowerCase()} ${r.stars ? CH_MEDAL[r.stars] + " " + CH_MEDAL_NAME[r.stars] : "no medal"} (${thruPar(r.toPar)})\n${row}\n${ch.pm.a ? `🎯 ${ch.pm.m}/${ch.pm.a} putts holed\n` : ""}${CH_TEST ? SITE_URL + "/beta/" : SITE_URL}`; // challenges only live in the beta for now
-            const share = async () => { track("challenge/share/" + sc.id); try { if (navigator.share) { await navigator.share({ text: shareText }); return; } } catch (e) { return; } try { await navigator.clipboard.writeText(shareText); window.alert("Result copied. Paste it anywhere!"); } catch (e) { window.alert(shareText); } };
+            // Wordle-style: four short lines
+            const shareText = `⛳ Sunday Pins ${ch.daily ? `${sc.rare ? "⭐" : ""}Daily #${today.n}` : "Challenge"} ${r.stars ? CH_MEDAL[r.stars] : "❌"} ${thruPar(r.toPar)}${streakNow && streakNow.now > 1 ? ` 🔥${streakNow.now}` : ""}\n${sc.you.name.split(" ").slice(-1)[0]} '${String(sc.year).slice(-2)}: ${sc.title}\n${row}\n${shareUrl(ch.daily ? "daily" : "challenge")}`;
+            const share = async () => {
+                const tag = (ch.daily ? "daily/" : "challenge/") + sc.id;
+                track("challenge/share-tap/" + sc.id);
+                if (navigator.share) {
+                    try { await navigator.share({ text: shareText }); track("share/" + tag + "/native"); return; }
+                    catch (e) { if (e && e.name === "AbortError") return; } // anything but a cancel: copy it instead
+                }
+                try { await navigator.clipboard.writeText(shareText); track("share/" + tag + "/copy"); window.alert("Result copied. Paste it anywhere!"); } catch (e) { window.alert(shareText); }
+            };
             return (React.createElement(Shell, null,
                 React.createElement("div", { className: "pt-6 text-center" },
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, `${sc.year} ${sc.event.toUpperCase()}`),
@@ -11515,7 +11675,7 @@ function GolfCareerSim() {
         React.createElement("div", null));
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(GolfCareerSim));
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(CrashGuard, null, React.createElement(SaveWarning, null), React.createElement(GolfCareerSim)));
 </script>
 <script>
 window.SP_EDITION = "app";
