@@ -3615,7 +3615,7 @@ const drawShareCard = async ({ kicker, headline, sub, name }) => {
     x.fillStyle = "#2E7D4F"; x.beginPath(); x.ellipse(W / 2, 380, 300, 56, 0, 0, Math.PI * 2); x.fill();
     x.fillStyle = "#0B2016"; x.beginPath(); x.ellipse(W / 2 + 90, 384, 18, 7, 0, 0, Math.PI * 2); x.fill();
     x.strokeStyle = "#F4F7F2"; x.lineWidth = 5; x.beginPath(); x.moveTo(W / 2 + 90, 384); x.lineTo(W / 2 + 90, 190); x.stroke();
-    x.fillStyle = "#D8423A"; x.beginPath(); x.moveTo(W / 2 + 90, 190); x.lineTo(W / 2 + 190, 218); x.lineTo(W / 2 + 90, 246); x.closePath(); x.fill();
+    x.fillStyle = hasGoldFlag() ? "#E8C35A" : "#D8423A"; x.beginPath(); x.moveTo(W / 2 + 90, 190); x.lineTo(W / 2 + 190, 218); x.lineTo(W / 2 + 90, 246); x.closePath(); x.fill();
     x.textAlign = "center"; x.textBaseline = "alphabetic";
     const wrap = (text, font, maxW, lineH, y, color) => {
         x.font = font; x.fillStyle = color;
@@ -3634,6 +3634,62 @@ const drawShareCard = async ({ kicker, headline, sub, name }) => {
     x.font = "500 32px Fraunces, Georgia, serif"; x.fillStyle = "#F4F7F2"; x.fillText("Play free · sunday-pins.com", W / 2, H - 100);
     return new Promise((res) => cv.toBlob((b) => res(b), "image/png"));
 };
+// ---------- VOTE NUDGE + GOLD FLAG ----------
+// Vibe Top List: one vote per IP every 12h. No backend here, so the gold flag is on trust: tap Vote, come back, it's yours.
+// The player id rides along as ?ref= so a future callback (e.g. a free worker) could verify votes without changing this.
+const VOTE_KEY = "sunday-pins-vote"; // starts with sunday-pins, so backup/restore carries it
+const VOTE_SLUG = "sundaypins", VOTE_GAP = 3 * 864e5;
+const voteLoad = () => { try { const v = JSON.parse(localStorage.getItem(VOTE_KEY) || "{}"); return v && typeof v === "object" ? v : {}; } catch (e) { return {}; } };
+const voteSave = (v) => { try { localStorage.setItem(VOTE_KEY, JSON.stringify(v)); } catch (e) { /* storage blocked */ } };
+const hasGoldFlag = () => !!voteLoad().gold;
+const votePid = () => { const v = voteLoad(); if (!v.pid) { v.pid = "p" + Math.random().toString(36).slice(2, 10); voteSave(v); } return v.pid; };
+function GoldFlag({ size = 20, title = "Gold flag: thanks for voting!" }) {
+    return React.createElement("svg", { width: size * 0.8, height: size, viewBox: "0 0 16 20", role: "img", "aria-label": title, style: { display: "inline-block", verticalAlign: "-0.1em", marginLeft: "0.3em" } },
+        React.createElement("title", null, title),
+        React.createElement("line", { x1: 3, y1: 1, x2: 3, y2: 19, stroke: "#F4F7F2", strokeWidth: 1.6, strokeLinecap: "round" }),
+        React.createElement("path", { d: "M3.8 1.6 L14.5 4.6 L3.8 7.8 Z", fill: "#E8C35A", stroke: "#B8912E", strokeWidth: 0.6, strokeLinejoin: "round" }));
+}
+function VoteNudge({ where }) {
+    const [show] = useState(() => {
+        if (EDITION === "app") return false;
+        const v = voteLoad(), now = Date.now();
+        if (now - Math.max(v.shown || 0, v.tapped || 0) < VOTE_GAP) return false;
+        if ((v.dismissed || 0) >= 3 && now - (v.shown || 0) < 30 * 864e5) return false; // said no three times: back off for a month
+        v.shown = now; voteSave(v); return true;
+    });
+    const [state, setState] = useState(""); // "", "away", "done", "closed"
+    const [hadGold] = useState(hasGoldFlag);
+    useEffect(() => { if (show) track("vote-nudge/shown/" + where); }, []);
+    useEffect(() => {
+        if (state !== "away") return;
+        const grant = () => { const v = voteLoad(); v.gold = 1; v.goldAt = v.goldAt || Date.now(); voteSave(v); setState("done"); window.dispatchEvent(new Event("sp-gold-flag")); };
+        const back = () => { if (document.visibilityState === "visible") grant(); };
+        const t = setTimeout(grant, 15000); // a browser that never left the page still gets it
+        document.addEventListener("visibilitychange", back); window.addEventListener("focus", back);
+        return () => { clearTimeout(t); document.removeEventListener("visibilitychange", back); window.removeEventListener("focus", back); };
+    }, [state]);
+    if (!show || state === "closed") return null;
+    const tap = () => {
+        const v = voteLoad(); v.tapped = Date.now(); v.votes = (v.votes || 0) + 1; voteSave(v);
+        track("vote-nudge/tap/" + where);
+        window.open(`https://vibetoplist.com/vote/${VOTE_SLUG}?ref=${encodeURIComponent(votePid())}`, "_blank", "noopener");
+        setTimeout(() => setState("away"), 400);
+    };
+    const dismiss = () => { const v = voteLoad(); v.dismissed = (v.dismissed || 0) + 1; voteSave(v); track("vote-nudge/dismiss/" + where); setState("closed"); };
+    return React.createElement("div", { className: "sp-vote-nudge p-3 rounded-xl mb-3 relative", style: { background: "linear-gradient(135deg, rgba(46,125,79,0.35), rgba(232,195,90,0.12))", border: "1px solid rgba(232,195,90,0.6)" } },
+        state !== "done" && React.createElement("button", { onClick: dismiss, "aria-label": "Not now", className: "absolute", style: { top: 4, right: 8, background: "none", border: 0, color: "#B9D2C3", fontSize: 18, lineHeight: 1, padding: 4 } }, "\u00D7"),
+        state === "done"
+            ? React.createElement("div", { className: "text-center" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 17, color: C.gold, letterSpacing: 1 } }, hadGold ? "Thanks for voting again!" : "Gold flag unlocked", React.createElement(GoldFlag, { size: 20 })),
+                React.createElement("div", { className: "text-xs mt-1", style: { color: C.chalk } }, hadGold ? "Your gold flag is still flying." : "It now flies next to your golfer's name. Thanks for the support!"))
+            : React.createElement(React.Fragment, null,
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 16, color: C.gold, paddingRight: 22 } }, "Enjoying SundayPins?", React.createElement(GoldFlag, { size: 18 })),
+                React.createElement("p", { className: "text-xs mt-1 mb-2", style: { color: C.chalk, paddingRight: 10 } }, hadGold ? "A vote on Vibe Top List helps more golfers find the game. You can vote every 12 hours." : "Vote for us on Vibe Top List and your golfer gets a gold flag next to their name. Free, takes 10 seconds."),
+                React.createElement("button", { onClick: tap, className: "w-full py-2 rounded-md active:scale-95", style: { background: C.gold, color: "#1A1405", border: 0, fontFamily: FONT, fontSize: 15, letterSpacing: 1.5 } }, state === "away" ? "WAITING FOR YOU TO COME BACK\u2026" : "\u2B50 VOTE ON VIBE TOP LIST"),
+                React.createElement("div", { className: "text-[10px] mt-1 text-center", style: { color: "#B9D2C3" } }, "Opens in a new tab \u00B7 one vote every 12 hours")));
+}
+// re-render whoever shows the flag once it's earned
+const useGoldFlag = () => { const [gf, setGf] = useState(hasGoldFlag); useEffect(() => { const on = () => setGf(hasGoldFlag()); window.addEventListener("sp-gold-flag", on); return () => window.removeEventListener("sp-gold-flag", on); }, []); return gf; };
 function ShareResult({ kicker, headline, sub, name, tag, label }) {
     const [note, setNote] = useState("");
     const url = shareUrl(tag || "result");
@@ -3688,6 +3744,7 @@ function GolfCareerSim() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10;
     const [g, setG] = useState(null);
     const [screen, setScreen] = useState("loading");
+    const goldFlag = useGoldFlag();
     // active area theme (home green / cup blue / management slate / major warm) — set each render
     {
         const cupS = ["ryder", "ryderCall", "ryderHQ", "cupMatch", "worldCup", "worldCupQual", "wcMatch", "wcPlayoff"];
@@ -7293,6 +7350,7 @@ function GolfCareerSim() {
                     React.createElement("div", { className: "text-xs", style: { color: C.muted } }, `Best: ${streakNow.best} day${streakNow.best === 1 ? "" : "s"} · Daily Challenge #${today.n + 1} in ${chNextHrs()} hour${chNextHrs() === 1 ? "" : "s"}`),
                     React.createElement(ChRemind, null)),
                 React.createElement("div", { className: "mb-3" }, React.createElement(Btn, { onClick: share }, "📤 SHARE YOUR RESULT")),
+                !ch.test && React.createElement(VoteNudge, { where: ch.daily ? "daily" : "challenge" }),
                 React.createElement("div", { className: "grid gap-2 mb-2", style: { gridTemplateColumns: !(sc.rare && !ch.test) ? "1fr 1fr" : "1fr" } },
                     !(sc.rare && !ch.test) && React.createElement(Btn, { small: true, onClick: () => { if (!ch.test) track("challenge/retry/" + sc.id); setCh({ ...chStart(sc), daily: false, test: !!ch.test }); }, kind: "panel" }, ch.daily ? "PRACTISE IT" : "TRY AGAIN"),
                     React.createElement(Btn, { small: true, onClick: () => setScreen(chBack), kind: "panel" }, ch.test ? "TEST MODE" : "ALL CHALLENGES")),
@@ -7767,7 +7825,7 @@ function GolfCareerSim() {
                 React.createElement("div", { className: "min-w-0" },
                     React.createElement("div", { style: { fontFamily: UI, fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: C.muted } },
                         `${g.mode === "alltime" ? "All-time · " : ""}Season ${g.season} · Age ${g.pro.age != null ? g.pro.age : 22} · ${g.pro.nation}`),
-                    React.createElement("h1", { style: { fontFamily: FONT, fontSize: "clamp(26px, 7.5vw, 34px)", fontWeight: 700, color: C.chalk, lineHeight: 1.1, marginTop: 6 } }, g.pro.name),
+                    React.createElement("h1", { style: { fontFamily: FONT, fontSize: "clamp(26px, 7.5vw, 34px)", fontWeight: 700, color: C.chalk, lineHeight: 1.1, marginTop: 6 } }, g.pro.name, goldFlag && React.createElement(GoldFlag, { size: 22 })),
                     g.mode === "team" && myTeam() && React.createElement("div", { className: "text-sm", style: { color: C.muted } }, myTeam().name),
                     g.mode === "league" && myLeagueTeam() && React.createElement("div", { className: "text-sm", style: { color: C.muted } }, myLeagueTeam().name)),
                 React.createElement("div", { className: "text-center rounded-xl px-3 py-2 flex-none", style: { border: "1px solid rgba(244,247,242,0.16)", background: C.panel } },
@@ -10182,7 +10240,7 @@ function GolfCareerSim() {
         rows.push(["Bank (spendable)", fmtMoney((_x = g.bank) !== null && _x !== void 0 ? _x : m.careerMoney)]);
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { onClick: () => setScreen("hub") }),
-            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, g.pro.name.toUpperCase()),
+            React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, g.pro.name.toUpperCase(), goldFlag && React.createElement(GoldFlag, { size: 24 })),
             React.createElement("p", { className: "text-xs mb-3", style: { color: C.muted } },
                 g.pro.nation,
                 " \u00B7 ",
@@ -10912,6 +10970,7 @@ function GolfCareerSim() {
                         sub: `${toPar(myRes.total, par, 4)}${results.playoff ? " \u00B7 won in a playoff" : by > 0 ? ` \u00B7 by ${by} shot${by === 1 ? "" : "s"}` : ""}${rec}`,
                         name: `${g.pro.name} \u00B7 ${g.pro.nation} \u00B7 age ${g.pro.age != null ? g.pro.age : 22}` });
                 })(),
+                myRes && myRes.pos === 1 && React.createElement(VoteNudge, { where: "win" }),
                 (() => {
                     // this week's head-to-head with your rival, and your sponsor's retainer
                     const rv = !tour.team && g.rival && tour.scores.find((x) => x.name === g.rival.name);
