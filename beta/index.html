@@ -10741,7 +10741,10 @@ function GolfCareerSim() {
                                 const stakes = strokeClutchStakes(tour, h) || (tour.round === 3 && h >= 14 ? "Sunday putt." : "For the hole.");
                                 const target = rs.strokes + 1, miss = rs.strokes + 2;
                                 setShotHole({ ...sh, spin: null, putt: "pending" });
-                                startClutch({ feet: ft, brk: rollBreak(), target, miss, label: clutchLabel(target, hole[0]), title: `${tour.ev.e.toUpperCase()} · HOLE ${h + 1}`, stakes, putting: a.putting, composure: a.composure, pressure: tour.round === 3 ? 1 + (h - 13) * 0.1 : 0.55,
+                                const pressure = tour.round === 3 ? 1 + (h - 13) * 0.1 : 0.55;
+                                const read = puttRead(ft, pressure);
+                                const cal = chPuttCal({ feet: ft, brk: read.brk, putting: a.putting, pace: a.paceControl, composure: a.composure, pressure, speedScale: 1 }, a, 1);
+                                startClutch({ feet: ft, brk: read.brk, read, target, miss, label: clutchLabel(target, hole[0]), title: `${tour.ev.e.toUpperCase()} · HOLE ${h + 1}`, stakes, putting: a.putting, pace: a.paceControl, composure: a.composure, pressure, zoneScale: cal.zoneScale, simP: cal.simP, makeP: cal.makeP,
                                     makeTxt: `${scoreName(target, hole[0])} on ${h + 1}.`, missTxt: `It's a ${scoreName(miss, hole[0]).toLowerCase()} on ${h + 1}.`,
                                     onDone: (made) => { setClutch(null); commitCareerHole(h, made ? target : miss, "Shot by shot", "even", `⛳ ${ft}ft — ${made ? "HOLED" : "missed"}`, rs.log); } });
                             };
@@ -12041,6 +12044,15 @@ function GolfCareerSim() {
     }
     return React.createElement(Shell, null,
         React.createElement("div", null));
+}
+
+
+if (typeof location !== "undefined" && /\bsim=1\b/.test(location.search || "")) {
+    window.__WHEEL_SIM = {
+        COURSES, withNewAttrs, chShotChoices, chShot, chMakeP, chPuttCal, puttRead, readMakeP, clutchMakeP,
+        getTune: () => ({ ...CH_TUNE }),
+        setTune: (t) => Object.assign(CH_TUNE, t),
+    };
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(CrashGuard, null, React.createElement(SaveWarning, null), React.createElement(GolfCareerSim)));
