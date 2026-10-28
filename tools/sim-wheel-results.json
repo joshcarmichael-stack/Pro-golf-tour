@@ -1,19 +1,38 @@
 {
   "mid": {
-    "avg": 4.37,
-    "med": 4,
-    "best": -2,
-    "worst": 13,
-    "p10": 1,
-    "p90": 8
+    "avg": 1.75,
+    "med": 2,
+    "best": -6,
+    "worst": 8,
+    "p10": -2,
+    "p90": 5
   },
   "elite": {
-    "avg": -0.77,
-    "med": -1,
-    "best": -8,
-    "worst": 7,
-    "p10": -4,
-    "p90": 3
+    "avg": -3.31,
+    "med": -3,
+    "best": -11,
+    "worst": 3,
+    "p10": -7,
+    "p90": 0
   },
-  "puttNote": "auto at 0.85*tour make curve; attack/safe mix ~45/55"
+  "puttNote": "auto at autoMul*chMakeP; attack/safe mix ~45/55; course TPC Scottsdale",
+  "before": {
+    "mid": {
+      "avg": 4.37
+    },
+    "elite": {
+      "avg": -0.77
+    }
+  },
+  "tune": {
+    "gir": 0.82,
+    "flagGir": 0.88,
+    "midGir": 1.2,
+    "flagClose": 0.4,
+    "midClose": 0.1,
+    "drvFw": 0.1,
+    "chip": 7,
+    "prox": 0.09,
+    "autoMul": 0.9
+  }
 }

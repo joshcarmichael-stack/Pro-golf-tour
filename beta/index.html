@@ -3096,7 +3096,7 @@ const chStart = (sc) => {
 };
 // every hole ends on the green. The closer you get to the end of the challenge, the smaller the green zone and the faster the needle:
 // big and steady on your first hole, tiny and quick on your last, worse still in a playoff
-const CH_TUNE = { pFlag: 0.25, pSafe: 0.08, autoSd: 0.15, autoMul: 0.85, readFix: 1, ironFw: 0.2, ironShort: 25, midPutt: 1.1, charge: 0.15, z0: 1.0, z1: 0.7, zPlayoff: 0.6, s0: 0.85, s1: 1.3, sPlayoff: 1.4, adjSkill: 40, holeOut: 0.004, chipIn: 0.05, ftHalf: 5, lagOk: 0.2, prox: 0.11, drvFw: 0.15, flagGir: 0.8, midGir: 1.15, flagClose: 0.34, midClose: 0.06, gir: 0.74, chip: 9 };
+const CH_TUNE = { pFlag: 0.25, pSafe: 0.08, autoSd: 0.15, autoMul: 0.9, readFix: 1, ironFw: 0.2, ironShort: 25, midPutt: 1.1, charge: 0.15, z0: 1.0, z1: 0.7, zPlayoff: 0.6, s0: 0.85, s1: 1.3, sPlayoff: 1.4, adjSkill: 40, holeOut: 0.004, chipIn: 0.05, ftHalf: 5, lagOk: 0.2, prox: 0.09, drvFw: 0.1, flagGir: 0.88, midGir: 1.2, flagClose: 0.4, midClose: 0.1, gir: 0.82, chip: 7 };
 // (zone size and needle speed at the start, the finish and in a playoff; how many skill points a stroke of pressure costs;
 // the chance of holing an approach at the flag from the fairway, and of holing an attacking chip; longer putts get a narrower zone,
 // halving it at `ftHalf` feet, so a 20-footer drops about as often as it does on tour)
@@ -3256,6 +3256,7 @@ const chIsWheel = (o) => o.length > 0 && o.every((x) => x.slice);
 const chPct = (p) => p * 100 < 1 ? (p * 100).toFixed(1) : String(Math.round(p * 100));
 // BETA PROTOTYPE: wheel presentation mode (odds identical in every mode)
 const WHEEL_MODE_KEY = "sunday-pins-wheel-mode";
+
 const WHEEL_MODES = {
     watch: { id: "watch", label: "Watch every spin", short: "Watch", desc: "The wheel spins on every shot. Best for feeling the new design." },
     key: { id: "key", label: "Key shots only", short: "Key shots", desc: "You spin the big moments; routine shots resolve in the background." },
@@ -10701,8 +10702,8 @@ function GolfCareerSim() {
                             if (!shotHole || shotHole.holeIdx !== h) {
                                 return React.createElement(React.Fragment, null,
                                     React.createElement("div", { className: "p-2.5 rounded-xl mb-2", style: { background: C.card, border: "1px solid rgba(232,195,90,0.35)" } },
-                                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, color: C.gold, letterSpacing: 2 } }, "BETA · WHEEL ON EVERY SHOT"),
-                                        React.createElement("p", { className: "text-xs", style: { color: C.chalk } }, "Play this hole shot by shot. Same wheel as the dailies — tee, approach, chip and bunker. Putting stays on the meter."),
+                                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 11, color: C.gold, letterSpacing: 2 } }, "SHOT BY SHOT"),
+                                        React.createElement("p", { className: "text-xs", style: { color: C.muted } }, "Wheel on every shot — same odds as the dailies. Putting stays on the meter."),
                                         React.createElement(WheelModePicker, { compact: true })),
                                     React.createElement(Btn, { onClick: beginShotHole }, "⛳ PLAY THIS HOLE"),
                                     React.createElement("div", { className: "grid grid-cols-2 gap-2 mt-2" },
