@@ -2051,7 +2051,11 @@ const matchPutt = (my, opp, par) => {
 // the meter for a putt: green-zone half-widths, where to aim, needle speed and shake
 // zones are tighter from distance and nerves, wider for a good putter; `zoneScale` and `speedScale` (challenges) adjust them on top
 const puttZones = (putt) => {
-    const { feet, brk, putting = 75, pressure = 0.5, zoneScale = 1, speedScale = 1 } = putt;
+    const feet = Number.isFinite(putt.feet) ? putt.feet : 8;
+    const brk = Number.isFinite(putt.brk) ? putt.brk : 0;
+    const putting = Number.isFinite(putt.putting) ? putt.putting : 75;
+    const pressure = Number.isFinite(putt.pressure) ? putt.pressure : 0.5;
+    const zoneScale = putt.zoneScale != null ? putt.zoneScale : 1, speedScale = putt.speedScale != null ? putt.speedScale : 1;
     const comp = putt.composure || 75, pace = putt.pace != null ? putt.pace : putting;
     const nerves = pressure * clampN(1 + (80 - comp) * 0.045, 0.3, 2.2); // how big the moment feels to YOU
     return {
@@ -2076,7 +2080,10 @@ const readMakeP = (putt, sd = 0.08) => {
     return m / 300;
 };
 function ClutchPutt({ putt, onDone }) {
-    const { feet, brk, putting = 75, pressure = 0.5 } = putt;
+    const feet = Number.isFinite(putt.feet) ? putt.feet : 8;
+    const brk = Number.isFinite(putt.brk) ? putt.brk : 0; // missing break used to render a broken break label
+    const putting = Number.isFinite(putt.putting) ? putt.putting : 75;
+    const pressure = Number.isFinite(putt.pressure) ? putt.pressure : 0.5;
     const [phase, setPhase] = useState("read"); // read → line → pace → roll → done
     const [needle, setNeedle] = useState(0);
     const [lineTap, setLineTap] = useState(null);
@@ -2148,7 +2155,7 @@ function ClutchPutt({ putt, onDone }) {
     const verdict = made ? (feet >= 15 ? "DRAINED IT!" : "IN THE HOLE!")
         : Math.abs(lineErr) > 1 && Math.abs(paceErr) <= 1 ? (Math.abs(lineErr) < 1.6 ? "LIPPED OUT!" : lineErr < 0 ? "Pulled it left" : "Pushed it right")
             : paceErr < -1 ? "Left it short" : paceErr > 1 ? "Ran it by" : "Never had the line";
-    const breakTxt = brk === 0 ? "Dead straight" : `${Math.abs(brk)} cup${Math.abs(brk) !== 1 ? "s" : ""} ${brk > 0 ? "left-to-right" : "right-to-left"}`;
+    const breakTxt = !Number.isFinite(brk) || brk === 0 ? "Dead straight" : `${Math.abs(brk)} cup${Math.abs(brk) !== 1 ? "s" : ""} ${brk > 0 ? "left-to-right" : "right-to-left"}`;
     const meter = (aim, half, tapped, labels) => (React.createElement("div", { className: "relative h-9 rounded-md my-2 overflow-hidden", style: { background: "rgba(244,247,242,0.08)", border: "1px solid rgba(244,247,242,0.2)" } },
         React.createElement("div", { className: "absolute top-0 bottom-0", style: { left: `${(aim - half) * 100}%`, width: `${half * 200}%`, background: "rgba(159,217,139,0.35)", borderLeft: `1px solid ${C.green}`, borderRight: `1px solid ${C.green}` } }),
         React.createElement("div", { className: "absolute top-0 bottom-0", style: { left: `${aim * 100}%`, width: 1, background: C.green } }),
@@ -3962,7 +3969,10 @@ function GolfCareerSim() {
     }, []);
     // is the NEXT hole (index h) a clutch moment in this stroke-play round? returns the stakes line, or null
     // every clutch putt counts toward a career record, shown on the putt screen
-    const startClutch = (spec0) => { const ea = effAttrs(g) || {}; const spec = { ...spec0, putting: spec0.putting != null ? spec0.putting : ea.putting,
+    const startClutch = (spec0) => { const ea = effAttrs(g) || {}; const spec = { ...spec0,
+        feet: Number.isFinite(spec0.feet) ? spec0.feet : 8,
+        brk: Number.isFinite(spec0.brk) ? spec0.brk : rollBreak(),
+        putting: spec0.putting != null ? spec0.putting : ea.putting,
         pace: spec0.pace != null ? spec0.pace : ea.paceControl, composure: spec0.composure != null ? spec0.composure : ea.composure }; return setClutch({ ...spec, record: g.clutch || { m: 0, a: 0 }, onDone: (made) => {
             setG((pg) => { const c = pg.clutch || { m: 0, a: 0 }; return { ...pg, clutch: { m: c.m + (made ? 1 : 0), a: c.a + 1 } }; });
             spec.onDone(made);
