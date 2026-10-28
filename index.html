@@ -2580,9 +2580,29 @@ const liveMoves = (key, h, names) => {
     return (name, i) => { if (!prev) return 0; const j = prev.indexOf(name); return j < 0 ? 0 : j - i; };
 };
 const liveSlide = (mv) => mv ? { "--from": `${clampN(mv, -5, 5) * 18}px`, animation: "spRow .8s .15s cubic-bezier(.3,.7,.2,1) both", position: "relative", zIndex: 1 + Math.abs(mv), background: C.panel } : {};
-function BackTop({ onClick }) {
-    if (NAV.shown && NAV.root) return null; // the menu is the way around on section pages
-    return (React.createElement("button", { onClick: onClick, className: "mb-3 px-3 py-2 rounded-lg active:scale-95 flex items-center gap-1", style: { background: "transparent", color: C.chalk, fontFamily: UI, fontWeight: 600, fontSize: 14, border: "1px solid rgba(244,247,242,0.16)", minHeight: 40 } }, "\u2039 Back"));
+// Top-left way out. Always shown when placed (Josh looks at the top, not the bottom tab bar).
+// Styles: A text link (default), B round icon, C sticky bar, D floating pill. Pick with ?topnav=B etc.
+function BackTop({ onClick, label, confirm, title }) {
+    const go = () => {
+        if (confirm && !window.confirm(typeof confirm === "string" ? confirm : "Leave this screen?")) return;
+        onClick && onClick();
+    };
+    const text = label || "Back";
+    const sty = (typeof location !== "undefined" && /[?&]topnav=([A-Da-d])/.test(location.search)) ? RegExp.$1.toUpperCase() : (typeof window !== "undefined" && window.__TOPNAV_STYLE) || "A";
+    const safe = { paddingTop: "max(0px, env(safe-area-inset-top, 0px))" };
+    if (sty === "B") {
+        return React.createElement("button", { onClick: go, "aria-label": text, className: "mb-3 active:scale-95 flex items-center justify-center", style: { ...safe, width: 44, height: 44, borderRadius: 22, background: "#2E7D4F", color: C.gold, border: "1.5px solid rgba(232,195,90,0.7)", fontSize: 22, fontWeight: 700, lineHeight: 1 } }, "\u2190");
+    }
+    if (sty === "C") {
+        return React.createElement("div", { className: "mb-3 -mx-4 px-4 flex items-center gap-3", style: { ...safe, position: "sticky", top: 0, zIndex: 30, background: "rgba(11,35,24,0.96)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", borderBottom: "1px solid rgba(232,195,90,0.25)", minHeight: 48 } },
+            React.createElement("button", { onClick: go, "aria-label": text, className: "active:scale-95 flex items-center gap-1.5", style: { background: "none", border: 0, color: C.gold, fontFamily: UI, fontWeight: 700, fontSize: 15, minHeight: 44, padding: "0 4px" } }, "\u2039 ", text),
+            title && React.createElement("div", { className: "truncate", style: { fontFamily: FONT, fontSize: 14, color: C.chalk, letterSpacing: 1 } }, title));
+    }
+    if (sty === "D") {
+        return React.createElement("button", { onClick: go, "aria-label": text, className: "mb-3 active:scale-95", style: { ...safe, display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 16px", borderRadius: 999, background: "rgba(46,125,79,0.9)", color: C.gold, fontFamily: UI, fontWeight: 700, fontSize: 14, letterSpacing: "0.04em", border: "1.5px solid rgba(232,195,90,0.65)", boxShadow: "0 6px 18px rgba(0,0,0,0.35)", minHeight: 44 } }, "\u2190 ", text);
+    }
+    // A — small gold text link (default)
+    return React.createElement("button", { onClick: go, "aria-label": text, className: "mb-3 active:scale-95", style: { ...safe, background: "none", border: 0, color: C.gold, fontFamily: UI, fontWeight: 700, fontSize: 15, letterSpacing: "0.03em", minHeight: 44, padding: "8px 2px", textAlign: "left" } }, "\u2190 ", text);
 }
 // NAVIGATION. One menu for the whole career: a side menu on desktop, a tab bar on phones. NAV is refreshed every
 // render by the main component (like SCREEN_KEY) so the Shell can draw it without threading props everywhere.
@@ -7108,7 +7128,7 @@ function GolfCareerSim() {
     if (screen === "chtest" && CH_TEST) {
         const by = chLoad().by || {};
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
             React.createElement("div", { className: "text-center mb-3" },
                 React.createElement(ChResume, { onResume: resumeCh }),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.blue, lineHeight: 1 } }, "🧪 CHALLENGE TEST MODE"),
@@ -7172,7 +7192,7 @@ function GolfCareerSim() {
         };
         NAV.wide = "page";
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
             React.createElement("div", { className: "text-center mb-3" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, "SUNDAY PINS"),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk, lineHeight: 1 } }, "🏆 CHALLENGES"),
@@ -7323,7 +7343,8 @@ function GolfCareerSim() {
                 try { await navigator.clipboard.writeText(shareText); track("share/" + tag + "/copy"); window.alert("Result copied. Paste it anywhere!"); } catch (e) { window.alert(shareText); }
             };
             return (React.createElement(Shell, null,
-                React.createElement("div", { className: "pt-6 text-center" },
+                React.createElement(BackTop, { label: "Home", title: "Result", onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
+                React.createElement("div", { className: "pt-2 text-center" },
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, `${sc.year} ${sc.event.toUpperCase()}`),
                     React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: r.won ? C.gold : C.chalk, lineHeight: 1.05 } }, chHeadline(sc, r.won, r)),
                     React.createElement("p", { className: "text-sm mt-1", style: { color: C.chalk } }, `${sc.you.name} finishes at ${thruPar(r.toPar)}${r.playoff ? " after a playoff" : ""}. ${r.won ? (r.playoff ? "Won in sudden death." : `Won by ${r.margin}.`) : r.margin === 0 || r.playoff ? "Lost in the playoff." : `${-r.margin} short.`}`),
@@ -7360,7 +7381,7 @@ function GolfCareerSim() {
             const rec = (chLoad().by || {})[sc.id] || {};
             const lead = board.filter((r) => !r.you)[0], gap = me.toPar - lead.toPar;
             return (React.createElement(Shell, null,
-                React.createElement(BackTop, { onClick: () => setScreen(chBack) }),
+                React.createElement(BackTop, { label: "Back", title: sc.event, onClick: () => setScreen(chBack) }),
                 React.createElement("div", { className: "text-center" },
                     React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, `★ ${sc.year} ${sc.event.toUpperCase()} ★${sc.tier ? `  ${CH_TIER_LABEL[sc.tier]}` : ""}`),
                     React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1.05 } }, `"${sc.title}"`),
@@ -7409,7 +7430,7 @@ function GolfCareerSim() {
         const choices = chShotChoices(h, hole);
         const nowFlags = chStars(sc, chNow(board)), nowMedal = nowFlags.filter(Boolean).length;
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen(chBack) }),
+            React.createElement(BackTop, { label: "Back", confirm: "Leave this challenge? You can resume it from the challenges list.", onClick: () => setScreen(chBack) }),
             React.createElement("div", { className: "text-center" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, `★ ${sc.year} ${sc.event.toUpperCase()} ★`),
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 20, color: C.chalk } }, `${sc.you.name} · "${sc.title}"`),
@@ -7491,7 +7512,7 @@ function GolfCareerSim() {
         const changed = Object.keys(ov).length;
         const editing = Object.keys(namesEdits).length;
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen(g && g.pro ? "hub" : "landing") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\u270F\uFE0F PLAYER NAMES"),
             React.createElement("p", { className: "text-xs mb-2", style: { color: C.muted } }, "Rename any player, legend, event or course, or import a names file that renames them all at once. Your careers and Hall of Fame follow the new names."),
             React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2" },
@@ -7533,7 +7554,7 @@ function GolfCareerSim() {
         // the top 10, plus each of your pros where they really rank
         const allTime = ranked.filter((r) => r.rank <= 10 || r.you).slice(0, 16);
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen(g && g.pro ? (g.retired ? "retired" : "landing") : "landing") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen(g && g.pro ? (g.retired ? "retired" : "landing") : "landing") }),
             React.createElement("div", { className: "text-center mb-3" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 4, color: C.gold } }, "SUNDAY PINS"),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 34, color: C.chalk, lineHeight: 1 } }, "\uD83C\uDFDB\uFE0F HALL OF FAME"),
@@ -7737,7 +7758,7 @@ function GolfCareerSim() {
             React.createElement("span", { className: "shrink-0", style: { color: C.gold, width: 108, fontSize: 11 } }, k),
             React.createElement("span", { style: { color: C.chalk } }, v))));
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk, lineHeight: 1 } }, "PLAYER GUIDE"),
             React.createElement("p", { className: "text-xs mb-3 mt-1", style: { color: C.muted } }, "Everything the game doesn't stop to explain."),
             sec("", "FINDING YOUR WAY", rows([
@@ -8222,7 +8243,7 @@ function GolfCareerSim() {
         }
         const nextRC = g.season % 2 === 0 ? `END OF THIS SEASON` : `END OF SEASON ${g.season + 1}`;
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "TEAM CUPS HQ"),
             (() => {
                 const cupNo = g.ryderCupNo || 0;
@@ -8613,7 +8634,7 @@ function GolfCareerSim() {
         const markAllRead = async () => { const st = { ...g, mailbox: mail.map((m) => ({ ...m, read: true })) }; setG(st); await save(st); };
         const iconFor = (k) => k === "result" ? "🏆" : k === "turnover" ? "🔄" : k === "transfer" ? "💰" : k === "caddie" ? "🎒" : k === "rival" ? "⚔️" : k === "sponsor" ? "💼" : "📩";
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: async () => { await markAllRead(); setScreen("hub"); } }),
+            React.createElement(BackTop, { label: "Home", onClick: async () => { await markAllRead(); setScreen("hub"); } }),
             React.createElement("div", { className: "flex justify-between items-baseline mb-2" },
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 26, color: C.chalk } }, "\uD83D\uDCEC MAILBOX"),
                 mail.some((m) => !m.read) && React.createElement("button", { onClick: markAllRead, className: "text-xs", style: { color: C.blue } }, "mark all read")),
@@ -8803,7 +8824,7 @@ function GolfCareerSim() {
         const mt = myLeagueTeam();
         if (!mt) {
             return React.createElement(Shell, null,
-                React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+                React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
                 React.createElement("p", { style: { color: C.muted }, className: "text-sm" }, "Sign for a club first to scout the market."));
         }
         const squadOvrs = mt.members.map((mn) => mn.includes("(YOU)") ? calcOverall(g.pro.attrs) : ovrOf(mn));
@@ -8831,7 +8852,7 @@ function GolfCareerSim() {
         };
         const nations = ["any", ...Array.from(new Set(allLeaguePlayers().map((p) => p.country))).sort()];
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 24, color: C.chalk }, className: "mb-1" }, "\uD83D\uDD0D SCOUTING"),
             React.createElement("p", { className: "text-[11px] mb-2", style: { color: C.muted } },
                 "Scout players to reveal their potential. You can sign players rated up to your squad average (",
@@ -8907,7 +8928,7 @@ function GolfCareerSim() {
         const mt = myLeagueTeam();
         if (!mt) {
             return React.createElement(Shell, null,
-                React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+                React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
                 React.createElement("p", { style: { color: C.muted }, className: "text-sm" }, "Sign for a club first to access the transfer market."));
         }
         const budget = Math.round((mt.teamPot || mt.budget || 0) * 10) / 10;
@@ -8936,7 +8957,7 @@ function GolfCareerSim() {
                 }))));
         }
         return (React.createElement(Shell, null,
-            !g.mustReplace && React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            !g.mustReplace && React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("div", { className: "mb-2" },
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 26, color: C.chalk } }, "\uD83D\uDCB0 TRANSFER MARKET"),
                 React.createElement("div", { className: "flex justify-between items-baseline" },
@@ -9128,7 +9149,7 @@ function GolfCareerSim() {
             .sort((a, b) => b.pts - a.pts || b.ovr - a.ovr);
         const myRank = mt ? table.findIndex((t) => t.id === mt.id) + 1 : 0;
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.chalk } },
                 "\uD83C\uDFDF\uFE0F ",
                 divName(myDiv)),
@@ -9204,7 +9225,7 @@ function GolfCareerSim() {
         const mt = myTeam();
         const myRank = table.findIndex((t) => t.id === (mt === null || mt === void 0 ? void 0 : mt.id)) + 1;
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83E\uDD1D TEAM TOUR"),
             mt && (React.createElement("div", { className: "p-3 rounded-xl mb-3", style: { background: `linear-gradient(160deg, ${C.card}, ${C.panel})`, border: `1.5px solid ${C.gold}` } },
                 React.createElement("div", { className: "flex justify-between items-baseline" },
@@ -9334,7 +9355,7 @@ function GolfCareerSim() {
             { name: g.pro.name, ovr: calcOverall(effAttrs(g)), age: (_l = g.pro.age) !== null && _l !== void 0 ? _l : 22, country: NATION_CODE[g.pro.nation] || "INT", isYou: true }]
             .sort((a, b) => b.ovr - a.ovr);
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83C\uDF10 WORLD RANKINGS"),
             React.createElement("div", { className: "flex gap-1 mb-2" }, [["pts", "RANKING POINTS"], ["ovr", "OVERALL RATINGS"]].map(([k, l]) => (React.createElement("button", { key: k, onClick: () => setWorldTab(k), className: "px-3 py-1.5 rounded-md", style: { background: worldTab === k ? C.gold : C.panel, color: worldTab === k ? C.bg : C.muted, fontFamily: FONT, fontSize: 13, letterSpacing: 1 } }, l)))),
             worldTab === "ovr" && (React.createElement(React.Fragment, null,
@@ -9381,7 +9402,7 @@ function GolfCareerSim() {
     // ---------- schedule & past winners ----------
     if (screen === "schedule") {
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } },
                 "\uD83D\uDCC5 SEASON ",
                 g.season,
@@ -9448,7 +9469,7 @@ function GolfCareerSim() {
     }
     if (false) {
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\u26A1 TRAINING"),
             React.createElement("p", { className: "text-xs mb-1", style: { color: C.muted } }, "Spend Tour XP on permanent gains. Earn it by playing well: cut made +1 \u00B7 top 10 +3 \u00B7 win +10 \u00B7 major win +15 extra \u00B7 FedEx Cup +20 \u00B7 team cup +5 (+8 for winning it)."),
             React.createElement("p", { className: "mb-3", style: { fontFamily: FONT, fontSize: 22, color: C.gold } },
@@ -9475,7 +9496,7 @@ function GolfCareerSim() {
     if (screen === "coaches") {
         const bank = (_m = g.bank) !== null && _m !== void 0 ? _m : g.myStats.careerMoney;
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83E\uDDD1\u200D\uD83C\uDFEB COACHING STAFF"),
             React.createElement("p", { className: "text-xs mb-1", style: { color: C.muted } }, "Put your prize money to work. Hire ONE coach per season \u2014 specialists deliver a permanent +2 in their area when the season ends; the elite programme lifts everything."),
             React.createElement("p", { className: "mb-3", style: { fontFamily: FONT, fontSize: 22, color: C.green } },
@@ -9529,7 +9550,7 @@ function GolfCareerSim() {
         };
         const totalMods = brandBag ? brandBag.mods : equipMods(equip);
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83C\uDFCC\uFE0F EQUIPMENT"),
             React.createElement("p", { className: "text-xs mb-1", style: { color: C.muted } }, "Every piece is fitted for one season and paid from your winnings. At the end of the season your bag goes back to stock, so a bad year means a cheaper bag. Almost everything is a trade-off, \u2605 tour-issue gear included."),
             React.createElement("p", { className: "mb-2", style: { fontFamily: FONT, fontSize: 20, color: C.green } },
@@ -9926,7 +9947,7 @@ function GolfCareerSim() {
         const myRank = myNationPlayers.findIndex((p) => p.isYou) + 1;
         const myNationInField = table.some((n) => n.code === myCode);
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("div", { className: "text-center mb-2" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } }, "\uD83C\uDF0D THE GLOBAL CUP"),
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 26, color: C.chalk } }, "WORLD CUP QUALIFYING"),
@@ -9974,7 +9995,7 @@ function GolfCareerSim() {
         const xp = g.xp || 0;
         const cur = effAttrs(g);
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("div", { className: "mb-2" },
                 React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83D\uDCAA DEVELOP"),
                 React.createElement("div", { className: "flex justify-between items-baseline" },
@@ -10025,7 +10046,7 @@ function GolfCareerSim() {
         const visible = BADGES.filter((b) => !isTeamBadge(b.id) || g.mode === "team" || g.mode === "league");
         const earnedCount = visible.filter((b) => have.includes(b.id)).length;
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83C\uDF96\uFE0F ACHIEVEMENTS"),
             React.createElement("p", { className: "text-xs mb-3", style: { color: C.muted } },
                 earnedCount,
@@ -10070,7 +10091,7 @@ function GolfCareerSim() {
                 w.seasons.map((s) => `Season ${s}`).join(" · "))));
         const empty = wins.length === 0 && g.myStats.fedexTitles === 0 && g.myStats.rc.teamWins === 0 && (((_q = g.myStats.pc) === null || _q === void 0 ? void 0 : _q.teamWins) || 0) === 0;
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk } }, "\uD83C\uDFC6 TROPHY CABINET"),
             React.createElement("p", { className: "text-xs mb-3", style: { color: C.muted } },
                 g.pro.name,
@@ -10205,7 +10226,7 @@ function GolfCareerSim() {
             rows = eraE;
         rows.sort((a, b) => b[1] - a[1]);
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "RECORDS"),
             React.createElement("p", { className: "text-xs mb-2", style: { color: C.muted } }, "All-time boards = real PGA Tour history PLUS wins from your era (active pros add to their legend totals). Era boards track your timeline only."),
             React.createElement("div", { className: "flex gap-1 mb-3 flex-wrap" }, tabs.map(([k, l]) => (React.createElement("button", { key: k, onClick: () => setRecTab(k), className: "px-2 py-1.5 rounded-md", style: { background: recTab === k ? C.gold : C.panel, color: recTab === k ? C.bg : C.muted, fontFamily: FONT, fontSize: 12, letterSpacing: 1 } }, l)))),
@@ -10238,7 +10259,7 @@ function GolfCareerSim() {
             rows.push(["Presidents Cups played", ((_s = m.pc) === null || _s === void 0 ? void 0 : _s.apps) || 0], ["Presidents Cup record", `${((_t = m.pc) === null || _t === void 0 ? void 0 : _t.w) || 0}-${((_u = m.pc) === null || _u === void 0 ? void 0 : _u.l) || 0}-${((_v = m.pc) === null || _v === void 0 ? void 0 : _v.h) || 0}`], ["Presidents Cup team wins", ((_w = m.pc) === null || _w === void 0 ? void 0 : _w.teamWins) || 0]);
         rows.push(["Bank (spendable)", fmtMoney((_x = g.bank) !== null && _x !== void 0 ? _x : m.careerMoney)]);
         return (React.createElement(Shell, null,
-            React.createElement(BackTop, { onClick: () => setScreen("hub") }),
+            React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, g.pro.name.toUpperCase(), goldFlag && React.createElement(GoldFlag, { size: 24 })),
             React.createElement("p", { className: "text-xs mb-3", style: { color: C.muted } },
                 g.pro.nation,
@@ -10914,6 +10935,7 @@ function GolfCareerSim() {
         }
         const myRes = results.finishers.find((r) => r.isYou);
         return (React.createElement(Shell, null,
+            React.createElement(BackTop, { label: "Home", title: "Final", onClick: () => setScreen("hub") }),
             React.createElement("div", { className: "text-center" },
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } },
                     "FINAL \u00B7 ",
