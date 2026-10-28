@@ -1,0 +1,19 @@
+{
+  "mid": {
+    "avg": 4.37,
+    "med": 4,
+    "best": -2,
+    "worst": 13,
+    "p10": 1,
+    "p90": 8
+  },
+  "elite": {
+    "avg": -0.77,
+    "med": -1,
+    "best": -8,
+    "worst": 7,
+    "p10": -4,
+    "p90": 3
+  },
+  "puttNote": "auto at 0.85*tour make curve; attack/safe mix ~45/55"
+}

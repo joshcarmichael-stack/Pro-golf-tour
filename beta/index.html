@@ -3165,43 +3165,44 @@ const chOutcomes = (a, hole, h, cid, adj) => {
         const left = Math.max(20, d - (shotPlan(a, [4, 9999]).drive - (drv ? 0 : CH_TUNE.ironShort) + ri(-8, 8)));
         const pF = clampN(0.6 + (DA - 80) * 0.012 + (f.fw != null ? (f.fw - 35) * 0.005 : 0) + (drv ? -CH_TUNE.drvFw : CH_TUNE.ironFw) - (drv && Math.abs(f.d || 0) >= 15 ? 0.05 : 0), 0.2, 0.93);
         const m = 1 - pF, pW = f.w === 1 || f.w === 2 ? m * (drv ? 0.3 : 0.12) : 0, pT = m * (f.t ? 0.25 : 0.14) * (drv ? 1.3 : 0.7), pB = m * 0.2;
-        add(pF, left <= 40 ? { lie: "fringe", d: left, txt: "Drove it all the way up by the green!" } : { lie: "fairway", d: left, txt: `Found the fairway, ${left} yds in.` });
-        add(m - pW - pT - pB, { lie: "rough", d: left + 8, txt: `Missed the fairway. Rough, ${left + 8} yds in.` });
-        add(pB, { lie: "bunker", d: left + 12, txt: `In a fairway bunker, ${left + 12} yds in.` });
-        add(pT, { lie: "trees", d: left + 15, txt: `Into the trees, ${left + 15} yds out.` });
-        add(pW, { lie: "rough", d: left + 25, pen: 1, txt: `Into the water! Penalty drop, ${left + 25} yds in.` });
+        add(pF, left <= 40 ? { slice: "longfw", lie: "fringe", d: left, txt: "Drove it all the way up by the green!" } : { slice: "fairway", lie: "fairway", d: left, txt: `Found the fairway, ${left} yds in.` });
+        add(m - pW - pT - pB, { slice: "rough", lie: "rough", d: left + 8, txt: `Missed the fairway. Rough, ${left + 8} yds in.` });
+        add(pB, { slice: "fbunker", lie: "bunker", d: left + 12, txt: `In a fairway bunker, ${left + 12} yds in.` });
+        add(pT, { slice: "trees", lie: "trees", d: left + 15, txt: `Into the trees, ${left + 15} yds out.` });
+        add(pW, { slice: "water", lie: "rough", d: left + 25, pen: 1, txt: `Into the water! Penalty drop, ${left + 25} yds in.` });
         return out;
     }
     if (cid === "layup" || cid === "punch") {
         const to = cid === "layup" ? ri(90, 110) : clampN(d - 45, 70, 220);
         const pF = cid === "layup" ? clampN(0.88 + (chSk(a, "shortApproach", adj) - 80) * 0.004, 0.75, 0.97) : 0.85;
-        add(pF, { lie: "fairway", d: to, txt: cid === "layup" ? `Laid up to ${to} yds.` : `Punched out to the fairway, ${to} yds in.` });
-        add(1 - pF, { lie: "rough", d: to + 5, txt: `${cid === "layup" ? "Lay-up" : "Punch-out"} ran into the rough, ${to + 5} yds in.` });
+        add(pF, { slice: "fairway", lie: "fairway", d: to, txt: cid === "layup" ? `Laid up to ${to} yds.` : `Punched out to the fairway, ${to} yds in.` });
+        add(1 - pF, { slice: "rough", lie: "rough", d: to + 5, txt: `${cid === "layup" ? "Lay-up" : "Punch-out"} ran into the rough, ${to + 5} yds in.` });
         return out;
     }
     if (cid === "long") {
         const to = Math.max(40, Math.round(d - (245 + ((a.drivingDistance || 82) - 80) * 1.2)));
         const pF = clampN(0.6 + (chSk(a, "longApproach", adj) - 80) * 0.01, 0.35, 0.8);
-        add(pF, { lie: to <= 40 ? "fringe" : "fairway", d: to, txt: `Great strike, ${to} yds left.` });
-        add(0.9 - pF, { lie: "rough", d: to + 10, txt: `In the rough, ${to + 10} yds left.` });
-        add(0.1, { lie: "bunker", d: to + 15, txt: `Found a fairway bunker, ${to + 15} yds left.` });
+        add(pF, { slice: to <= 40 ? "longfw" : "fairway", lie: to <= 40 ? "fringe" : "fairway", d: to, txt: `Great strike, ${to} yds left.` });
+        add(0.9 - pF, { slice: "rough", lie: "rough", d: to + 10, txt: `In the rough, ${to + 10} yds left.` });
+        add(0.1, { slice: "fbunker", lie: "bunker", d: to + 15, txt: `Found a fairway bunker, ${to + 15} yds left.` });
         return out;
     }
     if (cid === "hero") {
         const pG = clampN(0.22 + (chSk(a, "recovery", adj) - 80) * 0.01, 0.08, 0.4) * (d > 200 ? 0.6 : 1);
-        add(pG, { green: (d * CH_TUNE.prox + 8) * 1.5, txt: "Through the gap and onto the green!" });
-        add(0.3, { lie: "fringe", d: 15, txt: "Squeezed it out to just short of the green." });
-        add(0.7 - pG, { lie: "rough", d: Math.max(30, d - 40), txt: `Clipped a branch. In the rough, ${Math.max(30, d - 40)} yds out.` });
+        add(pG, { slice: "green", green: (d * CH_TUNE.prox + 8) * 1.5, txt: "Through the gap and onto the green!" });
+        add(0.3, { slice: "fringe", lie: "fringe", d: 15, txt: "Squeezed it out to just short of the green." });
+        add(0.7 - pG, { slice: "rough", lie: "rough", d: Math.max(30, d - 40), txt: `Clipped a branch. In the rough, ${Math.max(30, d - 40)} yds out.` });
         return out;
     }
     if (chAround(L)) {
         const bk = L === "gbunker", C = chSk(a, bk ? "bunker" : "chipping", adj), hard = { fringe: 1, gbunker: 1.3, deep: 1.6 }[L], go = cid === "hole";
         const pIn = clampN((go ? CH_TUNE.chipIn : CH_TUNE.chipIn * 0.3) * (1 + (C - 80) * 0.04) / hard, 0.003, 0.14);
         const pStay = bk ? clampN((go ? 0.07 : 0.025) * (1 - (C - 80) * 0.03), 0.005, 0.12) : 0, pPast = go ? 0.25 : 0;
-        add(pIn, { holed: true, txt: bk ? "🎯 HOLED IT FROM THE BUNKER!" : "🎯 CHIPPED IN!" });
-        add(pStay, { lie: "gbunker", d: 15, txt: "Left it in the bunker!" });
-        add(pPast, { green: 20, txt: "Came out hot and ran well past." });
-        add(1 - pIn - pStay - pPast, { green: (go ? CH_TUNE.chip * 0.9 : CH_TUNE.chip) * hard * clampN(1 - (C - 80) * 0.02, 0.6, 1.4) });
+        add(pIn, { slice: "holed", holed: true, txt: bk ? "🎯 HOLED IT FROM THE BUNKER!" : "🎯 CHIPPED IN!" });
+        add(pStay, { slice: "stay", lie: "gbunker", d: 15, txt: "Left it in the bunker!" });
+        add(pPast, { slice: "past", green: 20, txt: "Came out hot and ran well past." });
+        { const gMean = (go ? CH_TUNE.chip * 0.9 : CH_TUNE.chip) * hard * clampN(1 - (C - 80) * 0.02, 0.6, 1.4);
+          add(1 - pIn - pStay - pPast, { slice: gMean <= 8 ? "close" : "green", green: gMean }); }
         return out;
     }
     // an approach: GO FOR IT (at the flag) or PLAY SAFE (middle of the green). The outcome is a wheel of slices the
@@ -3248,9 +3249,58 @@ function ChGolferOdds({ ch }) {
 }
 // the wheel's slices: label, colour
 const CH_SLICE = { holed: ["🎯", "Hole it", "#F4D35E"], close: ["🔥", "Close", "#8FD16A"], green: ["🟢", "On the green", "#3F8A57"], fringe: ["🟧", "Just off", "#C9A46A"],
-    deep: ["😬", "Short-sided", "#9A6B4F"], bunker: ["⛱️", "Bunker", "#E6D3A3"], water: ["💧", "Water", "#4A8FD6"] };
+    deep: ["😬", "Short-sided", "#9A6B4F"], bunker: ["⛱️", "Bunker", "#E6D3A3"], water: ["💧", "Water", "#4A8FD6"],
+    fairway: ["🟩", "Fairway", "#3F8A57"], longfw: ["🚀", "Bombed it", "#8FD16A"], rough: ["🌾", "Rough", "#9A6B4F"],
+    trees: ["🌲", "Trees", "#5A7A4A"], fbunker: ["⛱️", "Fwy bunker", "#E6D3A3"], stay: ["😬", "Still in", "#B84A33"], past: ["💨", "Ran past", "#C9A46A"] };
 const chIsWheel = (o) => o.length > 0 && o.every((x) => x.slice);
 const chPct = (p) => p * 100 < 1 ? (p * 100).toFixed(1) : String(Math.round(p * 100));
+// BETA PROTOTYPE: wheel presentation mode (odds identical in every mode)
+const WHEEL_MODE_KEY = "sunday-pins-wheel-mode";
+const WHEEL_MODES = {
+    watch: { id: "watch", label: "Watch every spin", short: "Watch", desc: "The wheel spins on every shot. Best for feeling the new design." },
+    key: { id: "key", label: "Key shots only", short: "Key shots", desc: "You spin the big moments; routine shots resolve in the background." },
+    quick: { id: "quick", label: "Quick play", short: "Quick", desc: "You still pick attack or safe; the wheel resolves instantly and you just see the outcome." },
+};
+const wheelModeOf = () => { try { const v = localStorage.getItem(WHEEL_MODE_KEY); return WHEEL_MODES[v] ? v : "watch"; } catch (e) { return "watch"; } };
+const setWheelMode = (k) => { try { localStorage.setItem(WHEEL_MODE_KEY, k); } catch (e) { } };
+const chIsKeyShot = (hole, h, press, left, lead, playoff) => {
+    if (press > 0 || playoff) return true;
+    if (left != null && left <= 3 && lead != null && Math.abs(lead) <= 3) return true;
+    if (h.lie === "trees" || h.lie === "gbunker" || h.lie === "deep" || h.lie === "bunker") return true;
+    if (h.lie === "tee" && hole[0] > 3) { const f = hole[4] || {}; return !!(f.w === 1 || f.w === 2 || f.t); }
+    if (hole[0] === 5 && h.strokes === 1 && h.d > 200 && h.d <= 290) return true;
+    if (h.d <= 225 && !(h.lie === "tee" && hole[0] > 3)) return true;
+    return false;
+};
+const chShouldSpin = (hole, h, press, left, lead, playoff) => {
+    const mode = wheelModeOf();
+    if (mode === "quick") return false;
+    if (mode === "watch") return true;
+    return chIsKeyShot(hole, h, press, left, lead, playoff);
+};
+function WheelModePicker({ compact }) {
+    const [v, setV] = useState(wheelModeOf());
+    const pick = (k) => { setWheelMode(k); setV(k); };
+    return React.createElement("div", { className: compact ? "mt-2" : "mt-3", style: { color: C.muted } },
+        React.createElement("div", { className: "text-xs mb-1" }, "Shot wheel"),
+        React.createElement("div", { className: "flex rounded-full p-0.5 flex-wrap", style: { background: "rgba(244,247,242,0.06)" }, role: "group", "aria-label": "Shot wheel mode" },
+            Object.values(WHEEL_MODES).map((m) => React.createElement("button", { key: m.id, onClick: () => pick(m.id), "aria-pressed": v === m.id, className: "rounded-full px-2.5 py-1.5", style: { background: v === m.id ? C.gold : "transparent", color: v === m.id ? "#1A1405" : C.chalk, fontWeight: 600, fontSize: 12, minHeight: 34 } }, m.short))),
+        !compact && React.createElement("div", { className: "text-[11px] mt-1", style: { color: C.muted } }, (WHEEL_MODES[v] || WHEEL_MODES.watch).desc));
+}
+function QuickShotFeed({ rs, label, onDone }) {
+    const done = useRef(false);
+    const finish = () => { if (done.current) return; done.current = true; onDone(); };
+    useEffect(() => { const tm = setTimeout(finish, 900); return () => clearTimeout(tm); }, []);
+    const hit = rs.wheel ? rs.wheel.o[rs.wheel.i] : null;
+    const slice = hit && CH_SLICE[hit.s];
+    const line = (rs.txt || (rs.log && rs.log[rs.log.length - 1]) || "Shot played.");
+    return React.createElement("div", { onClick: finish, className: "p-3 rounded-xl mb-2 text-center select-none", style: { background: C.card, cursor: "pointer", border: "1px solid rgba(232,195,90,0.35)" } },
+        React.createElement("div", { style: { fontFamily: FONT, fontSize: 12, color: C.gold, letterSpacing: 2 } }, label || "SHOT RESULT"),
+        slice && React.createElement("div", { style: { fontSize: 36, lineHeight: 1.1, margin: "8px 0 4px" } }, slice[0]),
+        slice && React.createElement("div", { style: { fontFamily: FONT, fontSize: 18, color: C.chalk } }, slice[1]),
+        React.createElement("p", { className: "text-sm mt-1", style: { color: C.chalk } }, line),
+        React.createElement("div", { className: "text-[11px] mt-1", style: { color: C.muted } }, "Tap to continue"));
+}
 // THE WHEEL: the approach's slices spin and land on what happened (about 2 seconds; tap to skip, or switch to fast)
 const WHEEL_FAST_KEY = "sunday-pins-wheel-fast";
 function ShotWheel({ wheel, label, onDone }) {
@@ -3283,7 +3333,7 @@ function ShotWheel({ wheel, label, onDone }) {
 }
 // the chances worth showing on each button
 const chShotOdds = (a, hole, h, cid, adj) => {
-    { const o0 = chOutcomes(a, hole, h, cid, adj); if (chIsWheel(o0)) return o0.map((x) => [`${CH_SLICE[x.slice][0]} ${CH_SLICE[x.slice][1]}${x.ft ? ` ${x.ft[0]}-${x.ft[1]}ft` : ""}`, chPct(x.p)]); }
+    { const o0 = chOutcomes(a, hole, h, cid, adj); if (chIsWheel(o0)) return o0.slice().sort((a, b) => b.p - a.p).filter((x) => x.p >= 0.02).slice(0, 4).map((x) => [`${CH_SLICE[x.slice][0]} ${CH_SLICE[x.slice][1]}${x.ft ? ` ${x.ft[0]}-${x.ft[1]}ft` : ""}`, chPct(x.p)]); }
     const o = chOutcomes(a, hole, h, cid, adj), P = (fn) => Math.round(100 * o.filter(fn).reduce((t, x) => t + x.p, 0));
     const near = (ft) => Math.round(100 * o.filter((x) => x.green != null).reduce((t, x) => t + x.p * clampN((ft / x.green - 0.3) / 1.4, 0, 1), 0));
     const f = hole[4] || {};
@@ -3779,6 +3829,7 @@ function GolfCareerSim() {
     const [clutch, setClutch] = useState(null); // a live clutch-putt moment: putt spec + onDone(made)
     const [lastChoiceResult, setLastChoiceResult] = useState(null); // { hole, swing, score, par, label } — brief feedback after a shot choice
     const [storyHole, setStoryHole] = useState(null);
+    const [shotHole, setShotHole] = useState(null); // BETA: { holeIdx, h, spin, putt, attrs, adj }
     const [fullBoard, setFullBoard] = useState(false);
     const [ryder, setRyder] = useState(null);
     const [recTab, setRecTab] = useState("wins");
@@ -5125,36 +5176,59 @@ function GolfCareerSim() {
     const beginRound = () => setTour({ ...tour, live: { ...genHolesFor(tour, tour.round), revealed: 0 } });
     const advanceHoles = (n) => setTour((t) => ({ ...t, live: { ...t.live, revealed: Math.min(18, t.live.revealed + n) } }));
     // resolve the NEXT hole using the player's chosen option, overwriting the pre-computed baseline for just that hole
+    const commitCareerHole = (hIdx, sc, label, swing, puttNote, storyLines) => {
+        const meIdx = tour.scores.findIndex((s) => s.isYou);
+        const hole = tour.course.holes[hIdx];
+        const newHoles = tour.live.holes.map((row, i) => (i === meIdx ? row.map((v, j) => (j === hIdx ? sc : v)) : row));
+        const lines = storyLines && storyLines.length ? storyLines : shotStory(hole, sc, effAttrs(g));
+        const newStories = tour.live.stories ? tour.live.stories.map((s, j) => (j === hIdx ? [...lines, ...(puttNote ? [puttNote] : [])] : s)) : tour.live.stories;
+        setShotHole(null);
+        setTour({ ...tour, live: { ...tour.live, holes: newHoles, stories: newStories } });
+        setLastChoiceResult({ hole: hIdx, swing: swing || "even", score: sc, par: hole[0], label: label || "Shot by shot", putt: puttNote });
+        advanceHoles(1);
+    };
+    const beginShotHole = () => {
+        const meIdx = tour.scores.findIndex((s) => s.isYou);
+        const me = tour.scores[meIdx];
+        const hIdx = tour.live.revealed;
+        const hole = tour.course.holes[hIdx];
+        const prevRow = tour.live.holes[meIdx];
+        const lastOver = hIdx > 0 && prevRow ? prevRow[hIdx - 1] - tour.course.holes[hIdx - 1][0] : 0;
+        const adj = wxAdjFor(tour.live.wx, me.wx) + (me.extra || 0) + bounceAdj(effAttrs(g), lastOver);
+        const attrs = { ...effAttrs(g) };
+        const left = 18 - hIdx;
+        if (tour.round === 3 && left <= 4) {
+            const myTo = (() => { let x = 0; for (let i = 0; i < hIdx; i++) x += tour.live.holes[meIdx][i] - tour.course.holes[i][0]; return x; })();
+            let best = 99; tour.scores.forEach((s, i) => { if (s.isYou || s.cut) return; let x = 0; for (let j = 0; j < hIdx; j++) x += tour.live.holes[i][j] - tour.course.holes[j][0]; if (x < best) best = x; });
+            const lead = best - myTo;
+            const k = chPressK(lead, left, attrs.composure, false);
+            if (k > 0) attrs.press = k;
+        }
+        setAutoPlay(false);
+        setShotHole({ holeIdx: hIdx, h: { strokes: 0, d: hole[1], lie: "tee", log: [] }, spin: null, putt: null, attrs, adj });
+    };
     const chooseHole = (choiceId) => {
+        // used by AUTO / keyboard: old one-call-per-hole resolve
         const meIdx = tour.scores.findIndex((s) => s.isYou);
         const me = tour.scores[meIdx];
         const h = tour.live.revealed;
         const hole = tour.course.holes[h];
-        const choice = HOLE_CHOICES(hole).find((c) => c.id === choiceId);
+        const choice = HOLE_CHOICES(hole).find((c) => c.id === choiceId) || HOLE_CHOICES(hole)[0];
         const prevRow = tour.live.holes[meIdx];
         const lastOver = h > 0 && prevRow ? prevRow[h - 1] - tour.course.holes[h - 1][0] : 0;
         const adj = wxAdjFor(tour.live.wx, me.wx) + (me.extra || 0) + bounceAdj(effAttrs(g), lastOver);
         const played = playHoleWithChoice(effAttrs(g), hole, choice, adj);
         const { swing } = played;
         const { score, chip } = withChipIn(effAttrs(g), hole, played.score);
-        const commit = (sc, putt) => {
-            const newHoles = tour.live.holes.map((row, i) => (i === meIdx ? row.map((v, j) => (j === h ? sc : v)) : row));
-            const newStories = tour.live.stories ? tour.live.stories.map((s, j) => (j === h ? (chip ? chipStory(hole, sc, chip) : [...shotStory(hole, sc, effAttrs(g)), ...(putt ? [putt] : [])]) : s)) : tour.live.stories;
-            setTour({ ...tour, live: { ...tour.live, holes: newHoles, stories: newStories } });
-            setLastChoiceResult({ hole: h, swing, score: sc, par: hole[0], label: choice.label, putt });
-            advanceHoles(1);
-        };
-        if (chip)
-            return commit(score, chip === "bunker" ? "\uD83C\uDFAF HOLED FROM THE BUNKER!" : "\uD83C\uDFAF CHIPPED IN!");
+        if (chip) return commitCareerHole(h, score, choice.label, swing, chip === "bunker" ? "🎯 HOLED FROM THE BUNKER!" : "🎯 CHIPPED IN!");
         const stakes = holedFromOffGreen(score, hole[0]) ? null : strokeClutchStakes(tour, h);
-        if (!stakes)
-            return commit(score);
+        if (!stakes) return commitCareerHole(h, score, choice.label, swing);
         const pt = strokePutt(score, hole[0]);
         const a = effAttrs(g);
         setAutoPlay(false);
-        startClutch({ ...pt, title: `${tour.ev.e.toUpperCase()} \u00B7 HOLE ${h + 1}`, stakes, putting: a.putting, composure: a.composure, pressure: tour.round === 3 ? 1 + (h - 13) * 0.1 : 0.6,
+        startClutch({ ...pt, title: `${tour.ev.e.toUpperCase()} · HOLE ${h + 1}`, stakes, putting: a.putting, composure: a.composure, pressure: tour.round === 3 ? 1 + (h - 13) * 0.1 : 0.6,
             makeTxt: `${scoreName(pt.target, hole[0])} on ${h + 1}.`, missTxt: `It's a ${scoreName(pt.miss, hole[0]).toLowerCase()} on ${h + 1}.`,
-            onDone: (made) => { setClutch(null); commit(made ? pt.target : pt.miss, `\u26F3 ${pt.feet}ft putt ${pt.label} \u2014 ${made ? "HOLED" : "missed"}`); } });
+            onDone: (made) => { setClutch(null); commitCareerHole(h, made ? pt.target : pt.miss, choice.label, swing, `⛳ ${pt.feet}ft putt ${pt.label} — ${made ? "HOLED" : "missed"}`); } });
     };
     const finishRound = (genOverride) => {
         setAutoPlay(false);
@@ -7291,8 +7365,14 @@ function GolfCareerSim() {
         const choose = (choiceId) => {
             const best = Math.min(...board.filter((r) => !r.you).map((r) => r.toPar));
             // one shot: it either leaves you somewhere new to decide again, finishes the hole, or puts you on the green
-            const rs = chShot(chYou(ch, playoffNow), hole, h, choiceId, adjNow);
-            if (rs.wheel) return setCh({ ...ch, spin: { rs, label: (choices.find((c) => c.id === choiceId) || {}).label || "" } });
+            const youNow = chYou(ch, playoffNow);
+            const rs = chShot(youNow, hole, h, choiceId, adjNow);
+            const label = (choices.find((c) => c.id === choiceId) || {}).label || "";
+            if (rs.wheel) {
+                const leadNow = (() => { const b = chBoard(ch), me = b.find((r) => r.you).toPar; return Math.min(...b.filter((r) => !r.you).map((r) => r.toPar)) - me; })();
+                const spinIt = chShouldSpin(hole, h, youNow.press || 0, chLeft(ch), leadNow, playoffNow);
+                return setCh({ ...ch, spin: { rs, label, quick: !spinIt } });
+            }
             applyShot(rs);
         };
         const applyShot = (rs) => {
@@ -7390,7 +7470,8 @@ function GolfCareerSim() {
                     React.createElement("p", { className: "text-xs text-center", style: { color: C.chalk } }, `No shots to choose today: just ${sc.oneputt.feet} feet for par, the fastest greens in golf and every nerve you have. Read it, aim it, strike it. Miss and it's a playoff, with one more putt to save it.`)),
                 !sc.oneputt && React.createElement("div", { className: "p-2.5 rounded-xl mb-3", style: { background: C.card } },
                     React.createElement("div", { className: "text-[10px] text-center", style: { color: C.gold, letterSpacing: 3, fontFamily: FONT } }, "⛳ EVERY SHOT IS YOUR CALL"),
-                    React.createElement("p", { className: "text-xs text-center", style: { color: C.chalk } }, `Driver or the safe club, flag or middle of the green, go for it or chip it close: you choose every shot, and a good drive sets up a birdie while the rough, sand and trees make it harder. Then you putt it in yourself. ${total <= 1 ? "On a final hole the green zone is tiny and the needle quick." : "The green zone starts big and the needle steady; the closer you get to the finish, the smaller the zone and the faster the needle."}`)),
+                    React.createElement("p", { className: "text-xs text-center", style: { color: C.chalk } }, `Driver or the safe club, flag or middle of the green, go for it or chip it close: you choose every shot, and a good drive sets up a birdie while the rough, sand and trees make it harder. Then you putt it in yourself. ${total <= 1 ? "On a final hole the green zone is tiny and the needle quick." : "The green zone starts big and the needle steady; the closer you get to the finish, the smaller the zone and the faster the needle."}`),
+                    React.createElement(WheelModePicker, { compact: true })),
                 React.createElement(Btn, { onClick: () => { track("challenge/tee/" + sc.id); setCh(sc.oneputt ? onePutt(ch, false) : { ...ch, phase: "play" }); } }, sc.oneputt ? "⛳ STEP ONTO THE GREEN" : "⛳ TEE IT UP")));
         }
         if (ch.pop) {
@@ -7433,7 +7514,9 @@ function GolfCareerSim() {
                 React.createElement("div", { className: "flex justify-between items-baseline mt-2 pt-2", style: { borderTop: "1px solid rgba(244,247,242,0.12)" } },
                     React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } }, `SHOT ${h.strokes + 1}`),
                     React.createElement("span", { className: "text-sm", style: { color: C.chalk } }, `${CH_LIE[h.lie]} · ${h.d} yds`))),
-            ch.spin ? React.createElement(ShotWheel, { key: `${holeIdx}-${h.strokes}-${ch.my.length}`, wheel: ch.spin.rs.wheel, label: ch.spin.label, onDone: () => applyShot(ch.spin.rs) }) :
+            ch.spin ? (ch.spin.quick
+                ? React.createElement(QuickShotFeed, { key: `q-${holeIdx}-${h.strokes}-${ch.my.length}`, rs: ch.spin.rs, label: ch.spin.label, onDone: () => applyShot(ch.spin.rs) })
+                : React.createElement(ShotWheel, { key: `${holeIdx}-${h.strokes}-${ch.my.length}`, wheel: ch.spin.rs.wheel, label: ch.spin.label, onDone: () => applyShot(ch.spin.rs) })) :
             (() => { const nd = chNeed(ch, playoffNow), pk = chYou(ch, playoffNow).press; return (nd || pk) && React.createElement("div", { className: "p-2 rounded-xl mb-2 text-center", style: { background: C.panel, border: `1px solid ${C.gold}` } },
                 nd && React.createElement("div", { className: "text-sm", style: { color: C.gold, fontFamily: FONT } }, nd),
                 pk && React.createElement("div", { className: "text-[11px]", style: { color: C.bogey } }, `😰 Leading down the stretch: the wheel tightens${ch.sc.collapse ? " (and you know what happened here)" : ""}.`)); })(),
@@ -10609,20 +10692,68 @@ function GolfCareerSim() {
                     !myCut && h < 18 && !autoPlay ? (React.createElement(React.Fragment, null,
                         lastChoiceResult && lastChoiceResult.hole === h - 1 && (React.createElement("div", { className: "text-center text-xs mb-2", style: { color: lastChoiceResult.swing === "good" ? C.green : lastChoiceResult.swing === "bad" ? C.red : C.muted } },
                             lastChoiceResult.label,
-                            " \u2192 ",
+                            " → ",
                             scoreName(lastChoiceResult.score, lastChoiceResult.par),
-                            lastChoiceResult.putt ? ` \u00B7 ${lastChoiceResult.putt.replace("\u26F3 ", "")}` : "",
+                            lastChoiceResult.putt ? ` · ${lastChoiceResult.putt.replace("⛳ ", "")}` : "",
                             lastChoiceResult.swing === "good" ? " — the gamble paid off!" : lastChoiceResult.swing === "bad" ? " — that one bit back." : "")),
-                        g.season === 1 && (g.myStats.events || 0) < 3 && React.createElement(Tip, { id: "hole-choice", title: "ONE CALL PER HOLE" },
-                            React.createElement("b", { style: { color: C.gold } }, "Gold"), " options attack: more birdies and eagles, but more bogeys too, and they pay off best when the skills involved are strong. ",
-                            React.createElement("b", { style: { color: C.blue } }, "Blue"), " options play safe and keep the card clean. Protecting a lead? Go blue. Chasing? Go gold. ",
-                            "AUTO REST sims the rest of the round for you."),
-                        React.createElement("div", { className: "grid gap-2 mb-2" }, HOLE_CHOICES(nextHole).map((c, ci) => (React.createElement("button", { key: c.id, onClick: () => chooseHole(c.id), className: "w-full text-left p-2.5 rounded-xl active:scale-[0.98]", style: { background: C.card, border: `1px solid ${c.id === "attack" ? "rgba(232,195,90,0.4)" : "rgba(244,247,242,0.15)"}` } },
-                            React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: c.id === "attack" ? C.gold : C.blue } }, c.label, React.createElement(Kbd, { k: ci + 1 })),
-                            React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, c.desc))))),
-                        React.createElement("div", { className: "grid grid-cols-2 gap-2" },
-                            React.createElement(Btn, { small: true, kind: "green", onClick: () => setAutoPlay(true) }, "\u25B6 AUTO REST", React.createElement(Kbd, { k: "A" })),
-                            React.createElement(Btn, { small: true, kind: "panel", onClick: () => advanceHoles(18) }, "SKIP TO END \u23ED")))) : (React.createElement("div", { className: "grid grid-cols-3 gap-2" },
+                        (() => {
+                            const hole = nextHole;
+                            if (!shotHole || shotHole.holeIdx !== h) {
+                                return React.createElement(React.Fragment, null,
+                                    React.createElement("div", { className: "p-2.5 rounded-xl mb-2", style: { background: C.card, border: "1px solid rgba(232,195,90,0.35)" } },
+                                        React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, color: C.gold, letterSpacing: 2 } }, "BETA · WHEEL ON EVERY SHOT"),
+                                        React.createElement("p", { className: "text-xs", style: { color: C.chalk } }, "Play this hole shot by shot. Same wheel as the dailies — tee, approach, chip and bunker. Putting stays on the meter."),
+                                        React.createElement(WheelModePicker, { compact: true })),
+                                    React.createElement(Btn, { onClick: beginShotHole }, "⛳ PLAY THIS HOLE"),
+                                    React.createElement("div", { className: "grid grid-cols-2 gap-2 mt-2" },
+                                        React.createElement(Btn, { small: true, kind: "green", onClick: () => setAutoPlay(true) }, "▶ AUTO REST", React.createElement(Kbd, { k: "A" })),
+                                        React.createElement(Btn, { small: true, kind: "panel", onClick: () => advanceHoles(18) }, "SKIP TO END ⏭")));
+                            }
+                            const sh = shotHole;
+                            const attrs = sh.attrs;
+                            const choices = chShotChoices(sh.h, hole);
+                            const left = 18 - h;
+                            const applyCareerShot = (rs) => {
+                                if (rs.h) return setShotHole({ ...sh, h: rs.h, spin: null });
+                                if (rs.score != null) return commitCareerHole(h, rs.score, "Shot by shot", "even", null, rs.log);
+                                const a = attrs;
+                                const ft = rs.putt;
+                                const stakes = strokeClutchStakes(tour, h) || (tour.round === 3 && h >= 14 ? "Sunday putt." : "For the hole.");
+                                const target = rs.strokes + 1, miss = rs.strokes + 2;
+                                setShotHole({ ...sh, spin: null, putt: "pending" });
+                                startClutch({ feet: ft, target, miss, label: clutchLabel(target, hole[0]), title: `${tour.ev.e.toUpperCase()} · HOLE ${h + 1}`, stakes, putting: a.putting, composure: a.composure, pressure: tour.round === 3 ? 1 + (h - 13) * 0.1 : 0.55,
+                                    makeTxt: `${scoreName(target, hole[0])} on ${h + 1}.`, missTxt: `It's a ${scoreName(miss, hole[0]).toLowerCase()} on ${h + 1}.`,
+                                    onDone: (made) => { setClutch(null); commitCareerHole(h, made ? target : miss, "Shot by shot", "even", `⛳ ${ft}ft — ${made ? "HOLED" : "missed"}`, rs.log); } });
+                            };
+                            const pickCareer = (cid) => {
+                                const rs = chShot(attrs, hole, sh.h, cid, sh.adj);
+                                const label = (choices.find((c) => c.id === cid) || {}).label || "";
+                                if (rs.wheel) {
+                                    const spinIt = chShouldSpin(hole, sh.h, attrs.press || 0, left, 0, false);
+                                    return setShotHole({ ...sh, spin: { rs, label, quick: !spinIt } });
+                                }
+                                applyCareerShot(rs);
+                            };
+                            if (sh.putt === "pending") return React.createElement("div", { className: "text-center text-xs mb-2", style: { color: C.muted } }, "Line up the putt…");
+                            if (sh.spin) {
+                                return sh.spin.quick
+                                    ? React.createElement(QuickShotFeed, { key: "cq" + sh.h.strokes, rs: sh.spin.rs, label: sh.spin.label, onDone: () => applyCareerShot(sh.spin.rs) })
+                                    : React.createElement(ShotWheel, { key: "cw" + sh.h.strokes, wheel: sh.spin.rs.wheel, label: sh.spin.label, onDone: () => applyCareerShot(sh.spin.rs) });
+                            }
+                            return React.createElement(React.Fragment, null,
+                                React.createElement("div", { className: "p-2.5 rounded-xl mb-2", style: { background: C.card } },
+                                    React.createElement("div", { className: "flex justify-between" },
+                                        React.createElement("span", { style: { fontFamily: FONT, fontSize: 16, color: C.gold } }, `SHOT ${sh.h.strokes + 1}`),
+                                        React.createElement("span", { className: "text-sm", style: { color: C.chalk } }, `${CH_LIE[sh.h.lie]} · ${sh.h.d} yds`)),
+                                    attrs.press > 0 && React.createElement("div", { className: "text-[11px] mt-1", style: { color: C.bogey } }, "😰 Leading late: the wheel tightens."),
+                                    sh.h.log.map((line, i) => React.createElement("div", { key: i, className: "text-xs mt-1", style: { color: C.muted } }, line))),
+                                choices.map((c, ci) => { const att = ci === 0; return React.createElement("button", { key: c.id, onClick: () => pickCareer(c.id), className: "w-full p-3 rounded-xl mb-2 text-left active:scale-[0.99]", style: { background: att ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card, border: `1px solid ${att ? C.gold : "rgba(127,183,217,0.5)"}` } },
+                                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: att ? C.gold : C.blue } }, c.label),
+                                    React.createElement("div", { className: "text-[11px]", style: { color: C.muted } }, c.desc),
+                                    React.createElement("div", { className: "text-[11px] mt-1 flex flex-wrap gap-x-3", style: { fontFamily: MONO, color: C.chalk } },
+                                        chShotOdds(attrs, hole, sh.h, c.id, sh.adj).map(([k, v]) => React.createElement("span", { key: k }, v == null ? k : `${k} ${v}%`)))); }),
+                                React.createElement("button", { onClick: () => setShotHole(null), className: "text-[11px] underline mb-2 block", style: { color: C.muted } }, "Cancel hole"));
+                        })())) : (React.createElement("div", { className: "grid grid-cols-3 gap-2" },
                         React.createElement(Btn, { small: true, onClick: () => advanceHoles(1), disabled: autoPlay },
                             "PLAY ",
                             h + 1),
@@ -10630,7 +10761,7 @@ function GolfCareerSim() {
                         React.createElement(Btn, { small: true, kind: "panel", onClick: () => { setAutoPlay(false); advanceHoles(18); } }, "SKIP \u23ED")))
                     ),
                     React.createElement("div", { style: { order: 12 } },
-                    h < 18 && React.createElement(SpeedPicker, null)
+                    h < 18 && React.createElement(React.Fragment, null, React.createElement(SpeedPicker, null), React.createElement(WheelModePicker, null))
                     ),
                     ),
                     React.createElement("div", { className: "sp-round-rail" },
