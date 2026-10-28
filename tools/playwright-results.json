@@ -1,0 +1,63 @@
+{
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (File not found)",
+    "Error: <path> attribute d: Expected number, \"M 100 232 Q NaN 145 100 58\"."
+  ],
+  "pages": [],
+  "rounds": [
+    {
+      "type": "challenge",
+      "bodySnippet": "2006 U.S. OPEN\nHistory Rewritten\n\nPhil Mickelson finishes at +4. Won by 1.\n\n\ud83e\udd48\nSILVER MEDAL\nNew personal best!\nPutts holed: 1 of 1\n\ud83e\udd49 BRONZE: Win the U.S. Open \u2713\n\ud83e\udd48 SILVER: Win without a playoff \u2713\n\u2606 GOLD: Birdie the 18th\n\u2b1c\nWHAT REALLY HAPPENED\n\nPhil hit driver off a hospitality tent, then hit a tree, and made double bogey. Ogilvy won at +5.\n\n\ud83d\udd13 OTHER SIDE UNLOCKED\n\nNow play it as Colin Montgomerie: \"Monty's Moment\"\n\nPLAY THE OTHER SIDE\n\ud83d\udd25 1-Day S",
+      "scoreHint": "+4",
+      "shots": 3,
+      "wheelsSeen": 9
+    },
+    {
+      "type": "career",
+      "wheelsSeen": 9,
+      "shotsHole1": 3,
+      "bodySnippet": "SONY OPEN\nRound 1 Complete\nYOUR CARD \u00b7 tap holes for detail\n75 (+5)\n1\n5\n2\n4\n3\n5\n4\n3\n5\n4\n6\n4\n7\n3\n8\n4\n9\n5\n10\n5\n11\n3\n12\n4\n13\n5\n14\n4\n15\n4\n16\n5\n17\n4\n18\n4\nROUND ANALYSIS VS FIELD\nHARDEST 6 HOLES \u00b7 you +3 / field +1.0\nshots lost here\nEASIEST 6 HOLES \u00b7 you +1 / field -0.3\nshots lost here\nPAR 5s \u00b7 you -1 / field -0.5\nlevel with the field\nWORST: HOLE 16\ncost you 1.0 vs the field\nBEST: HOLE 18\ngained 0.8 on the field\nSEE THE LEADERBOARD",
+      "scoreHint": null
+    }
+  ],
+  "ok": true,
+  "challenge": {
+    "ok": true,
+    "shots": 3,
+    "wheelsSeen": 9
+  },
+  "career": {
+    "ok": true,
+    "wheelsSeen": 9,
+    "shotsHole1": 3,
+    "body": "SONY OPEN\nRound 1 Complete\nYOUR CARD \u00b7 tap holes for detail\n75 (+5)\n1\n5\n2\n4\n3\n5\n4\n3\n5\n4\n6\n4\n7\n3\n8\n4\n9\n5\n10\n5\n11\n3\n12\n4\n13\n5\n14\n4\n15\n4\n16\n5\n17\n4\n18\n4\nROUND ANALYSIS VS FIELD\nHARDEST 6 HOLES \u00b7 you +3 / field +1.0\nshots lost here\nEASIEST 6 HOLES \u00b7 you +1 / field -0.3\nshots lost here\nPAR 5s \u00b7 you -1 / field -0.5\nlevel with the field\nWORST: HOLE 16\ncost you 1.0 vs the field\nBEST: HOLE 18\ngained 0.8 on the field\nSEE THE LEADERBOARD"
+  },
+  "symbols": {
+    "WheelModePicker": true,
+    "fairwaySlice": true
+  },
+  "simAverages": {
+    "mid": {
+      "avg": 4.37,
+      "med": 4,
+      "best": -2,
+      "worst": 13,
+      "p10": 1,
+      "p90": 8
+    },
+    "elite": {
+      "avg": -0.77,
+      "med": -1,
+      "best": -8,
+      "worst": 7,
+      "p10": -4,
+      "p90": 3
+    },
+    "puttNote": "auto at 0.85*tour make curve; attack/safe mix ~45/55"
+  },
+  "consoleErrorsFiltered": [],
+  "knownBenignConsole": [
+    "Failed to load resource: the server responded with a status of 404 (File not found)",
+    "Error: <path> attribute d: Expected number, \"M 100 232 Q NaN 145 100 58\"."
+  ]
+}
