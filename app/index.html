@@ -2582,28 +2582,15 @@ const liveMoves = (key, h, names) => {
 };
 const liveSlide = (mv) => mv ? { "--from": `${clampN(mv, -5, 5) * 18}px`, animation: "spRow .8s .15s cubic-bezier(.3,.7,.2,1) both", position: "relative", zIndex: 1 + Math.abs(mv), background: C.panel } : {};
 // Top-left way out. Always shown when placed (Josh looks at the top, not the bottom tab bar).
-// Styles: A text link (default), B round icon, C sticky bar, D floating pill. Pick with ?topnav=B etc.
+// Floating pill (Josh's pick). Hidden during a round because play screens don't place it.
 function BackTop({ onClick, label, confirm, title }) {
     const go = () => {
         if (confirm && !window.confirm(typeof confirm === "string" ? confirm : "Leave this screen?")) return;
         onClick && onClick();
     };
     const text = label || "Back";
-    const sty = (typeof location !== "undefined" && /[?&]topnav=([A-Da-d])/.test(location.search)) ? RegExp.$1.toUpperCase() : (typeof window !== "undefined" && window.__TOPNAV_STYLE) || "A";
     const safe = { paddingTop: "max(0px, env(safe-area-inset-top, 0px))" };
-    if (sty === "B") {
-        return React.createElement("button", { onClick: go, "aria-label": text, className: "mb-3 active:scale-95 flex items-center justify-center", style: { ...safe, width: 44, height: 44, borderRadius: 22, background: "#2E7D4F", color: C.gold, border: "1.5px solid rgba(232,195,90,0.7)", fontSize: 22, fontWeight: 700, lineHeight: 1 } }, "\u2190");
-    }
-    if (sty === "C") {
-        return React.createElement("div", { className: "mb-3 -mx-4 px-4 flex items-center gap-3", style: { ...safe, position: "sticky", top: 0, zIndex: 30, background: "rgba(11,35,24,0.96)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", borderBottom: "1px solid rgba(232,195,90,0.25)", minHeight: 48 } },
-            React.createElement("button", { onClick: go, "aria-label": text, className: "active:scale-95 flex items-center gap-1.5", style: { background: "none", border: 0, color: C.gold, fontFamily: UI, fontWeight: 700, fontSize: 15, minHeight: 44, padding: "0 4px" } }, "\u2039 ", text),
-            title && React.createElement("div", { className: "truncate", style: { fontFamily: FONT, fontSize: 14, color: C.chalk, letterSpacing: 1 } }, title));
-    }
-    if (sty === "D") {
-        return React.createElement("button", { onClick: go, "aria-label": text, className: "mb-3 active:scale-95", style: { ...safe, display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 16px", borderRadius: 999, background: "rgba(46,125,79,0.9)", color: C.gold, fontFamily: UI, fontWeight: 700, fontSize: 14, letterSpacing: "0.04em", border: "1.5px solid rgba(232,195,90,0.65)", boxShadow: "0 6px 18px rgba(0,0,0,0.35)", minHeight: 44 } }, "\u2190 ", text);
-    }
-    // A — small gold text link (default)
-    return React.createElement("button", { onClick: go, "aria-label": text, className: "mb-3 active:scale-95", style: { ...safe, background: "none", border: 0, color: C.gold, fontFamily: UI, fontWeight: 700, fontSize: 15, letterSpacing: "0.03em", minHeight: 44, padding: "8px 2px", textAlign: "left" } }, "\u2190 ", text);
+    return React.createElement("button", { onClick: go, "aria-label": text, className: "mb-3 active:scale-95", style: { ...safe, display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 16px", borderRadius: 999, background: "rgba(46,125,79,0.9)", color: C.gold, fontFamily: UI, fontWeight: 700, fontSize: 14, letterSpacing: "0.04em", border: "1.5px solid rgba(232,195,90,0.65)", boxShadow: "0 6px 18px rgba(0,0,0,0.35)", minHeight: 44 } }, "\u2190 ", text);
 }
 // NAVIGATION. One menu for the whole career: a side menu on desktop, a tab bar on phones. NAV is refreshed every
 // render by the main component (like SCREEN_KEY) so the Shell can draw it without threading props everywhere.
@@ -10935,114 +10922,71 @@ function GolfCareerSim() {
                     React.createElement(Btn, { small: true, kind: "panel", onClick: () => simRounds(4) }, "SIM TO THE FINISH ⏭⏭"))));
         }
         const myRes = results.finishers.find((r) => r.isYou);
+        const winner = results.finishers[0];
+        const won = !!(myRes && myRes.pos === 1);
+        const top10 = results.finishers.slice(0, 10);
+        const outsideTop10 = !!(myRes && myRes.pos > 10);
+        const youRow = (r, i) => React.createElement("div", { key: r.id || ("you-" + i), className: "flex justify-between py-1.5 px-2 rounded-lg", style: { fontSize: 13, background: "rgba(232,195,90,0.12)", border: "1px solid rgba(232,195,90,0.55)", color: C.gold } },
+            React.createElement("span", null, r.pos, ". You"),
+            React.createElement("span", { className: "font-mono" }, toPar(r.total), " · ", fmtMoney(r.money)));
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { label: "Home", title: "Final", onClick: () => setScreen("hub") }),
-            React.createElement("div", { className: "text-center" },
-                React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } },
-                    "FINAL \u00B7 ",
-                    ev.e.toUpperCase()),
-                React.createElement("div", { className: "my-2" },
-                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 17, color: C.muted } },
-                        "\uD83C\uDFC6 CHAMPION",
-                        ev.type === "tc" ? " & TOUR CUP WINNER" : "",
-                        tour.team ? "S" : ""),
-                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 30, color: C.gold, lineHeight: 1 } }, results.finishers[0].name),
-                    React.createElement("div", { className: "text-sm", style: { color: C.chalk } },
-                        toPar(results.finishers[0].total, par, 4),
-                        " (",
-                        results.finishers[0].rounds.join("-"),
-                        ")"),
-                    results.playoff && (React.createElement("div", { className: "text-xs mt-1", style: { color: C.bogey } },
-                        "\u26A1 WON IN A PLAYOFF \u2014 ",
-                        results.playoff.holesPlayed,
-                        " extra hole",
-                        results.playoff.holesPlayed > 1 ? "s" : "",
-                        " vs ",
-                        results.playoff.names.filter((n) => n !== results.playoff.winner).join(", ")))),
-                myRes && myRes.pos === 1 && React.createElement(Celebration, { size: ev.type === "major" || ev.type === "tc" ? "huge" : "big", trophy: "\uD83C\uDFC6" }),
-                myRes ? (React.createElement("div", { className: "p-3 rounded-xl my-3 sp-anim", style: { background: C.card, border: `1.5px solid ${myRes.pos <= 10 ? C.gold : "rgba(244,247,242,0.2)"}` } },
-                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 38, color: myRes.pos === 1 ? C.gold : myRes.pos <= 10 ? C.green : C.chalk, lineHeight: 1, animation: myRes.pos === 1 ? "spTrophy .9s .3s cubic-bezier(.2,.9,.3,1.3) both, spGlow 1.8s 1.2s ease-in-out 3" : undefined } }, ordinal(myRes.pos)),
-                    React.createElement("div", { className: "text-sm", style: { color: C.chalk } },
-                        toPar(myRes.total, par, 4),
-                        " (",
-                        myRes.rounds.join("-"),
-                        ")"),
-                    React.createElement("div", { className: "text-xs mt-1", style: { color: C.muted } },
-                        "+",
-                        React.createElement(CountUp, { to: myRes.pts, ms: 1100, delay: 250 }),
-                        " Tour Cup pts \u00B7 ",
-                        React.createElement(CountUp, { to: myRes.money, ms: 1300, delay: 250, fmt: fmtMoney }),
-                        tour.team ? " each" : ""),
-                    myRes.pos === 1 && results.playoff && React.createElement("div", { className: "mt-1", style: { color: C.bogey, fontFamily: FONT, fontSize: 16 } }, "\u26A1 PLAYOFF WINNER"),
-                    myRes.pos === 2 && results.playoff && results.playoff.names.includes(myRes.name) && React.createElement("div", { className: "mt-1", style: { color: C.red, fontFamily: FONT, fontSize: 14 } }, "Heartbreak in the playoff"),
-                    myRes.pos === 1 && ev.type === "major" && React.createElement("div", { className: "mt-1", style: { color: C.gold, fontFamily: FONT, fontSize: 18 } }, "YOU ARE A MAJOR CHAMPION"),
-                    myRes.pos === 1 && ev.type === "tc" && React.createElement("div", { className: "mt-1", style: { color: C.gold, fontFamily: FONT, fontSize: 18 } }, "TOUR CUP CHAMPION \uD83C\uDFC6"))) : (React.createElement("div", { className: "p-3 rounded-xl my-3", style: { background: C.card } },
-                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 24, color: C.red } }, "MISSED CUT"),
-                    React.createElement("div", { className: "text-xs", style: { color: C.muted } },
-                        me.rounds.join("-"),
-                        " \u00B7 No points, no cheque. Next week."))),
-                myRes && myRes.pos === 1 && (() => {
-                    const second = results.finishers[1];
-                    const by = second && !results.playoff ? second.total - myRes.total : 0;
-                    const cw = g.myStats.careerWins || 0, cm = g.myStats.careerMajors || 0, maj = ev.type === "major";
-                    const rec = cw === RECORD_WINS + 1 ? ` \u00B7 win No. ${cw}: past Tiger's ${RECORD_WINS}!` : maj && cm === RECORD_MAJORS + 1 ? ` \u00B7 major No. ${cm}: past Jack's ${RECORD_MAJORS}!` : maj && cm > 1 ? ` \u00B7 major No. ${cm}` : cw > 1 && cw % 10 === 0 ? ` \u00B7 career win No. ${cw}` : "";
-                    return React.createElement(ShareResult, { tag: maj ? "major" : "win",
-                        kicker: maj && cm === 1 ? "FIRST MAJOR CHAMPIONSHIP" : !maj && cw === 1 ? "FIRST TOUR WIN" : maj ? "MAJOR CHAMPION" : ev.type === "tc" ? "TOUR CHAMPIONSHIP" : `SEASON ${g.season} \u00B7 EVENT ${g.evIdx + 1}`,
-                        headline: `${ev.e} champion`,
-                        sub: `${toPar(myRes.total, par, 4)}${results.playoff ? " \u00B7 won in a playoff" : by > 0 ? ` \u00B7 by ${by} shot${by === 1 ? "" : "s"}` : ""}${rec}`,
-                        name: `${g.pro.name} \u00B7 ${g.pro.nation} \u00B7 age ${g.pro.age != null ? g.pro.age : 22}` });
-                })(),
-                myRes && myRes.pos === 1 && React.createElement(VoteNudge, { where: "win" }),
-                (() => {
-                    // this week's head-to-head with your rival, and your sponsor's retainer
-                    const rv = !tour.team && g.rival && tour.scores.find((x) => x.name === g.rival.name);
-                    const o = rv ? rivalOutcome(tour, rv.name) : null;
-                    const rvRes = rv && results.finishers.find((r) => r.name === rv.name);
-                    const sp = tour.inField && g.sponsor;
-                    if (!rv && !sp)
-                        return null;
-                    return (React.createElement("div", { className: "p-3 rounded-xl mb-3 text-left", style: { background: C.panel } },
-                        rv && (React.createElement("div", { className: "flex justify-between items-baseline text-xs" },
-                            React.createElement("span", { style: { color: C.bogey } },
-                                RV,
-                                rv.name,
-                                ": ",
-                                React.createElement("b", null, rvRes ? ordinal(rvRes.pos) : "MC")),
-                            React.createElement("span", { style: { color: o === 1 ? C.green : o === -1 ? C.red : C.muted } }, o === 1 ? "you beat him · +6 XP" : o === -1 ? "he had the better week" : "dead level"))),
-                        rv && (React.createElement("div", { className: "text-[10px] mt-0.5", style: { color: C.muted } },
-                            "Head-to-head becomes ",
-                            g.rival.w + (o === 1 ? 1 : 0),
-                            "–",
-                            g.rival.l + (o === -1 ? 1 : 0),
-                            g.rival.h + (o === 0 ? 1 : 0) ? `–${g.rival.h + (o === 0 ? 1 : 0)}` : "")),
-                        sp && (React.createElement("div", { className: "text-xs", style: { color: C.chalk, marginTop: rv ? 6 : 0 } },
-                            sp.emoji,
-                            " ",
-                            sp.name,
-                            ": +",
-                            fmtMoney(sp.retainer),
-                            " retainer"))));
-                })(),
-                React.createElement("div", { className: "p-3 rounded-xl mb-3 text-left", style: { background: C.panel } },
-                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 13, letterSpacing: 2, color: C.gold }, className: "mb-1" }, "TOP 10"),
-                    results.finishers.slice(0, 10).map((r) => (React.createElement("div", { key: r.name, className: "flex justify-between text-xs mb-0.5", style: { color: r.isYou ? C.gold : C.chalk } },
-                        React.createElement("span", { className: "truncate pr-2" },
-                            r.pos,
-                            ". ",
-                            r.name,
-                            r.isYou ? " (YOU)" : ""),
-                        React.createElement("span", null,
-                            toPar(r.total, par, 4),
-                            " \u00B7 ",
-                            fmtMoney(r.money)))))),
-                React.createElement("div", { className: "mb-2" },
-                    React.createElement(Btn, { kind: "panel", onClick: () => {
-                            const fb = { event: ev.e, par: tour.course.par, course: tour.course.name,
-                                rows: results.finishers.map((r) => ({ name: (r.name || "").replace(" (YOU)", ""), pos: r.pos, total: r.total, cut: r.cut, isYou: r.isYou, rounds: r.rounds })) };
-                            setG({ ...g, lastFullBoard: fb, boardReturn: "event" });
-                            setScreen("fullBoard");
-                        } }, "\uD83D\uDCCB VIEW FULL LEADERBOARD")),
-                React.createElement(Btn, { onClick: closeEvent }, "CONTINUE"))));
+            React.createElement("div", { className: "text-center mb-5" },
+                React.createElement("div", { style: { fontFamily: FONT, fontSize: 11, letterSpacing: 3, color: C.muted } }, "FINAL \u00B7 ", event.name.toUpperCase()),
+                won ? React.createElement(React.Fragment, null,
+                    React.createElement(Celebration, { kind: event.tier === "major" ? "major" : "win" }),
+                    React.createElement("div", { className: "mt-3", style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } }, "YOU ARE THE CHAMPION"),
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 42, color: C.gold, lineHeight: 1.05, marginTop: 6 } }, myRes.name),
+                    React.createElement("div", { className: "mt-2 font-mono", style: { fontSize: 20, color: C.chalk } }, toPar(myRes.total), " (", myRes.rounds.map(toPar).join(" ") , ")"),
+                    React.createElement("div", { className: "mt-1", style: { fontSize: 15, color: C.gold } }, "+", myRes.pts, " pts \u00B7 ", fmtMoney(myRes.money)),
+                    React.createElement("div", { className: "inline-block mt-3 px-3 py-1 rounded-full", style: { background: "rgba(232,195,90,0.15)", border: "1px solid " + C.gold, color: C.gold, fontSize: 12, letterSpacing: 1 } }, "1st \u00B7 career win #", (player.stats.wins || 0) + 1),
+                    results.playoff && React.createElement("div", { className: "mt-2 text-xs", style: { color: C.muted } }, "Won in a ", results.playoff.length, "-player playoff"),
+                    event.tier === "major" && React.createElement("div", { className: "mt-2 text-sm", style: { color: C.gold } }, "\uD83C\uDFC6 Major championship secured"),
+                    event.id === "tourchamp" && React.createElement("div", { className: "mt-2 text-sm", style: { color: C.gold } }, "Tour Championship · Tour Cup clinched"))
+                : myRes ? React.createElement(React.Fragment, null,
+                    React.createElement("div", { className: "mt-3", style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.gold } }, "YOU FINISHED"),
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 56, color: C.chalk, lineHeight: 1, marginTop: 4 } }, ordinal(myRes.pos)),
+                    React.createElement("div", { className: "mt-1", style: { fontFamily: FONT, fontSize: 22, color: C.chalk } }, myRes.name),
+                    React.createElement("div", { className: "mt-2 font-mono", style: { fontSize: 18, color: C.chalk } }, toPar(myRes.total), " (", myRes.rounds.map(toPar).join(" ") , ")"),
+                    React.createElement("div", { className: "mt-1", style: { fontSize: 14, color: C.gold } }, "+", myRes.pts, " pts \u00B7 ", fmtMoney(myRes.money)),
+                    winner && React.createElement("div", { className: "mt-4 mx-auto px-4 py-2.5 rounded-xl inline-flex items-center gap-2", style: { background: "rgba(232,195,90,0.1)", border: "1px solid rgba(232,195,90,0.45)", maxWidth: "100%" } },
+                        React.createElement("span", { style: { fontSize: 18 } }, "\uD83C\uDFC6"),
+                        React.createElement("div", { className: "text-left" },
+                            React.createElement("div", { style: { fontSize: 11, letterSpacing: 1, color: C.muted } }, "WINNER"),
+                            React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: C.gold } }, winner.name, " ", React.createElement("span", { className: "font-mono", style: { color: C.chalk } }, toPar(winner.total))))),
+                    results.playoff && results.playoff.includes(myRes.id) && React.createElement("div", { className: "mt-2 text-xs", style: { color: C.muted } }, "Lost in a ", results.playoff.length, "-player playoff"),
+                    results.playoff && !results.playoff.includes(myRes.id) && React.createElement("div", { className: "mt-2 text-xs", style: { color: C.muted } }, "Decided in a ", results.playoff.length, "-player playoff"))
+                : React.createElement(React.Fragment, null,
+                    React.createElement("div", { className: "mt-3", style: { fontFamily: FONT, fontSize: 13, letterSpacing: 3, color: C.danger || "#e57373" } }, "MISSED CUT"),
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 42, color: C.chalk, lineHeight: 1.05, marginTop: 6 } }, "CUT"),
+                    React.createElement("div", { className: "mt-2 font-mono text-sm", style: { color: C.muted } }, results.yourRounds.map(toPar).join(" ")),
+                    winner && React.createElement("div", { className: "mt-4 mx-auto px-4 py-2.5 rounded-xl inline-flex items-center gap-2", style: { background: "rgba(232,195,90,0.1)", border: "1px solid rgba(232,195,90,0.45)", maxWidth: "100%" } },
+                        React.createElement("span", { style: { fontSize: 18 } }, "\uD83C\uDFC6"),
+                        React.createElement("div", { className: "text-left" },
+                            React.createElement("div", { style: { fontSize: 11, letterSpacing: 1, color: C.muted } }, "WINNER"),
+                            React.createElement("div", { style: { fontFamily: FONT, fontSize: 15, color: C.gold } }, winner.name, " ", React.createElement("span", { className: "font-mono", style: { color: C.chalk } }, toPar(winner.total))))))),
+            won && React.createElement(ShareResult, { player, event, result: myRes, season: season.year }),
+            won && React.createElement("div", { className: "mt-3" }, React.createElement(VoteNudge, { moment: "win", playerName: player.name })),
+            React.createElement("div", { className: "card mt-4 mb-4" },
+                rival && React.createElement("div", { className: "text-sm mb-2", style: { color: C.muted } },
+                    "vs ", rival.name, ": ", (() => { const o = rivalOutcome(myRes, results.finishers.find((r) => r.id === rival.id)); return o === "beat" ? "You finished ahead \u2713" : o === "lost" ? "They finished ahead" : o === "tied" ? "Tied" : "They missed cut"; })()),
+                sponsor && React.createElement("div", { className: "text-sm", style: { color: C.muted } },
+                    "Sponsor (", sponsor.name, "): ", results.sponsorMet ? React.createElement("span", { style: { color: C.fairway } }, "Target met \u2713 +$", (sponsor.bonus/1000).toFixed(0), "k") : React.createElement("span", { style: { color: C.danger } }, "Missed \u2014 contract at risk"))),
+            React.createElement("div", { className: "card" },
+                React.createElement("div", { className: "section-label mb-2" }, "TOP 10"),
+                top10.map((r, i) => r.isYou
+                    ? youRow(r, i)
+                    : React.createElement("div", { key: r.id || i, className: "flex justify-between py-1.5", style: { fontSize: 13, borderBottom: i < top10.length - 1 || outsideTop10 ? "1px solid rgba(255,255,255,0.04)" : "none", color: i === 0 ? C.gold : C.chalk } },
+                        React.createElement("span", null, r.pos, ". ", r.name),
+                        React.createElement("span", { className: "font-mono", style: { color: C.muted } }, toPar(r.total), " · ", fmtMoney(r.money)))),
+                outsideTop10 && React.createElement(React.Fragment, null,
+                    React.createElement("div", { className: "text-center py-1", style: { color: C.muted, fontSize: 12, letterSpacing: 2 } }, "\u00B7\u00B7\u00B7"),
+                    youRow(myRes, "me")),
+                React.createElement("button", { className: "w-full mt-3 py-2.5 rounded-xl text-sm font-semibold active:scale-[0.98]", style: { background: "rgba(255,255,255,0.06)", color: C.chalk, border: "1px solid rgba(255,255,255,0.12)", letterSpacing: "0.04em" }, onClick: () => {
+                        setBoardSource({ finishers: results.finishers, yourRounds: results.yourRounds, eventName: event.name, cutLine: results.cutLine });
+                        setScreen("fullBoard");
+                    } }, "\uD83D\uDCCB VIEW FULL LEADERBOARD")),
+            React.createElement(Btn, { onClick: closeEvent }, "CONTINUE")));
     }
     const cupCourseOf = () => COURSES.find((c) => c.name === (CUP_COURSE_OF[ryder.venue] || "Muirfield Village"));
     // shared by every match-play format: does this hole get a clutch putt, and what's riding on it?
