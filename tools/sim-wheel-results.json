@@ -1,29 +1,98 @@
 {
   "mid": {
-    "avg": 1.75,
+    "avg": 1.94,
     "med": 2,
     "best": -6,
-    "worst": 8,
+    "worst": 12,
     "p10": -2,
     "p90": 5
   },
   "elite": {
-    "avg": -3.31,
+    "avg": -3.28,
     "med": -3,
-    "best": -11,
-    "worst": 3,
+    "best": -10,
+    "worst": 5,
     "p10": -7,
     "p90": 0
   },
-  "puttNote": "auto at autoMul*chMakeP; attack/safe mix ~45/55; course TPC Scottsdale",
-  "before": {
+  "puttNote": "auto at autoMul*chMakeP (=simP from chPuttCal); attack/safe mix ~45/55; career shot-by-shot now uses puttRead+chPuttCal",
+  "puttRates": {
     "mid": {
-      "avg": 4.37
+      "3": {
+        "makeP": 0.957,
+        "simP": 0.861,
+        "calSimP": 0.861,
+        "tapP": 0.893,
+        "zoneScale": 1.679
+      },
+      "6": {
+        "makeP": 0.641,
+        "simP": 0.577,
+        "calSimP": 0.577,
+        "tapP": 0.713,
+        "zoneScale": 1.019
+      },
+      "10": {
+        "makeP": 0.38,
+        "simP": 0.342,
+        "calSimP": 0.342,
+        "tapP": 0.397,
+        "zoneScale": 0.797
+      },
+      "15": {
+        "makeP": 0.216,
+        "simP": 0.194,
+        "calSimP": 0.194,
+        "tapP": 0.11,
+        "zoneScale": 0.682
+      },
+      "20": {
+        "makeP": 0.14,
+        "simP": 0.126,
+        "calSimP": 0.126,
+        "tapP": 0.127,
+        "zoneScale": 0.65
+      }
     },
     "elite": {
-      "avg": -0.77
+      "3": {
+        "makeP": 0.973,
+        "simP": 0.876,
+        "calSimP": 0.876,
+        "tapP": 0.987,
+        "zoneScale": 1.212
+      },
+      "6": {
+        "makeP": 0.747,
+        "simP": 0.672,
+        "calSimP": 0.672,
+        "tapP": 0.47,
+        "zoneScale": 0.786
+      },
+      "10": {
+        "makeP": 0.503,
+        "simP": 0.453,
+        "calSimP": 0.453,
+        "tapP": 0.363,
+        "zoneScale": 0.633
+      },
+      "15": {
+        "makeP": 0.312,
+        "simP": 0.281,
+        "calSimP": 0.281,
+        "tapP": 0.123,
+        "zoneScale": 0.535
+      },
+      "20": {
+        "makeP": 0.212,
+        "simP": 0.19,
+        "calSimP": 0.19,
+        "tapP": 0.187,
+        "zoneScale": 0.481
+      }
     }
   },
+  "course": "TPC Scottsdale",
   "tune": {
     "gir": 0.82,
     "flagGir": 0.88,
@@ -34,5 +103,9 @@
     "chip": 7,
     "prox": 0.09,
     "autoMul": 0.9
+  },
+  "targetBand": {
+    "mid": 1.75,
+    "elite": -3.31
   }
 }
