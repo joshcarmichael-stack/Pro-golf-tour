@@ -1,0 +1,55 @@
+{
+  "ok": true,
+  "steps": [
+    "shot:01-home-invitational-card",
+    "home-card",
+    "shot:02-intro",
+    "shot:03-channel-comedy",
+    "shot:04-combine-complete",
+    "combine",
+    "shot:05-captains",
+    "captains",
+    "shot:06-draft-order",
+    "shot:07-draft-complete",
+    "draft",
+    "shot:08-brief",
+    "shot:09-play-front-hole1",
+    "shot:10-nine-break",
+    "front9",
+    "shot:11-play-back-hole1",
+    "shot:12-results",
+    "results",
+    "roster-range-ok"
+  ],
+  "consoleErrors": [],
+  "screenshots": [
+    "/workspace/invitational/shots/01-home-invitational-card.png",
+    "/workspace/invitational/shots/02-intro.png",
+    "/workspace/invitational/shots/03-channel-comedy.png",
+    "/workspace/invitational/shots/04-combine-complete.png",
+    "/workspace/invitational/shots/05-captains.png",
+    "/workspace/invitational/shots/06-draft-order.png",
+    "/workspace/invitational/shots/07-draft-complete.png",
+    "/workspace/invitational/shots/08-brief.png",
+    "/workspace/invitational/shots/09-play-front-hole1.png",
+    "/workspace/invitational/shots/10-nine-break.png",
+    "/workspace/invitational/shots/11-play-back-hole1.png",
+    "/workspace/invitational/shots/12-results.png"
+  ],
+  "playerOvrBand": true,
+  "rosterRange": {
+    "min": 40,
+    "max": 89,
+    "n": 64,
+    "badges": [
+      "inv_win",
+      "inv_duke",
+      "inv_lastpick",
+      "inv_lowcap",
+      "inv_comeback",
+      "inv_clean9",
+      "inv_bothjosh",
+      "inv_combine_elite"
+    ]
+  }
+}
