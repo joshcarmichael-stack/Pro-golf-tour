@@ -14,12 +14,21 @@ const INV_ROSTER_RAW = [{"name":"Brad","shortName":"Brad","sourceTeam":"Dalke","
 const ATTR_KEYS = ["drivingAccuracy","drivingDistance","longApproach","shortApproach","chipping","putting","recovery","bunker","paceControl","shotShaping","courseManagement","composure"];
 
 const CHANNELS = [
-  { id: "elite", emoji: "🏆", name: "Elite Competitive", blurb: "Scratch golf content. You're basically a tour hopeful on camera.", base: 84, spread: 4, bias: { drivingDistance: 4, longApproach: 3, composure: 3 } },
-  { id: "tips", emoji: "⛳", name: "Golf Tips Channel", blurb: "Solid single-digit tips and drills. Credible, not flashy.", base: 74, spread: 5, bias: { shortApproach: 3, chipping: 3, courseManagement: 2 } },
-  { id: "vlog", emoji: "🎥", name: "Day-in-the-Life Vlog", blurb: "Fun rounds with mates. Mid-handicap energy.", base: 62, spread: 6, bias: { putting: 2, composure: 2 } },
-  { id: "scramble", emoji: "🎢", name: "Scramble & Chaos", blurb: "High-handicap entertainment. The gallery loves you.", base: 50, spread: 6, bias: { recovery: 5, bunker: 3, drivingDistance: 2 } },
-  { id: "comedy", emoji: "😂", name: "Comedy Golf", blurb: "Bits over birdies. Near the bottom of this field — and that's the brand.", base: 44, spread: 5, bias: { composure: 4, recovery: 2 } },
+  { id: "elite", emoji: "🏆", name: "Elite Competitive", blurb: "Scratch golf content. Flavour for your brand — the land wheel still sets your band.", bias: { drivingDistance: 3, longApproach: 2, composure: 2 } },
+  { id: "tips", emoji: "⛳", name: "Golf Tips Channel", blurb: "Solid tips and drills. Flavour for your brand — the land wheel still sets your band.", bias: { shortApproach: 2, chipping: 2, courseManagement: 2 } },
+  { id: "vlog", emoji: "🎥", name: "Day-in-the-Life Vlog", blurb: "Fun rounds with mates. Flavour for your brand — the land wheel still sets your band.", bias: { putting: 2, composure: 1 } },
+  { id: "scramble", emoji: "🎢", name: "Scramble & Chaos", blurb: "High-handicap entertainment. Flavour for your brand — the land wheel still sets your band.", bias: { recovery: 3, bunker: 2, drivingDistance: 1 } },
+  { id: "comedy", emoji: "😂", name: "Comedy Golf", blurb: "Bits over birdies. Flavour for your brand — the land wheel still sets your band.", bias: { composure: 3, recovery: 1 } },
 ];
+
+// Where do you land? Roughly equal slices. Band mid ± spread, then channel/combine nudge a few points.
+const LAND_BANDS = [
+  { id: "elite", name: "Elite", slice: "longfw", blurb: "Best in the field energy. High 70s into the high 80s.", mid: 82, spread: 6, min: 76, max: 89 },
+  { id: "middle", name: "Middle of the pack", slice: "fairway", blurb: "Solid midfield. Plenty of golf left either side of you.", mid: 64, spread: 8, min: 55, max: 74 },
+  { id: "underdog", name: "Underdog", slice: "rough", blurb: "Near the bottom. Your draft and your shots still win it.", mid: 46, spread: 6, min: 40, max: 54 },
+];
+
+const ANYONE_WINS = "Your overall picks your rivals, not your result. Every captain starts level — your draft and your shots win it.";
 
 const COMBINE_DRILLS = [
   { id: "drive", name: "Driver Booth", attr: "drivingDistance", desc: "Smash it. Longer is better." },
@@ -72,6 +81,7 @@ function hashStr(s) {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
 }
+function pickRng(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
 
 function attrsFromBase(base, bias, rng) {
   const a = {};
@@ -80,7 +90,6 @@ function attrsFromBase(base, bias, rng) {
     const jitter = Math.floor(rng() * 7) - 3;
     a[k] = clampN(Math.round(base + b + jitter), 28, 96);
   });
-  // nudge so calcOverall ≈ base ± small
   let o = calcOverall(a), guard = 0;
   while (Math.abs(o - base) > 2 && guard++ < 40) {
     const keys = ATTR_KEYS.slice().sort(() => rng() - 0.5);
@@ -91,42 +100,58 @@ function attrsFromBase(base, bias, rng) {
   return a;
 }
 
-function buildPlayerFromChannel(channel, channelName, seed) {
-  const rng = mulberry32(seed ^ hashStr(channel.id + "|" + channelName));
-  const base = clampN(Math.round(channel.base + (rng() * 2 - 1) * channel.spread), 40, 89);
+function rollLandBand(seed) {
+  const rng = mulberry32(seed ^ 0x1A4D);
+  const r = rng();
+  // roughly equal thirds
+  const band = r < 1 / 3 ? LAND_BANDS[0] : r < 2 / 3 ? LAND_BANDS[1] : LAND_BANDS[2];
+  const base = clampN(Math.round(band.mid + (rng() * 2 - 1) * band.spread), band.min, band.max);
+  return { band, base, sliceIdx: LAND_BANDS.indexOf(band) };
+}
+
+function buildPlayerFromLand(channel, land, channelName, seed) {
+  const rng = mulberry32(seed ^ hashStr(channel.id + "|" + channelName + "|" + land.band.id));
+  // channel bias nudges a point or two inside the land band
+  let base = land.base + Math.round((rng() * 5) - 2);
+  base = clampN(base, 40, 89);
+  // soft-keep near band
+  base = clampN(base, Math.max(40, land.band.min - 3), Math.min(89, land.band.max + 3));
   const attrs = attrsFromBase(base, channel.bias, rng);
-  return { name: channelName || "You", channelId: channel.id, channelName: channel.name, attrs, overall: calcOverall(attrs), isYou: true, combine: null };
+  return {
+    name: channelName || "You", channelId: channel.id, channelName: channel.name,
+    landId: land.band.id, landName: land.band.name, landBase: land.base,
+    attrs, overall: calcOverall(attrs), isYou: true, combine: null
+  };
 }
 
 function applyCombine(player, scores, seed) {
-  // scores: {drive, iron, wedge, putt} each 0..100 from minigames
   const rng = mulberry32(seed ^ 0xC0FFEE);
   const attrs = { ...player.attrs };
   const map = { drive: "drivingDistance", iron: "longApproach", wedge: "shortApproach", putt: "putting" };
   let bumpSum = 0;
   Object.keys(map).forEach((k) => {
     const sc = scores[k] == null ? 50 : scores[k];
-    // map score → attr delta: 0→-10, 50→0, 100→+10, plus small noise
-    const delta = Math.round((sc - 50) / 5 + (rng() * 3 - 1.5));
+    // combine only nudges a few points
+    const delta = Math.round((sc - 50) / 12 + (rng() * 2 - 1));
     attrs[map[k]] = clampN(attrs[map[k]] + delta, 28, 96);
     bumpSum += delta;
   });
-  // light spill to related skills
-  attrs.drivingAccuracy = clampN(attrs.drivingAccuracy + Math.round((scores.drive - 50) / 12), 28, 96);
-  attrs.chipping = clampN(attrs.chipping + Math.round((scores.wedge - 50) / 14), 28, 96);
-  attrs.composure = clampN(attrs.composure + Math.round((scores.putt - 50) / 16) + Math.floor(rng() * 3) - 1, 28, 96);
+  attrs.drivingAccuracy = clampN(attrs.drivingAccuracy + Math.round((scores.drive - 50) / 20), 28, 96);
+  attrs.chipping = clampN(attrs.chipping + Math.round((scores.wedge - 50) / 22), 28, 96);
+  attrs.composure = clampN(attrs.composure + Math.round((scores.putt - 50) / 24), 28, 96);
   let overall = calcOverall(attrs);
-  // hard clamp into invitational band with a touch of randomness so elite stays rare
-  const softMin = 40, softMax = 89;
-  if (overall < softMin) {
-    ATTR_KEYS.forEach((k) => { attrs[k] = clampN(attrs[k] + 2, 28, 96); });
+  // stay near land band (±5 soft)
+  const lo = player.landBase != null ? clampN(player.landBase - 5, 40, 89) : 40;
+  const hi = player.landBase != null ? clampN(player.landBase + 5, 40, 89) : 89;
+  let guard = 0;
+  while ((overall < lo || overall > hi) && guard++ < 30) {
+    const dir = overall < lo ? 1 : -1;
+    const k = ATTR_KEYS[Math.floor(rng() * ATTR_KEYS.length)];
+    attrs[k] = clampN(attrs[k] + dir, 28, 96);
     overall = calcOverall(attrs);
   }
-  if (overall > softMax) {
-    ATTR_KEYS.forEach((k) => { attrs[k] = clampN(attrs[k] - 1, 28, 96); });
-    overall = calcOverall(attrs);
-  }
-  return { ...player, attrs, overall: calcOverall(attrs), combine: { scores, bumpSum } };
+  overall = clampN(calcOverall(attrs), 40, 89);
+  return { ...player, attrs, overall, combine: { scores, bumpSum } };
 }
 
 function rosterPlayers() {
@@ -137,10 +162,8 @@ function rosterPlayers() {
 }
 
 function pickCaptains(player, field) {
-  // player always captain; 3 AI closest in overall
   const ai = field.filter((p) => !p.isYou).slice().sort((a, b) => Math.abs(a.overall - player.overall) - Math.abs(b.overall - player.overall) || a.overall - b.overall);
   const caps = [player, ai[0], ai[1], ai[2]];
-  // stable colors
   const colors = ["#E8C35A", "#6FB3A8", "#D4796A", "#7FB7D9"];
   return caps.map((c, i) => ({ ...c, captainIdx: i, color: colors[i], teamName: c.isYou ? (c.name + "'s Squad") : (c.shortName || c.name) + "'s Squad" }));
 }
@@ -148,7 +171,6 @@ function pickCaptains(player, field) {
 function draftPool(field, captains) {
   const capNames = new Set(captains.map((c) => c.name));
   const pool = field.filter((p) => !capNames.has(p.name));
-  // leave exactly 60 for even 15-each; sit out the one furthest from field median
   if (pool.length <= 60) return pool;
   const med = pool.slice().sort((a, b) => a.overall - b.overall)[Math.floor(pool.length / 2)].overall;
   const sorted = pool.slice().sort((a, b) => Math.abs(b.overall - med) - Math.abs(a.overall - med));
@@ -157,7 +179,6 @@ function draftPool(field, captains) {
 }
 
 function snakeOrder(nCaptains, nRounds) {
-  // returns array of captainIdx for each pick
   const order = [];
   for (let r = 0; r < nRounds; r++) {
     const fwd = r % 2 === 0;
@@ -167,7 +188,6 @@ function snakeOrder(nCaptains, nRounds) {
 }
 
 function aiDraftPick(pool, team, captains, myIdx) {
-  // prefer best available, slight preference for fitting holes in team avg
   const avg = team.length ? team.reduce((s, p) => s + p.overall, 0) / team.length : captains[myIdx].overall;
   return pool.slice().sort((a, b) => {
     const sa = a.overall - Math.abs(a.overall - avg) * 0.05;
@@ -179,39 +199,229 @@ function aiDraftPick(pool, team, captains, myIdx) {
 function invCourse() {
   const c = (typeof COURSES !== "undefined" && COURSES.find((x) => x.holes && x.holes.length >= 18)) || null;
   if (c) return c;
-  // minimal fallback
   const holes = [];
   for (let i = 0; i < 18; i++) holes.push([i % 3 === 0 ? 5 : (i % 2 ? 3 : 4), i % 2 ? 175 : (i % 3 === 0 ? 520 : 410), 3, i + 1, {}]);
   return { name: "Internet Links", holes };
 }
 
-function simStroke(attrs, hole, noise) {
-  if (typeof playHole === "function") {
-    try { return playHole(attrs, hole, noise || 0, false, 0); } catch (e) {}
+function shortNameOf(p) { return (p && (p.shortName || p.name || "Player")).split(" ")[0]; }
+
+// --- Per-hitter shot engine (alt shot + scramble) ---
+// Low-rated players: tops/duffs, shanks, multi-try bunkers, chunked chips, three-putts.
+// High-rated: big drives, clean escapes. An 88+40 pair visibly alternates great and terrible.
+
+function skill01(v) { return clampN((v - 30) / 65, 0, 1); }
+
+function hitOneShot(hitter, lie, distToGreen, holePar, rng) {
+  // returns { yards, lie, text, holed, pen }
+  const a = hitter.attrs || hitter;
+  const name = shortNameOf(hitter);
+  const ovr = hitter.overall != null ? hitter.overall : calcOverall(a);
+  const sk = skill01(ovr);
+  const puttSk = skill01(a.putting || ovr);
+  const chipSk = skill01(a.chipping || ovr);
+  const bunkSk = skill01(a.bunker || ovr);
+  const drvSk = skill01(a.drivingDistance || ovr);
+  const accSk = skill01(a.drivingAccuracy || ovr);
+
+  // On green — putting
+  if (lie === "green") {
+    const feet = Math.max(1, distToGreen); // reuse dist as feet on green
+    // Realistic make curve: 3ft ~85% elite / ~55% 40-ovr; 20ft ~20% elite / ~5% dog
+    const makeP = clampN(0.88 - feet * 0.030 + puttSk * 0.16 - (1 - puttSk) * 0.20, 0.03, 0.92);
+    if (rng() < makeP) return { yards: 0, lie: "holed", text: name + (feet <= 3 ? " taps in." : " drains it from " + feet + " ft."), holed: true };
+    // miss — bad putters three-putt often (leave long or lip out short then miss again)
+    let leave;
+    if (feet <= 5) {
+      leave = rng() < (0.55 + puttSk * 0.35) ? 0 : Math.round(1 + (1 - puttSk) * 4 * rng());
+    } else {
+      leave = Math.round(2 + (1 - puttSk) * 14 * rng() + (feet > 20 ? 3 : 0) + rng() * 4);
+      if (rng() < (1 - puttSk) * 0.35) leave = Math.round(leave + 4 + rng() * 8); // hammer past
+    }
+    if (leave === 0) return { yards: 0, lie: "holed", text: name + " lips it in.", holed: true };
+    return { yards: leave, lie: "green", text: name + (puttSk < 0.4 ? " hammers it " + leave + " ft past." : " leaves " + leave + " ft."), holed: false };
   }
-  const o = calcOverall(attrs);
-  const par = hole[0];
-  const mean = par + (78 - o) * 0.045;
-  const r = (Math.random() + Math.random() + Math.random()) / 3;
-  return clampN(Math.round(mean + (r - 0.5) * 2.4), 1, par + 4);
+
+  // Bunker
+  if (lie === "bunker" || lie === "gbunker") {
+    // low bunker skill: often stay in (40 can take 2–4 goes)
+    const escapeP = clampN(0.15 + bunkSk * 0.72, 0.10, 0.92);
+    if (rng() > escapeP) {
+      const again = bunkSk < 0.35 ? "still in the bunker… again." : "still in the sand.";
+      return { yards: 0, lie: "bunker", text: name + " blasts it thin — " + again, holed: false };
+    }
+    if (rng() < 0.04 + (1 - bunkSk) * 0.08) {
+      return { yards: Math.round(2 + rng() * 6), lie: "green", text: name + " skulls it over the green.", holed: false };
+    }
+    const ft = Math.round(4 + (1 - bunkSk) * 18 * rng() + rng() * 8);
+    return { yards: ft, lie: "green", text: name + " splashes out to " + ft + " ft.", holed: false };
+  }
+
+  // Around green / chip
+  if (lie === "fringe" || lie === "rough_short" || (lie !== "tee" && distToGreen <= 40)) {
+    // chunk / duff
+    if (rng() < (1 - chipSk) * 0.55) {
+      const yds = Math.max(1, Math.round(2 + rng() * 8));
+      return { yards: yds, lie: "fringe", text: name + " chunks it " + yds + " yards.", holed: false };
+    }
+    if (rng() < (1 - chipSk) * 0.18) {
+      return { yards: 0, lie: "bunker", text: name + " chunks it straight into the bunker.", holed: false };
+    }
+    if (rng() < 0.06 + chipSk * 0.08) {
+      return { yards: 0, lie: "holed", text: name + " chips in!", holed: true };
+    }
+    const ft = Math.round(3 + (1 - chipSk) * 20 * rng() + rng() * 10);
+    return { yards: ft, lie: "green", text: name + " chips to " + ft + " ft.", holed: false };
+  }
+
+  // Tee / fairway / long rough — full swing
+  const isTee = lie === "tee";
+  const isDriver = isTee && holePar > 3;
+  // Top / duff of a few yards — common for low OVR
+  const topP = isDriver ? clampN((1 - drvSk) * 0.48, 0.02, 0.52) : clampN((1 - sk) * 0.28, 0.015, 0.36);
+  if (rng() < topP) {
+    const yds = Math.round(3 + rng() * 12);
+    return { yards: yds, lie: "fairway", text: name + " tops it " + yds + " yards.", holed: false };
+  }
+  // Shank
+  if (rng() < (1 - sk) * 0.1) {
+    const yds = Math.round(40 + rng() * 50);
+    return { yards: yds, lie: "rough", text: name + " shanks it " + yds + " yards into trouble.", holed: false };
+  }
+  // Water / big miss
+  if (rng() < (1 - accSk) * 0.08) {
+    return { yards: Math.round(distToGreen * 0.4), lie: "fairway", text: name + " finds the drink. Drop, still a way in.", holed: false, pen: 1 };
+  }
+
+  let carry;
+  if (isDriver) {
+    // 40 OVR ~ 160–210; 88 OVR ~ 280–320
+    const mean = 155 + drvSk * 155;
+    carry = Math.round(mean + (rng() - 0.5) * 40);
+    carry = clampN(carry, 40, 340);
+  } else {
+    // approach / layup intent toward green
+    const want = Math.min(distToGreen, 220);
+    const miss = (1 - sk) * 70 * (rng() - 0.25) - sk * 8;
+    carry = Math.round(clampN(want + miss, 15, 250));
+  }
+
+  const rem = Math.max(0, distToGreen - carry);
+  // lie after shot
+  if (rem <= 0) {
+    // Overshoot / thin through: low skill often fails to hold
+    if (rng() < (1 - sk) * 0.45) {
+      const long = Math.round(8 + (1 - sk) * 25 * rng());
+      if (rng() < 0.4) return { yards: carry, lie: "bunker", text: name + " flies the green into the bunker.", holed: false };
+      return { yards: carry, lie: "fringe", text: name + " flies it long by " + long + " yards.", holed: false };
+    }
+    const ft = Math.round(6 + (1 - sk) * 30 * rng() + rng() * 14);
+    return { yards: carry, lie: "green", text: name + (isDriver && carry >= 280 ? " bombs one " + carry + " yards onto the dancefloor — " + ft + " ft." : " finds the green, " + ft + " ft."), holed: false, greenFt: ft };
+  }
+  // From 40–120 in, hold green only with skill
+  if (rem <= 120 && rem > 0 && !isDriver) {
+    const holdP = clampN(0.12 + sk * 0.62 - rem * 0.002, 0.06, 0.82);
+    if (rng() < holdP) {
+      const ft = Math.round(5 + (1 - sk) * 28 * rng() + rng() * 12);
+      return { yards: carry, lie: "green", text: name + " sticks it to " + ft + " ft.", holed: false, greenFt: ft };
+    }
+    if (rng() < (1 - sk) * 0.35) {
+      return { yards: carry, lie: "bunker", text: name + " dumps it in the greenside bunker.", holed: false };
+    }
+    if (rng() < (1 - sk) * 0.25) {
+      return { yards: carry, lie: "rough", text: name + " leaks it wide into the rough.", holed: false };
+    }
+    return { yards: carry, lie: "fringe", text: name + " comes up " + Math.max(1, rem) + " yards short.", holed: false };
+  }
+  if (rem <= 40 && rng() < 0.25 + sk * 0.35) {
+    return { yards: carry, lie: "fringe", text: name + " to " + rem + " yards short.", holed: false };
+  }
+  // bunker chance near green
+  if (rem < 50 && rng() < (1 - sk) * 0.35) {
+    return { yards: carry, lie: "bunker", text: name + " dumps it in the greenside bunker.", holed: false };
+  }
+  if (rng() < (1 - accSk) * 0.35) {
+    return { yards: carry, lie: "rough", text: name + " leaks it into the rough, " + rem + " yards in.", holed: false };
+  }
+  const label = isDriver && carry >= 290 ? "ripping a " + carry + "-yard drive." : "hits it " + carry + " yards. " + rem + " in.";
+  return { yards: carry, lie: "fairway", text: name + " " + label, holed: false };
 }
 
-function scrambleScores(pairAttrs, hole) {
-  // best ball
-  const a = simStroke(pairAttrs[0], hole, 0);
-  const b = simStroke(pairAttrs[1], hole, 0.01);
-  return Math.min(a, b);
+function playBallHole(hitters, hole, startIdx, rng, mode) {
+  // hitters: [p0, p1] for alt (alternate each shot); scramble uses one hitter array of 1
+  // mode: "alt" | "solo"
+  const par = hole[0];
+  const yardage = hole[1] || 400;
+  let dist = yardage;
+  let lie = "tee";
+  let strokes = 0;
+  let pens = 0;
+  const log = [];
+  let hIdx = startIdx || 0;
+  let greenFt = null;
+  let guard = 0;
+
+  while (guard++ < 24) {
+    const hitter = hitters[hIdx % hitters.length];
+    const inputDist = lie === "green" ? (greenFt || 12) : dist;
+    const shot = hitOneShot(hitter, lie === "gbunker" ? "bunker" : lie, inputDist, par, rng);
+    strokes += 1 + (shot.pen || 0);
+    pens += shot.pen || 0;
+    log.push({ name: shortNameOf(hitter), text: shot.text, lie: shot.lie, ovr: hitter.overall });
+    if (shot.holed || shot.lie === "holed") break;
+    if (shot.lie === "green") {
+      lie = "green";
+      greenFt = shot.greenFt != null ? shot.greenFt : (shot.yards || 10);
+      dist = 0;
+    } else if (shot.lie === "bunker" || shot.lie === "gbunker") {
+      lie = "bunker";
+      // stay roughly near green
+      dist = Math.min(dist, 30);
+    } else if (shot.lie === "fringe") {
+      lie = "fringe";
+      dist = Math.max(5, dist - (shot.yards || 10));
+    } else {
+      lie = shot.lie || "fairway";
+      dist = Math.max(0, dist - (shot.yards || 0));
+      if (dist < 1) { lie = "green"; greenFt = Math.round(8 + rng() * 20); }
+    }
+    if (mode === "alt") hIdx += 1;
+    // three-putt / endless bunker safety: cap
+    if (strokes >= par + 8) {
+      log.push({ name: shortNameOf(hitter), text: shortNameOf(hitter) + " finally picks it up.", lie: "holed" });
+      strokes = par + 8;
+      break;
+    }
+  }
+  return { score: strokes, log, pens };
 }
-function altShotScore(pairAttrs, hole, startIdx) {
-  // blend toward the hitter of record; approximate with blended attrs
-  const w0 = startIdx === 0 ? 0.55 : 0.45;
-  const blended = {};
-  ATTR_KEYS.forEach((k) => { blended[k] = Math.round(pairAttrs[0][k] * w0 + pairAttrs[1][k] * (1 - w0)); });
-  return simStroke(blended, hole, 0);
+
+function playAltHole(p0, p1, hole, startIdx, rng) {
+  return playBallHole([p0, p1], hole, startIdx || 0, rng, "alt");
+}
+
+function playScrambleHole(p0, p1, hole, rng) {
+  // each plays own ball; take best score; merge logs tagged
+  const a = playBallHole([p0], hole, 0, rng, "solo");
+  const b = playBallHole([p1], hole, 0, rng, "solo");
+  const best = a.score <= b.score ? a : b;
+  const other = a.score <= b.score ? b : a;
+  const log = best.log.map((x) => ({ ...x, text: x.text })).concat(
+    [{ name: "—", text: "(partner " + other.score + ", best ball " + best.score + ")", lie: "note" }]
+  );
+  return { score: best.score, log };
+}
+
+function scrambleScores(pair, hole, rng) {
+  const r = rng || mulberry32(Date.now() ^ 0x5C12);
+  return playScrambleHole(pair[0], pair[1], hole, r).score;
+}
+function altShotScore(pair, hole, startIdx, rng) {
+  const r = rng || mulberry32(Date.now() ^ 0xA17);
+  return playAltHole(pair[0], pair[1], hole, startIdx, r).score;
 }
 
 function pairingsForNine(teamA, teamB, seed, nine) {
-  // teamA/teamB: arrays of 16 players. Build 8 pairs per team, then 8 matchups.
   const rng = mulberry32(seed ^ (nine * 9973));
   const shuffle = (arr) => {
     const a = arr.slice();
@@ -225,19 +435,55 @@ function pairingsForNine(teamA, teamB, seed, nine) {
     return pairs;
   };
   const pa = makePairs(teamA), pb = makePairs(teamB);
-  // player (isYou) pair should be first matchup for UX
   const youIdx = pa.findIndex((pr) => pr.some((p) => p.isYou));
   if (youIdx > 0) { const t = pa[0]; pa[0] = pa[youIdx]; pa[youIdx] = t; }
   return pa.map((pr, i) => ({ a: pr, b: pb[i], ptsA: 0, ptsB: 0, holes: [] }));
 }
 
 function matchPointsFromHoles(holes) {
-  // match play: each hole 1 pt to winner, 0.5 each if half. Return {a,b} over holes played.
   let a = 0, b = 0;
   holes.forEach((x) => { if (x.sa < x.sb) a += 1; else if (x.sb < x.sa) b += 1; else { a += 0.5; b += 0.5; } });
   return { a, b };
 }
 
+function makeAttrsAtOvr(target) {
+  const rng = mulberry32(target * 9999 + 42);
+  return attrsFromBase(target, {}, rng);
+}
+
+/** Calibration: 9-hole alt-shot averages vs par for pairings. */
+function calibrateAltPairs(nRuns) {
+  const course = invCourse();
+  const holes = course.holes.slice(0, 9);
+  const par = holes.reduce((s, h) => s + h[0], 0);
+  const specs = [
+    { label: "88+88", a: 88, b: 88 },
+    { label: "88+40", a: 88, b: 40 },
+    { label: "60+60", a: 60, b: 60 },
+    { label: "40+40", a: 40, b: 40 },
+  ];
+  const runs = nRuns || 80;
+  return specs.map((sp) => {
+    const p0 = { name: "A", shortName: "A", overall: sp.a, attrs: makeAttrsAtOvr(sp.a) };
+    const p1 = { name: "B", shortName: "B", overall: sp.b, attrs: makeAttrsAtOvr(sp.b) };
+    let sum = 0, bunkMulti = 0, tops = 0;
+    for (let r = 0; r < runs; r++) {
+      const rng = mulberry32((r + 1) * 10007 + sp.a * 13 + sp.b);
+      let score = 0;
+      holes.forEach((hl, hi) => {
+        const res = playAltHole(p0, p1, hl, hi % 2, rng);
+        score += res.score;
+        res.log.forEach((line) => {
+          if (/still in the bunker/i.test(line.text)) bunkMulti++;
+          if (/tops it/i.test(line.text)) tops++;
+        });
+      });
+      sum += score;
+    }
+    const avg = sum / runs;
+    return { label: sp.label, avg: Math.round(avg * 10) / 10, vsPar: Math.round((avg - par) * 10) / 10, par, bunkStuck: bunkMulti, tops, runs };
+  });
+}
 
 function InvAiDraftTick({ onTick }) {
   useEffect(() => { const t = setTimeout(onTick, 350); return () => clearTimeout(t); }, []);
@@ -282,8 +528,8 @@ function InternetInvitational({ onHome }) {
       h("div", { className: "p-3 rounded-xl mb-3 text-left", style: { background: "linear-gradient(160deg,#1D5237,#123524)", border: "1.5px solid " + C.gold } },
         h("div", { style: { color: C.gold, fontFamily: FONT, fontSize: 14, letterSpacing: 2 } }, "HOW IT WORKS"),
         h("ul", { className: "text-sm mt-2 space-y-1", style: { color: C.chalk, paddingLeft: 18 } },
-          h("li", null, "Pick a channel vibe — that sets your base game."),
-          h("li", null, "Play the combine. Results nudge your overall (elite ~89 down to the 40s)."),
+          h("li", null, "Pick a channel vibe (flavour), then spin Where do you land? — Elite / Middle / Underdog."),
+          h("li", null, "Combine only nudges a few points. Anyone can win from any band."),
           h("li", null, "You captain. Three AI captains closest to your overall join you."),
           h("li", null, "Wheel for draft order, then snake draft your squad."),
           h("li", null, "Day 1: front 9 scramble 2v2 match play (8 pts), reshuffle, back 9 alternate shot (8 pts)."),
@@ -305,13 +551,70 @@ function InternetInvitational({ onHome }) {
       CHANNELS.map((c) => h("button", { key: c.id, onClick: () => setChannelId(c.id), className: "w-full mb-2 p-3 rounded-xl text-left", style: { background: channelId === c.id ? "linear-gradient(160deg,#1D5237,#123524)" : C.panel, border: channelId === c.id ? "1.5px solid " + C.gold : "1px solid rgba(244,247,242,0.12)" } },
         h("div", { style: { fontFamily: FONT, fontSize: 18, color: C.chalk } }, c.emoji + " " + c.name),
         h("div", { className: "text-xs mt-1", style: { color: C.muted } }, c.blurb),
-        h("div", { className: "text-[11px] mt-1", style: { color: C.gold } }, "Base band ~" + (c.base - c.spread) + "–" + (c.base + c.spread) + " OVR"))),
+        h("div", { className: "text-[11px] mt-1", style: { color: C.gold } }, "Brand flavour — the land wheel sets your band"))),
       h(Btn, { disabled: !name.trim(), onClick: () => {
         const seed = (Date.now() ^ hashStr(name.trim())) >>> 0;
-        const player = buildPlayerFromChannel(ch, name.trim(), seed);
-        persist({ seed, player, phase: "combine" }, "combine");
-        setCombineIdx(0); setCombineScores({});
-      } }, "CONTINUE TO COMBINE"));
+        persist({ seed, pendingName: name.trim(), pendingChannelId: ch.id, phase: "land" }, "land");
+        setWheelSpin(null);
+      } }, "WHERE DO YOU LAND?"));
+  }
+
+  // ---------- LAND WHEEL ----------
+  if (phase === "land" && st) {
+    const ch = CHANNELS.find((c) => c.id === (st.pendingChannelId || channelId)) || CHANNELS[1];
+    const finishLand = (land) => {
+      const player = buildPlayerFromLand(ch, land, st.pendingName || name || "You", st.seed);
+      persist({ ...st, player, land: { id: land.band.id, name: land.band.name, base: land.base }, phase: "landResult" }, "landResult");
+      setWheelSpin(null);
+    };
+    if (wheelSpin && wheelSpin.kind === "land" && wheelSpin.done) {
+      return h(Shell, null,
+        h(BackTop, { onClick: () => setPhase("channel"), label: "Back" }),
+        h("div", { className: "text-center mb-3" },
+          h("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "WHERE DO YOU LAND?"),
+          h("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk } }, wheelSpin.land.band.name),
+          h("p", { className: "text-sm mt-1", style: { color: C.muted } }, wheelSpin.land.band.blurb)),
+        h(Btn, { onClick: () => finishLand(wheelSpin.land) }, "LOCK IT IN"));
+    }
+    if (wheelSpin && wheelSpin.kind === "land" && !wheelSpin.done) {
+      const fakeWheel = { o: LAND_BANDS.map((b) => ({ p: 1 / 3, s: b.slice })), i: wheelSpin.land.sliceIdx };
+      return h(Shell, null,
+        h("div", { className: "text-center mb-2", style: { fontFamily: FONT, fontSize: 14, color: C.gold } }, "WHERE DO YOU LAND?"),
+        h(ShotWheel, { wheel: fakeWheel, label: "ELITE · MIDDLE · UNDERDOG", onDone: () => setWheelSpin({ ...wheelSpin, done: true }) }),
+        h("p", { className: "text-xs text-center mt-2", style: { color: C.muted } }, "Roughly even odds. Channel flavour nudges you a few points after."));
+    }
+    return h(Shell, null,
+      h(BackTop, { onClick: () => setPhase("channel"), label: "Back" }),
+      h("div", { className: "text-center mb-4" },
+        h("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "STEP 1B · THE LAND WHEEL"),
+        h("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.chalk } }, "Where do you land?"),
+        h("p", { className: "text-sm", style: { color: C.muted } }, "Elite, middle of the pack, or underdog — about the same chance of each. That sets your overall band. Channel and combine only nudge from there.")),
+      LAND_BANDS.map((b) => h("div", { key: b.id, className: "mb-2 p-3 rounded-xl text-left", style: { background: C.panel } },
+        h("div", { style: { fontFamily: FONT, fontSize: 16, color: C.chalk } }, b.name),
+        h("div", { className: "text-xs", style: { color: C.muted } }, b.blurb + " (~" + b.min + "–" + b.max + ")"))),
+      h(Btn, { onClick: () => {
+        const land = rollLandBand(st.seed ^ Date.now());
+        setWheelSpin({ kind: "land", land, done: false });
+      } }, "SPIN"));
+  }
+
+  // ---------- LAND RESULT ----------
+  if (phase === "landResult" && st && st.player) {
+    const under = st.land && st.land.id === "underdog";
+    return h(Shell, null,
+      h(BackTop, { onClick: goHome, label: "Home", confirm: true }),
+      h("div", { className: "text-center mb-3" },
+        h("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "YOU LANDED"),
+        h("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.chalk } }, st.land ? st.land.name : "—"),
+        h("div", { style: { fontFamily: FONT, fontSize: 48, color: C.gold } }, st.player.overall),
+        h("div", { className: "text-sm", style: { color: C.muted } }, "Band base · combine still to come")),
+      h("div", { className: "p-3 rounded-xl mb-3 text-left", style: { background: "linear-gradient(160deg,#1D5237,#123524)", border: "1.5px solid " + C.gold } },
+        h("div", { style: { fontFamily: FONT, fontSize: 14, color: C.gold } }, "ANYONE CAN WIN"),
+        h("p", { className: "text-sm mt-1", style: { color: C.chalk } }, ANYONE_WINS)),
+      under && h("div", { className: "p-3 rounded-xl mb-3 text-left", style: { background: "rgba(212,121,106,0.15)", border: "1px solid #D4796A" } },
+        h("div", { style: { fontFamily: FONT, fontSize: 14, color: "#D4796A" } }, "UNDERDOG PATH"),
+        h("p", { className: "text-sm mt-1", style: { color: C.chalk } }, "Chase Captain Underdog, Win with the Duke, Diamond in the Rough, Josh Squared — low overall is a story, not a sentence.")),
+      h(Btn, { onClick: () => { setCombineIdx(0); setCombineScores({}); persist({ ...st, phase: "combine" }, "combine"); } }, "CONTINUE TO COMBINE"));
   }
 
   // ---------- COMBINE ----------
@@ -383,7 +686,13 @@ function InternetInvitational({ onHome }) {
         all.filter((_, i) => i < 5 || i >= all.length - 3 || all[i].isYou).map((p) => h("div", { key: p.name, className: "flex justify-between text-xs py-0.5", style: { color: p.isYou ? C.gold : C.chalk } },
           h("span", null, p.isYou ? "★ " + p.name : p.name),
           h("span", null, p.overall)))),
-      h("p", { className: "text-[11px] mb-3 text-center", style: { color: C.muted } }, "Top of the board sits near 89. The floor is in the 40s. Not everyone is a star."),
+      h("div", { className: "p-3 rounded-xl mb-3 text-left", style: { background: "linear-gradient(160deg,#1D5237,#123524)", border: "1.5px solid " + C.gold } },
+        h("div", { style: { fontFamily: FONT, fontSize: 14, color: C.gold } }, "ANYONE CAN WIN"),
+        h("p", { className: "text-sm mt-1", style: { color: C.chalk } }, ANYONE_WINS)),
+      st.player && st.player.landId === "underdog" && h("div", { className: "p-3 rounded-xl mb-3 text-left", style: { background: "rgba(212,121,106,0.15)", border: "1px solid #D4796A" } },
+        h("div", { style: { fontFamily: FONT, fontSize: 14, color: "#D4796A" } }, "UNDERDOG CAPTAIN"),
+        h("p", { className: "text-sm mt-1", style: { color: C.chalk } }, "Captain Underdog, Win with the Duke, Diamond in the Rough — these are made for you.")),
+      h("p", { className: "text-[11px] mb-3 text-center", style: { color: C.muted } }, "Top of the board near 89. Floor in the 40s. Your band picks rivals — not the trophy."),
       h(Btn, { onClick: () => setPhase("wheel") }, "SPIN FOR DRAFT ORDER"));
   }
 
@@ -551,41 +860,22 @@ function InternetInvitational({ onHome }) {
       return { us, them };
     };
 
-    const resolveHole = (playerStroke) => {
+    const resolveHole = (entry) => {
       const mode = nine === "front" ? "scramble" : "alt";
-      let sa, sb;
-      if (mode === "scramble") {
-        const partner = youPair.find((p) => !p.isYou) || youPair[1];
-        const youScore = playerStroke;
-        const partScore = simStroke(partner.attrs, hole, 0.02);
-        sa = Math.min(youScore, partScore);
-        sb = scrambleScores([oppPair[0].attrs, oppPair[1].attrs], hole);
-      } else {
-        // alternate: approximate — player contributes when holeIdx even
-        const partner = youPair.find((p) => !p.isYou) || youPair[1];
-        if (holeIdx % 2 === 0) {
-          sa = Math.round((playerStroke + simStroke(partner.attrs, hole, 0.02)) / 2);
-        } else {
-          sa = altShotScore([partner.attrs, st.player.attrs], hole, 0);
-        }
-        sb = altShotScore([oppPair[0].attrs, oppPair[1].attrs], hole, holeIdx % 2);
-      }
-      const entry = { n: holeIdx + 1, par: hole[0], sa, sb };
       const newHoles = (mu.holes || []).concat([entry]);
       const newMus = matchups.map((m, i) => i === matchIdx ? { ...m, holes: newHoles } : m);
 
-      // sim remaining matchups' this hole when we finish player's hole (batch AI matchups at end of each hole for matchIdx 0 only — simpler: sim all other matchups entirely when player finishes nine)
       if (holeIdx + 1 >= 9) {
-        // finish other matchups if needed
         let finalMus = newMus.map((m, i) => {
           if (i === matchIdx) return m;
           if (m.holes && m.holes.length >= 9) return m;
           const hs = [];
+          const rngM = mulberry32((st.seed ^ (i * 7919) ^ (nine === "front" ? 1 : 2)) >>> 0);
           for (let hi = 0; hi < 9; hi++) {
             const hl = holesSlice[hi];
-            const sa2 = mode === "scramble" ? scrambleScores([m.a[0].attrs, m.a[1].attrs], hl) : altShotScore([m.a[0].attrs, m.a[1].attrs], hl, hi % 2);
-            const sb2 = mode === "scramble" ? scrambleScores([m.b[0].attrs, m.b[1].attrs], hl) : altShotScore([m.b[0].attrs, m.b[1].attrs], hl, hi % 2);
-            hs.push({ n: hi + 1, par: hl[0], sa: sa2, sb: sb2 });
+            const ra = mode === "scramble" ? playScrambleHole(m.a[0], m.a[1], hl, rngM) : playAltHole(m.a[0], m.a[1], hl, hi % 2, rngM);
+            const rb = mode === "scramble" ? playScrambleHole(m.b[0], m.b[1], hl, rngM) : playAltHole(m.b[0], m.b[1], hl, hi % 2, rngM);
+            hs.push({ n: hi + 1, par: hl[0], sa: ra.score, sb: rb.score });
           }
           return { ...m, holes: hs };
         });
@@ -601,44 +891,63 @@ function InternetInvitational({ onHome }) {
       } else {
         const key = nine === "front" ? "matchupsFront" : "matchupsBack";
         persist({ ...st, [key]: newMus, playHoleIdx: holeIdx + 1, playMatchIdx: matchIdx }, "play");
-        setPlay({ matchIdx, holeIdx: holeIdx + 1, nine, holes: newHoles, last: entry });
+        setPlay({ matchIdx, holeIdx: holeIdx + 1, nine, holes: newHoles, last: entry, shotLog: entry.log || [] });
       }
     };
 
-    // quick player stroke via wheel-ish: use playHole on player attrs then optional ShotWheel flair
     const takeShot = () => {
-      const score = simStroke(st.player.attrs, hole, 0);
-      // show a quick wheel flavor then resolve
+      const mode = nine === "front" ? "scramble" : "alt";
+      const rng = mulberry32((st.seed ^ (holeIdx + 1) * 13331 ^ (nine === "front" ? 11 : 22) ^ Date.now()) >>> 0);
+      const partner = youPair.find((p) => !p.isYou) || youPair[1];
+      const youP = youPair.find((p) => p.isYou) || st.player;
+      let resA, resB;
+      if (mode === "scramble") {
+        resA = playScrambleHole(youP, partner, hole, rng);
+        resB = playScrambleHole(oppPair[0], oppPair[1], hole, rng);
+      } else {
+        const start = holeIdx % 2;
+        const ordered = start === 0 ? [youP, partner] : [partner, youP];
+        resA = playAltHole(ordered[0], ordered[1], hole, 0, rng);
+        resB = playAltHole(oppPair[0], oppPair[1], hole, holeIdx % 2, rng);
+      }
+      const sa = resA.score, sb = resB.score;
+      const log = (resA.log || []).concat([{ name: "vs", text: "— opponents —", lie: "note" }]).concat(resB.log || []);
+      const entry = { n: holeIdx + 1, par: hole[0], sa, sb, log };
       const slices = [
         { p: 0.18, s: "longfw" }, { p: 0.32, s: "fairway" }, { p: 0.30, s: "green" }, { p: 0.20, s: "rough" }
       ];
-      let i = score <= hole[0] - 1 ? 0 : score === hole[0] ? 1 : score === hole[0] + 1 ? 2 : 3;
-      setPlay({ ...(play || {}), matchIdx, holeIdx, nine, spinning: { o: slices, i }, pendingScore: score });
+      let i = sa <= hole[0] - 1 ? 0 : sa === hole[0] ? 1 : sa === hole[0] + 1 ? 2 : 3;
+      setPlay({ ...(play || {}), matchIdx, holeIdx, nine, spinning: { o: slices, i }, pendingEntry: entry });
     };
 
     if (play && play.spinning) {
       return h(Shell, null,
         h(BackTop, { onClick: goHome, label: "Home", confirm: "Leave mid-round?" }),
         h(ShotWheel, { wheel: play.spinning, label: (nine === "front" ? "SCRAMBLE" : "ALT SHOT") + " · HOLE " + (holeIdx + 1), onDone: () => {
-          const sc = play.pendingScore;
-          setPlay({ ...play, spinning: null, pendingScore: null });
-          resolveHole(sc);
+          const entry = play.pendingEntry;
+          setPlay({ ...play, spinning: null, pendingEntry: null, shotLog: entry.log || [], last: entry });
+          resolveHole(entry);
         } }));
     }
 
     const holeLog = (mu.holes || []);
     const diff = holeLog.reduce((d, x) => d + (x.sa < x.sb ? 1 : x.sb < x.sa ? -1 : 0), 0);
+    const shotLog = (play && play.shotLog) || (play && play.last && play.last.log) || [];
     return h(Shell, null,
       h(BackTop, { onClick: goHome, label: "Home", confirm: "Leave mid-round? Progress is saved." }),
       h("div", { className: "text-center mb-2" },
         h("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, (nine === "front" ? "FRONT 9 · SCRAMBLE" : "BACK 9 · ALTERNATE SHOT") + " · MATCHUP 1/8"),
         h("div", { style: { fontFamily: FONT, fontSize: 18, color: C.chalk } }, fmtPair(youPair) + "  vs  " + fmtPair(oppPair)),
+        h("div", { className: "text-[11px]", style: { color: C.muted } }, youPair.map((p) => (p.isYou ? "YOU" : p.name) + " " + p.overall).join(" · ") + "  vs  " + oppPair.map((p) => p.name + " " + p.overall).join(" · ")),
         h("div", { className: "text-sm mt-1", style: { color: diff > 0 ? C.gold : diff < 0 ? "#D4796A" : C.muted } }, diff === 0 && !holeLog.length ? "All square" : (diff === 0 ? "AS" : (Math.abs(diff) + " UP")))),
       h("div", { className: "p-3 rounded-xl mb-3 text-center", style: { background: "linear-gradient(160deg,#1D5237,#0B2318)", border: "1px solid " + C.gold } },
         h("div", { style: { fontFamily: FONT, fontSize: 14, color: C.gold } }, "HOLE " + (holeIdx + 1) + " · PAR " + hole[0] + " · " + hole[1] + " yds"),
         play && play.last && h("div", { className: "text-sm mt-2", style: { color: C.chalk } }, "Last: you " + play.last.sa + " · them " + play.last.sb + (play.last.sa < play.last.sb ? " · won" : play.last.sa > play.last.sb ? " · lost" : " · halved")),
-        h("div", { className: "mt-3" }, h(Btn, { onClick: takeShot }, "PLAY YOUR SHOT")),
+        h("div", { className: "mt-3" }, h(Btn, { onClick: takeShot }, nine === "front" ? "PLAY SCRAMBLE HOLE" : "PLAY ALT-SHOT HOLE")),
         h(WheelModePicker, { compact: true })),
+      shotLog.length > 0 && h("div", { className: "rounded-xl p-2 mb-3 text-left", style: { background: "rgba(0,0,0,0.35)", maxHeight: 220, overflow: "auto" } },
+        h("div", { className: "text-[11px] mb-1", style: { color: C.gold } }, "SHOT LOG"),
+        shotLog.map((line, li) => h("div", { key: li, className: "text-xs py-0.5", style: { color: line.lie === "note" ? C.muted : C.chalk } }, line.text))),
       h("div", { className: "rounded-xl p-2", style: { background: C.panel } },
         h("div", { className: "text-[11px] mb-1", style: { color: C.muted } }, "Scorecard"),
         holeLog.map((x) => h("div", { key: x.n, className: "flex justify-between text-xs py-0.5", style: { color: C.chalk } },
@@ -719,5 +1028,9 @@ global.InternetInvitational = InternetInvitational;
 global.INV_BADGES = INV_BADGES;
 global.invAchLoad = invAchLoad;
 global.INV_CHANNELS = CHANNELS;
+global.INV_LAND_BANDS = LAND_BANDS;
 global.invRosterRaw = INV_ROSTER_RAW;
+global.calibrateAltPairs = calibrateAltPairs;
+global.playAltHole = playAltHole;
+global.makeAttrsAtOvr = makeAttrsAtOvr;
 })(typeof window !== "undefined" ? window : globalThis);
