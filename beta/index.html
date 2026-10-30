@@ -100,6 +100,7 @@ button{-webkit-tap-highlight-color:transparent}
 <body>
 <div id="root"></div>
 <script src="courses-geo.js"></script>
+<script src="invitational.js"></script>
 <script>
 "use strict";
 const { useState, useEffect, useRef } = React;
@@ -1043,6 +1044,15 @@ const BADGES = [
         test: (m, st) => { var _a; return (((_a = st === null || st === void 0 ? void 0 : st.teamTrophies) === null || _a === void 0 ? void 0 : _a.poys) || 0) >= 1; } },
     { id: "t_poy3", name: "Era-Defining", desc: "Win Player of the Year 3 times", attr: "ALL",
         test: (m, st) => { var _a; return (((_a = st === null || st === void 0 ? void 0 : st.teamTrophies) === null || _a === void 0 ? void 0 : _a.poys) || 0) >= 3; } },
+    // --- Internet Invitational (unlocked via invAchLoad; career checkBadges ignores these) ---
+    { id: "inv_win", name: "Internet Champ", desc: "Win the Internet Invitational (Day 1)", attr: "ALL", test: () => false },
+    { id: "inv_duke", name: "Win with the Duke", desc: "Have Duke on your team and win Day 1", attr: "recovery", test: () => false },
+    { id: "inv_lastpick", name: "Diamond in the Rough", desc: "Draft the last pick and win Day 1", attr: "courseManagement", test: () => false },
+    { id: "inv_lowcap", name: "Captain Underdog", desc: "Win Day 1 as the lowest-rated captain", attr: "composure", test: () => false },
+    { id: "inv_comeback", name: "Back-Nine Heist", desc: "Lose the front 9, then win the match", attr: "putting", test: () => false },
+    { id: "inv_clean9", name: "Perfect Nine", desc: "Take all 8 points on a nine", attr: "longApproach", test: () => false },
+    { id: "inv_bothjosh", name: "Josh Squared", desc: "Draft both Joshes onto your team", attr: "shortApproach", test: () => false },
+    { id: "inv_combine_elite", name: "Combine King", desc: "Post an 85+ combine overall", attr: "drivingDistance", test: () => false },
 ];
 const COACHES = [
     { name: "Dave Stockwell", title: "Putting guru", attr: "putting", price: 2.5e6 },
@@ -6968,6 +6978,10 @@ function GolfCareerSim() {
     if (screen === "loading")
         return React.createElement(Shell, null,
             React.createElement("div", null));
+    if (screen === "invitational") {
+        NAV.wide = "page";
+        return React.createElement(InternetInvitational, { onHome: () => setScreen("landing") });
+    }
     if (screen === "landing") {
         const modeLabel = (id) => id === "alltime" ? "All-Time Greats" : id === "team" ? "Team Tour" : id === "league" ? "League System" : "Tour Career";
         const startFresh = (id) => { setConfirmEraseId(null); setMode(id); setAttrs({}); setPair(null); setName(""); setNation(""); setLastTake(null); setScreen("identity"); };
@@ -7048,6 +7062,14 @@ function GolfCareerSim() {
                             React.createElement(Btn, { small: true, kind: "red", onClick: async () => { await eraseSlot(md.id); startFresh(md.id); } }, "YES, ERASE"),
                             React.createElement(Btn, { small: true, kind: "panel", onClick: () => setConfirmEraseId(null) }, "CANCEL"))))));
             })),
+            React.createElement("div", { className: "w-full mb-3 p-4 rounded-xl text-left relative overflow-hidden", style: { background: "linear-gradient(160deg, #1D5237 0%, #0B2318 100%)", border: "1.5px solid " + C.gold, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" } },
+                React.createElement("div", { className: "absolute", style: { left: 0, top: 0, bottom: 0, width: 4, background: C.gold } }),
+                React.createElement("div", { className: "flex justify-between items-start gap-2" },
+                    React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk, lineHeight: 1.1 } }, "🎬 INTERNET INVITATIONAL"),
+                    React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded shrink-0", style: { background: C.gold, color: "#1A1405", fontFamily: FONT, fontSize: 11, letterSpacing: 1 } }, "NEW · BETA")),
+                React.createElement("p", { className: "text-sm mt-1", style: { color: C.gold, fontWeight: 600 } }, "64 YouTubers. Four captains. Scramble, then alternate shot."),
+                React.createElement("div", { className: "flex flex-wrap gap-1 mt-2" }, ["Channel + combine OVR", "Wheel draft", "Day 1 match play", "Achievements"].map((f) => React.createElement("span", { key: f, className: "text-[10px] px-1.5 py-0.5 rounded", style: { background: "rgba(244,247,242,0.08)", color: C.chalk } }, f))),
+                React.createElement("div", { className: "mt-3" }, React.createElement(Btn, { small: true, onClick: () => { track("invitational/open"); setScreen("invitational"); } }, "ENTER THE INVITATIONAL"))),
             CH_ON && React.createElement("div", { className: "w-full mb-3 p-4 rounded-xl text-left relative overflow-hidden", style: { background: "linear-gradient(160deg, #2A2410, #10301F)", border: "1px solid rgba(232,195,90,0.4)" } },
                 React.createElement("div", { className: "absolute", style: { left: 0, top: 0, bottom: 0, width: 4, background: C.gold } }),
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk, lineHeight: 1.1 } }, "🏆 Challenges"),
@@ -10127,8 +10149,11 @@ function GolfCareerSim() {
         const have = g.badges || [];
         // group: which are relevant to this mode (team ones only show meaningfully in team/league)
         const isTeamBadge = (id) => ["t_promo", "t_topflight", "t_divtitle", "t_title", "t_mvp", "t_poy"].includes(id);
-        const visible = BADGES.filter((b) => !isTeamBadge(b.id) || g.mode === "team" || g.mode === "league");
-        const earnedCount = visible.filter((b) => have.includes(b.id)).length;
+        const isInvBadge = (id) => String(id || "").startsWith("inv_");
+        const invHave = (typeof invAchLoad === "function" ? invAchLoad() : []);
+        const haveAll = Array.from(new Set([...(have || []), ...invHave]));
+        const visible = BADGES.filter((b) => isInvBadge(b.id) || !isTeamBadge(b.id) || g.mode === "team" || g.mode === "league");
+        const earnedCount = visible.filter((b) => haveAll.includes(b.id)).length;
         return (React.createElement(Shell, null,
             React.createElement(BackTop, { label: "Home", onClick: () => setScreen("hub") }),
             React.createElement("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "\uD83C\uDF96\uFE0F ACHIEVEMENTS"),
@@ -10138,7 +10163,7 @@ function GolfCareerSim() {
                 visible.length,
                 " unlocked \u00B7 each grants a permanent attribute boost. Chase them to build your pro."),
             React.createElement("div", { className: "grid gap-2" }, visible.map((b) => {
-                const got = have.includes(b.id);
+                const got = haveAll.includes(b.id);
                 const isAll = b.attr === "ALL";
                 return (React.createElement("div", { key: b.id, className: "p-3 rounded-xl flex justify-between items-center", style: {
                         background: got ? (isAll ? `linear-gradient(160deg, ${C.card}, #2A2410)` : C.card) : C.panel,
