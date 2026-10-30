@@ -21,7 +21,7 @@ sandbox.window = sandbox;
 sandbox.globalThis = sandbox;
 vm.runInNewContext(code, sandbox);
 
-const rows = sandbox.calibrateAltPairs(120);
+const rows = sandbox.calibrateAltPairs(150);
 console.log("PAR", rows[0].par);
 console.log("PAIRING | AVG | VS PAR | bunk-stuck events | tops");
 rows.forEach((r) => {

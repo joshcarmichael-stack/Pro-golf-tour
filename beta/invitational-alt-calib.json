@@ -6,75 +6,69 @@
       "vsPar": -6.2,
       "par": 36,
       "bunkStuck": 0,
-      "tops": 78,
-      "runs": 120
+      "tops": 40,
+      "runs": 150
     },
     {
       "label": "88+40",
-      "avg": 40.7,
-      "vsPar": 4.6,
+      "avg": 38,
+      "vsPar": 2,
       "par": 36,
-      "bunkStuck": 37,
-      "tops": 365,
-      "runs": 120
+      "bunkStuck": 10,
+      "tops": 172,
+      "runs": 150
     },
     {
       "label": "60+60",
-      "avg": 45.5,
-      "vsPar": 9.5,
+      "avg": 41.9,
+      "vsPar": 5.9,
       "par": 36,
       "bunkStuck": 0,
-      "tops": 458,
-      "runs": 120
+      "tops": 211,
+      "runs": 150
     },
     {
       "label": "40+40",
-      "avg": 65.5,
-      "vsPar": 29.5,
+      "avg": 53.4,
+      "vsPar": 17.4,
       "par": 36,
-      "bunkStuck": 722,
-      "tops": 801,
-      "runs": 120
+      "bunkStuck": 204,
+      "tops": 336,
+      "runs": 150
     }
   ],
   "sample": {
-    "score": 6,
+    "score": 5,
     "log": [
       {
         "name": "Ace",
-        "text": "Ace ripping a 295-yard drive.",
+        "text": "Ace hits it 288 yards. 122 in.",
         "lie": "fairway",
         "ovr": 88
       },
       {
         "name": "Duke",
-        "text": "Duke finds the green, 25 ft.",
-        "lie": "green",
+        "text": "Duke comes up 1 yards short.",
+        "lie": "fringe",
         "ovr": 40
       },
       {
         "name": "Ace",
-        "text": "Ace leaves 6 ft.",
+        "text": "Ace chips to 9 ft.",
         "lie": "green",
         "ovr": 88
       },
       {
         "name": "Duke",
-        "text": "Duke hammers it 9 ft past.",
+        "text": "Duke hammers it 11 ft past.",
         "lie": "green",
         "ovr": 40
       },
       {
         "name": "Ace",
-        "text": "Ace leaves 10 ft.",
-        "lie": "green",
-        "ovr": 88
-      },
-      {
-        "name": "Duke",
-        "text": "Duke drains it from 10 ft.",
+        "text": "Ace drains it from 11 ft.",
         "lie": "holed",
-        "ovr": 40
+        "ovr": 88
       }
     ],
     "pens": 0

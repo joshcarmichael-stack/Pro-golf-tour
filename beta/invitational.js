@@ -210,7 +210,7 @@ function shortNameOf(p) { return (p && (p.shortName || p.name || "Player")).spli
 // Low-rated players: tops/duffs, shanks, multi-try bunkers, chunked chips, three-putts.
 // High-rated: big drives, clean escapes. An 88+40 pair visibly alternates great and terrible.
 
-function skill01(v) { return clampN((v - 30) / 65, 0, 1); }
+function skill01(v) { return clampN((v - 32) / 58, 0.06, 1); }
 
 function hitOneShot(hitter, lie, distToGreen, holePar, rng) {
   // returns { yards, lie, text, holed, pen }
@@ -228,7 +228,7 @@ function hitOneShot(hitter, lie, distToGreen, holePar, rng) {
   if (lie === "green") {
     const feet = Math.max(1, distToGreen); // reuse dist as feet on green
     // Realistic make curve: 3ft ~85% elite / ~55% 40-ovr; 20ft ~20% elite / ~5% dog
-    const makeP = clampN(0.88 - feet * 0.030 + puttSk * 0.16 - (1 - puttSk) * 0.20, 0.03, 0.92);
+    const makeP = clampN(0.84 - feet * 0.032 + puttSk * 0.11 - (1 - puttSk) * 0.08, 0.05, 0.90);
     if (rng() < makeP) return { yards: 0, lie: "holed", text: name + (feet <= 3 ? " taps in." : " drains it from " + feet + " ft."), holed: true };
     // miss — bad putters three-putt often (leave long or lip out short then miss again)
     let leave;
@@ -245,7 +245,7 @@ function hitOneShot(hitter, lie, distToGreen, holePar, rng) {
   // Bunker
   if (lie === "bunker" || lie === "gbunker") {
     // low bunker skill: often stay in (40 can take 2–4 goes)
-    const escapeP = clampN(0.15 + bunkSk * 0.72, 0.10, 0.92);
+    const escapeP = clampN(0.42 + bunkSk * 0.48, 0.34, 0.94);
     if (rng() > escapeP) {
       const again = bunkSk < 0.35 ? "still in the bunker… again." : "still in the sand.";
       return { yards: 0, lie: "bunker", text: name + " blasts it thin — " + again, holed: false };
@@ -260,57 +260,64 @@ function hitOneShot(hitter, lie, distToGreen, holePar, rng) {
   // Around green / chip
   if (lie === "fringe" || lie === "rough_short" || (lie !== "tee" && distToGreen <= 40)) {
     // chunk / duff
-    if (rng() < (1 - chipSk) * 0.55) {
+    if (rng() < (1 - chipSk) * 0.30) {
       const yds = Math.max(1, Math.round(2 + rng() * 8));
       return { yards: yds, lie: "fringe", text: name + " chunks it " + yds + " yards.", holed: false };
     }
-    if (rng() < (1 - chipSk) * 0.18) {
+    if (rng() < (1 - chipSk) * 0.12) {
       return { yards: 0, lie: "bunker", text: name + " chunks it straight into the bunker.", holed: false };
     }
-    if (rng() < 0.06 + chipSk * 0.08) {
+    if (rng() < 0.05 + chipSk * 0.10) {
       return { yards: 0, lie: "holed", text: name + " chips in!", holed: true };
     }
-    const ft = Math.round(3 + (1 - chipSk) * 20 * rng() + rng() * 10);
-    return { yards: ft, lie: "green", text: name + " chips to " + ft + " ft.", holed: false };
+    // occasional tidy up-and-down leave even for dogs
+    const tidy = rng() < 0.16 + chipSk * 0.22;
+    const ft = tidy ? Math.round(2 + rng() * 6) : Math.round(4 + (1 - chipSk) * 18 * rng() + rng() * 10);
+    return { yards: ft, lie: "green", text: name + (tidy ? " chips it close — " + ft + " ft." : " chips to " + ft + " ft."), holed: false };
   }
 
   // Tee / fairway / long rough — full swing
   const isTee = lie === "tee";
   const isDriver = isTee && holePar > 3;
   // Top / duff of a few yards — common for low OVR
-  const topP = isDriver ? clampN((1 - drvSk) * 0.48, 0.02, 0.52) : clampN((1 - sk) * 0.28, 0.015, 0.36);
+  const topP = isDriver ? clampN((1 - drvSk) * 0.24, 0.02, 0.30) : clampN((1 - sk) * 0.12, 0.01, 0.18);
   if (rng() < topP) {
     const yds = Math.round(3 + rng() * 12);
     return { yards: yds, lie: "fairway", text: name + " tops it " + yds + " yards.", holed: false };
   }
   // Shank
-  if (rng() < (1 - sk) * 0.1) {
+  if (rng() < (1 - sk) * 0.07) {
     const yds = Math.round(40 + rng() * 50);
     return { yards: yds, lie: "rough", text: name + " shanks it " + yds + " yards into trouble.", holed: false };
   }
   // Water / big miss
-  if (rng() < (1 - accSk) * 0.08) {
+  if (rng() < (1 - accSk) * 0.11) {
     return { yards: Math.round(distToGreen * 0.4), lie: "fairway", text: name + " finds the drink. Drop, still a way in.", holed: false, pen: 1 };
   }
 
   let carry;
+  // Hero / half-decent swing — dogs can still flush one
+  const hero = rng() < (0.14 + sk * 0.06);  // dogs ~14–17% flush chance
   if (isDriver) {
-    // 40 OVR ~ 160–210; 88 OVR ~ 280–320
-    const mean = 155 + drvSk * 155;
-    carry = Math.round(mean + (rng() - 0.5) * 40);
-    carry = clampN(carry, 40, 340);
+    // 40 OVR typical ~180–230, hero ~250; 88 OVR ~280–320
+    const mean = 165 + drvSk * 145;
+    let c = mean + (rng() - 0.5) * 36;
+    if (hero) c = Math.max(c, 230 + drvSk * 60 + rng() * 30);
+    carry = Math.round(clampN(c, 50, 340));
   } else {
     // approach / layup intent toward green
     const want = Math.min(distToGreen, 220);
-    const miss = (1 - sk) * 70 * (rng() - 0.25) - sk * 8;
-    carry = Math.round(clampN(want + miss, 15, 250));
+    const miss = (1 - sk) * 64 * (rng() - 0.26) - sk * 3;
+    let c = want + miss;
+    if (hero) c = want - 5 + (rng() - 0.5) * 16; // flush approach
+    carry = Math.round(clampN(c, 18, 250));
   }
 
   const rem = Math.max(0, distToGreen - carry);
   // lie after shot
   if (rem <= 0) {
     // Overshoot / thin through: low skill often fails to hold
-    if (rng() < (1 - sk) * 0.45) {
+    if (rng() < (1 - sk) * 0.22) {
       const long = Math.round(8 + (1 - sk) * 25 * rng());
       if (rng() < 0.4) return { yards: carry, lie: "bunker", text: name + " flies the green into the bunker.", holed: false };
       return { yards: carry, lie: "fringe", text: name + " flies it long by " + long + " yards.", holed: false };
@@ -320,15 +327,15 @@ function hitOneShot(hitter, lie, distToGreen, holePar, rng) {
   }
   // From 40–120 in, hold green only with skill
   if (rem <= 120 && rem > 0 && !isDriver) {
-    const holdP = clampN(0.12 + sk * 0.62 - rem * 0.002, 0.06, 0.82);
+    const holdP = clampN(0.07 + sk * 0.55 - rem * 0.003, 0.05, 0.78);
     if (rng() < holdP) {
       const ft = Math.round(5 + (1 - sk) * 28 * rng() + rng() * 12);
       return { yards: carry, lie: "green", text: name + " sticks it to " + ft + " ft.", holed: false, greenFt: ft };
     }
-    if (rng() < (1 - sk) * 0.35) {
+    if (rng() < (1 - sk) * 0.22) {
       return { yards: carry, lie: "bunker", text: name + " dumps it in the greenside bunker.", holed: false };
     }
-    if (rng() < (1 - sk) * 0.25) {
+    if (rng() < (1 - sk) * 0.20) {
       return { yards: carry, lie: "rough", text: name + " leaks it wide into the rough.", holed: false };
     }
     return { yards: carry, lie: "fringe", text: name + " comes up " + Math.max(1, rem) + " yards short.", holed: false };
@@ -337,13 +344,18 @@ function hitOneShot(hitter, lie, distToGreen, holePar, rng) {
     return { yards: carry, lie: "fringe", text: name + " to " + rem + " yards short.", holed: false };
   }
   // bunker chance near green
-  if (rem < 50 && rng() < (1 - sk) * 0.35) {
+  if (rem < 50 && rng() < (1 - sk) * 0.28) {
     return { yards: carry, lie: "bunker", text: name + " dumps it in the greenside bunker.", holed: false };
   }
   if (rng() < (1 - accSk) * 0.35) {
     return { yards: carry, lie: "rough", text: name + " leaks it into the rough, " + rem + " yards in.", holed: false };
   }
-  const label = isDriver && carry >= 290 ? "ripping a " + carry + "-yard drive." : "hits it " + carry + " yards. " + rem + " in.";
+  let label;
+  if (isDriver && carry >= 290) label = "ripping a " + carry + "-yard drive.";
+  else if (isDriver && hero && sk < 0.45) label = "catches one flush — " + carry + " yards down the middle.";
+  else if (isDriver && hero) label = "stripes one " + carry + " yards.";
+  else if (hero && !isDriver) label = "pure strike — " + carry + " yards, " + rem + " in.";
+  else label = "hits it " + carry + " yards. " + rem + " in.";
   return { yards: carry, lie: "fairway", text: name + " " + label, holed: false };
 }
 
@@ -387,9 +399,9 @@ function playBallHole(hitters, hole, startIdx, rng, mode) {
     }
     if (mode === "alt") hIdx += 1;
     // three-putt / endless bunker safety: cap
-    if (strokes >= par + 8) {
+    if (strokes >= par + 6) {
       log.push({ name: shortNameOf(hitter), text: shortNameOf(hitter) + " finally picks it up.", lie: "holed" });
-      strokes = par + 8;
+      strokes = par + 6;
       break;
     }
   }
