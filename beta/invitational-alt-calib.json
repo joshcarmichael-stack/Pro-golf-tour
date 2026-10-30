@@ -1,0 +1,76 @@
+{
+  "rows": [
+    {
+      "label": "88+88",
+      "avg": 29.8,
+      "vsPar": -6.2,
+      "par": 36,
+      "bunkStuck": 0,
+      "tops": 40,
+      "runs": 150
+    },
+    {
+      "label": "88+40",
+      "avg": 38,
+      "vsPar": 2,
+      "par": 36,
+      "bunkStuck": 10,
+      "tops": 172,
+      "runs": 150
+    },
+    {
+      "label": "60+60",
+      "avg": 41.9,
+      "vsPar": 5.9,
+      "par": 36,
+      "bunkStuck": 0,
+      "tops": 211,
+      "runs": 150
+    },
+    {
+      "label": "40+40",
+      "avg": 53.4,
+      "vsPar": 17.4,
+      "par": 36,
+      "bunkStuck": 204,
+      "tops": 336,
+      "runs": 150
+    }
+  ],
+  "sample": {
+    "score": 5,
+    "log": [
+      {
+        "name": "Ace",
+        "text": "Ace hits it 288 yards. 122 in.",
+        "lie": "fairway",
+        "ovr": 88
+      },
+      {
+        "name": "Duke",
+        "text": "Duke comes up 1 yards short.",
+        "lie": "fringe",
+        "ovr": 40
+      },
+      {
+        "name": "Ace",
+        "text": "Ace chips to 9 ft.",
+        "lie": "green",
+        "ovr": 88
+      },
+      {
+        "name": "Duke",
+        "text": "Duke hammers it 11 ft past.",
+        "lie": "green",
+        "ovr": 40
+      },
+      {
+        "name": "Ace",
+        "text": "Ace drains it from 11 ft.",
+        "lie": "holed",
+        "ovr": 88
+      }
+    ],
+    "pens": 0
+  }
+}
