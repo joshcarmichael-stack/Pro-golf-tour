@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 
 const BASE = process.env.BETA_URL || "http://127.0.0.1:8765/index.html";
-const SHOTS = process.env.SHOTS_DIR || "/workspace/invitational/shots-v2";
+const SHOTS = process.env.SHOTS_DIR || "/workspace/invitational/shots-live";
 fs.mkdirSync(SHOTS, { recursive: true });
 
 const results = { ok: true, steps: [], consoleErrors: [], screenshots: [] };
@@ -153,9 +153,61 @@ async function skipWheel(page, times = 4) {
   await shot(page, "07-draft-complete");
   results.steps.push("draft");
 
-  await clickText(page, /DAY 1 BRIEFING/i);
-  await page.waitForTimeout(300);
+  // Post-draft chip contest (sets Day 1 matchups; $5k to winning team)
+  await clickText(page, /CHIP CONTEST/i);
+  await page.waitForTimeout(500);
+  await page.getByText(/CAPTAINS CHIP|Closest to the hole|POST-DRAFT/i).first().waitFor({ timeout: 15000 });
+  await shot(page, "07b-chip-intro");
+
+  // Play through chip: player aims when YOUR CHIP; AI auto
+  let chipGuard = 0;
+  while (chipGuard++ < 40) {
+    await page.waitForTimeout(400);
+    const body = await page.locator("body").innerText();
+    if (/CHIP CONTEST RESULTS|Pick your Day 1|chooses|LOCK MATCHUPS/i.test(body)) break;
+    if (/SET AIM|POWER METER/i.test(body)) {
+      // tap green center-ish then set aim
+      const svg = page.locator("svg").first();
+      if (await svg.count()) {
+        const box = await svg.boundingBox();
+        if (box) await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.55);
+      }
+      await clickText(page, /SET AIM|POWER METER/i).catch(() => {});
+      await page.waitForTimeout(200);
+    }
+    if (/TAP — SET POWER|1 · POWER/i.test(body) && await page.getByText(/TAP — SET POWER/i).count()) {
+      await clickText(page, /TAP — SET POWER/i);
+      await page.waitForTimeout(250);
+    }
+    if (/TAP — STRIKE/i.test(body)) {
+      await clickText(page, /TAP — STRIKE/i);
+      await page.waitForTimeout(1600);
+      await shot(page, "07c-chip-fly");
+    }
+    if (/RE-CHIP/i.test(body)) {
+      await clickText(page, /RE-CHIP/i);
+      await page.waitForTimeout(300);
+    }
+  }
+  await shot(page, "07d-chip-results");
+  results.steps.push("chip");
+
+  // Results → choose matchups (player) or lock (AI)
+  if (await page.getByText(/CHOOSE DAY 1 MATCHUPS/i).count()) {
+    await clickText(page, /CHOOSE DAY 1 MATCHUPS/i);
+    await page.waitForTimeout(300);
+  }
+  await shot(page, "07e-chip-pick");
+  if (await page.getByText(/Pick your Day 1 opponent/i).count()) {
+    await page.getByText(/^Play /i).first().click({ force: true });
+  } else if (await page.getByText(/LOCK MATCHUPS/i).count()) {
+    await clickText(page, /LOCK MATCHUPS/i);
+  }
+  await page.waitForTimeout(500);
+
+  await page.getByText(/TEE IT UP|FRONT 9 · SCRAMBLE/i).first().waitFor({ timeout: 15000 });
   await shot(page, "08-brief");
+  results.steps.push("brief");
   await clickText(page, /TEE IT UP/i);
 
   // Play front 9
@@ -193,9 +245,85 @@ async function skipWheel(page, times = 4) {
       if (/SHOT LOG/i.test(b)) results.altShotLogVisible = true;
     }
   }
+  // May hit Day 1 sudden death first
+  for (let i = 0; i < 5; i++) {
+    await page.waitForTimeout(500);
+    const body = await page.locator("body").innerText();
+    if (/DAY 1 FINAL/i.test(body)) break;
+    if (/SUDDEN DEATH|Best pairings/i.test(body)) {
+      await shot(page, "11c-day1-tiebreak");
+      if (await page.getByText(/CONTINUE TO RESULTS/i).count()) await clickText(page, /CONTINUE TO RESULTS/i);
+      results.steps.push("day1-tiebreak");
+    }
+  }
   await page.getByText(/DAY 1 FINAL/i).first().waitFor({ timeout: 30000 });
   await shot(page, "12-results");
   results.steps.push("results");
+
+  // Day 2 if through
+  if (await page.getByText(/CONTINUE TO DAY 2/i).count()) {
+    await clickText(page, /CONTINUE TO DAY 2/i);
+    await page.waitForTimeout(400);
+    await shot(page, "13-day2-brief");
+    await clickText(page, /PLAY SCRAMBLE/i);
+    for (let h = 0; h < 9; h++) {
+      await page.getByText(/PLAY HOLE/i).first().waitFor({ timeout: 10000 });
+      if (h === 0) await shot(page, "14-day2-scramble-h1");
+      await clickText(page, /PLAY HOLE/i);
+      await page.waitForTimeout(350);
+    }
+    await page.getByText(/SCRAMBLE COMPLETE/i).waitFor({ timeout: 20000 });
+    await shot(page, "15-day2-scramble-done");
+    await clickText(page, /PLAY SINGLES/i);
+    for (let h = 0; h < 18; h++) {
+      await page.getByText(/PLAY HOLE/i).first().waitFor({ timeout: 10000 });
+      if (h === 0) await shot(page, "16-day2-singles-h1");
+      await clickText(page, /PLAY HOLE/i);
+      await page.waitForTimeout(250);
+    }
+    // captain SD or results or chip-off
+    for (let i = 0; i < 8; i++) {
+      await page.waitForTimeout(400);
+      const body = await page.locator("body").innerText();
+      if (/DAY 2 FINAL|FINAL DAY|Coming soon/i.test(body)) break;
+      if (/CAPTAINS SUDDEN DEATH/i.test(body)) {
+        await shot(page, "17-day2-captain-sd");
+        if (await page.getByText(/^CONTINUE$/i).count()) await clickText(page, /^CONTINUE$/i);
+      }
+      if (/CHIP FOR THE POT|SKIN CHIP-OFF|chip-off/i.test(body)) {
+        await shot(page, "17b-skin-chipoff");
+        if (await page.getByText(/CHIP FOR THE POT/i).count()) await clickText(page, /CHIP FOR THE POT/i);
+        // play money chip quickly
+        for (let c = 0; c < 20; c++) {
+          await page.waitForTimeout(300);
+          const b2 = await page.locator("body").innerText();
+          if (/wins the pot|CONTINUE/i.test(b2) && await page.getByText(/^CONTINUE$/i).count()) {
+            await shot(page, "17c-skin-paid");
+            await clickText(page, /^CONTINUE$/i);
+            break;
+          }
+          if (/SET AIM|POWER METER/i.test(b2)) {
+            const svg = page.locator("svg").first();
+            if (await svg.count()) {
+              const box = await svg.boundingBox();
+              if (box) await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.55);
+            }
+            await clickText(page, /SET AIM|POWER METER/i).catch(() => {});
+          }
+          if (await page.getByText(/TAP — SET POWER/i).count()) await clickText(page, /TAP — SET POWER/i);
+          if (await page.getByText(/TAP — STRIKE/i).count()) {
+            await clickText(page, /TAP — STRIKE/i);
+            await page.waitForTimeout(1500);
+          }
+        }
+      }
+      if (/FINAL DAY/i.test(body) && await page.getByText(/^FINAL DAY$/i).count()) {
+        await clickText(page, /^FINAL DAY$/i);
+      }
+    }
+    await shot(page, "18-day2-end");
+    results.steps.push("day2");
+  }
 
   const range = await page.evaluate(() => {
     const r = window.invRosterRaw || [];
@@ -221,14 +349,16 @@ async function skipWheel(page, times = 4) {
     results.calibration = JSON.parse(fs.readFileSync("/workspace/invitational/alt-calib.json", "utf8")).rows;
   } catch (e) {}
 
+  fs.writeFileSync("/workspace/invitational/playwright-inv-live-results.json", JSON.stringify(results, null, 2));
   fs.writeFileSync("/workspace/invitational/playwright-inv-v2-results.json", JSON.stringify(results, null, 2));
   console.log(JSON.stringify(results, null, 2));
   await browser.close();
-  process.exit(results.ok && results.steps.includes("results") ? 0 : 1);
+  process.exit(results.ok && results.steps.includes("results") && results.steps.includes("chip") ? 0 : 1);
 })().catch((e) => {
   console.error(e);
   results.ok = false;
   results.fatal = String(e);
+  fs.writeFileSync("/workspace/invitational/playwright-inv-live-results.json", JSON.stringify(results, null, 2));
   fs.writeFileSync("/workspace/invitational/playwright-inv-v2-results.json", JSON.stringify(results, null, 2));
   process.exit(1);
 });
