@@ -608,7 +608,7 @@ function captainsSuddenDeath(capA, capB, seed) {
   return { winner: "us", log, entry: log[log.length - 1], forced: true };
 }
 
-const INV_SKIN_STAKE = 25000; // $ per scramble match hole-9; rolls until won; never expires
+const INV_SKIN_STAKE = 50000; // $ per scramble match hole-9 ($25k to each winner); rolls until won; never expires
 const INV_SKIN_MAX_PAY = 25000;
 
 function fmtInvCash(n) {
@@ -731,85 +731,83 @@ function simCaptainChip(cap, wind, seed) {
   return applyChipShot(aimX, aimY, wind, powerFrac, dirNeedle, dirAim, sg, rng);
 }
 
-/** Resolve hole-9 skins across scramble matchups. Pot never expires; if still live after last match → puttoff needed. */
+/** Resolve hole-9 skins across scramble matchups.
+ * Every match's 9th is worth INV_SKIN_STAKE ($50k = $25k a player). A halved 9th rolls the money into the next match.
+ * When a pair wins a 9th they take the whole pot: $25k each for them AND $25k each for their own team's pairs who halved
+ * the rolled-over 9ths. Then the next match starts a fresh $50k. Money still rolling after the last match → captains chip-off. */
 function resolveHole9Skins(matchups, stake) {
   const unit = stake != null ? stake : INV_SKIN_STAKE;
+  const nm = (p) => (p && p.isYou ? "YOU" : (p && p.name) || "?");
   let pot = 0;
-  const events = [];
-  let winnerSide = null; // "us" | "them" | null
-  let winPair = null;
-  const halvedUs = []; // player refs who halved on our side
-  const halvedThem = [];
+  let carryUs = [], carryThem = [];
+  const events = [], claims = [];
   matchups.forEach((m, i) => {
     const h9 = (m.holes || []).find((x) => x.n === 9) || (m.holes || [])[8];
     if (!h9) return;
     pot += unit;
-    const sa = h9.sa, sb = h9.sb;
-    if (sa === sb) {
-      events.push({ match: i, result: "halved", sa, sb, pot });
-      (m.a || []).forEach((p) => halvedUs.push(p));
-      (m.b || []).forEach((p) => halvedThem.push(p));
-    } else if (sa < sb) {
-      events.push({ match: i, result: "us", sa, sb, pot });
-      winnerSide = "us";
-      winPair = m.a;
-      // pot claimed — stop rolling for payout tracking; remaining matches still play golf but skin is done
-      pot = 0; // claimed; record claimed amount in event
-      events[events.length - 1].claimed = events[events.length - 1].pot;
-      events[events.length - 1].pot = 0;
+    const base = { match: i, sa: h9.sa, sb: h9.sb, aNames: (m.a || []).map(nm), bNames: (m.b || []).map(nm) };
+    if (h9.sa === h9.sb) {
+      carryUs = carryUs.concat(m.a || []);
+      carryThem = carryThem.concat(m.b || []);
+      events.push({ ...base, result: "halved", pot });
     } else {
-      events.push({ match: i, result: "them", sa, sb, pot });
-      winnerSide = "them";
-      winPair = m.b;
-      events[events.length - 1].claimed = events[events.length - 1].pot;
-      events[events.length - 1].pot = 0;
-      pot = 0;
+      const side = h9.sa < h9.sb ? "us" : "them";
+      const recipients = side === "us" ? carryUs.concat(m.a || []) : carryThem.concat(m.b || []);
+      const pay = paySkinPot(pot, recipients);
+      claims.push({ match: i, side, amount: pot, rolled: pot / unit - 1, pay });
+      events.push({ ...base, result: side, claimed: pot, pot: 0 });
+      pot = 0; carryUs = []; carryThem = [];
     }
   });
-  // Recompute properly: pot rolls until first win
-  pot = 0;
-  winnerSide = null;
-  winPair = null;
-  let claimed = 0;
-  const clean = [];
-  const hUs = [], hThem = [];
-  for (let i = 0; i < matchups.length; i++) {
-    const m = matchups[i];
-    const h9 = (m.holes || []).find((x) => x.n === 9) || (m.holes || [])[8];
-    if (!h9) continue;
-    pot += unit;
-    if (h9.sa === h9.sb) {
-      clean.push({ match: i, result: "halved", sa: h9.sa, sb: h9.sb, pot });
-      (m.a || []).forEach((p) => hUs.push(p));
-      (m.b || []).forEach((p) => hThem.push(p));
-    } else if (h9.sa < h9.sb) {
-      claimed = pot;
-      clean.push({ match: i, result: "us", sa: h9.sa, sb: h9.sb, claimed, pot: 0 });
-      winnerSide = "us"; winPair = m.a; pot = 0;
-      // continue counting later halves? No — skin already won; later hole-9s don't add (skin session over)
-      for (let j = i + 1; j < matchups.length; j++) {
-        const mj = matchups[j];
-        const hj = (mj.holes || []).find((x) => x.n === 9) || (mj.holes || [])[8];
-        if (hj) clean.push({ match: j, result: "closed", sa: hj.sa, sb: hj.sb, pot: 0 });
-      }
-      break;
-    } else {
-      claimed = pot;
-      clean.push({ match: i, result: "them", sa: h9.sa, sb: h9.sb, claimed, pot: 0 });
-      winnerSide = "them"; winPair = m.b; pot = 0;
-      for (let j = i + 1; j < matchups.length; j++) {
-        const mj = matchups[j];
-        const hj = (mj.holes || []).find((x) => x.n === 9) || (mj.holes || [])[8];
-        if (hj) clean.push({ match: j, result: "closed", sa: hj.sa, sb: hj.sb, pot: 0 });
-      }
-      break;
-    }
-  }
+  const last = claims[claims.length - 1];
   return {
-    events: clean, pot, winnerSide, winPair, claimed,
-    needsPuttoff: pot > 0 && !winnerSide,
-    halvedUs: hUs, halvedThem: hThem,
+    events, claims, pot,
+    winnerSide: last ? last.side : null,
+    claimed: claims.reduce((t, c) => t + c.amount, 0),
+    needsPuttoff: pot > 0,
+    halvedUs: carryUs, halvedThem: carryThem,
   };
+}
+
+/** Test-only switch (never set for real players): localStorage "sunday-pins-inv-test" = JSON like
+ *  {"day1":"win"|"tie","day2":"win"|"tie","skin":"roll"|"unwon","chipoffTie":true}. Rewrites hole scores so QA can reach every screen. */
+function invTest() {
+  try { const v = localStorage.getItem("sunday-pins-inv-test"); return v ? JSON.parse(v) : null; } catch (e) { return null; }
+}
+function invForceHoles(holes, day, session, matchIdx) {
+  const T = invTest();
+  if (!T || !holes) return holes;
+  const how = T[day];
+  return holes.map((x) => {
+    let sa = x.sa, sb = x.sb;
+    if (how === "win") { sa = Math.min(sa, sb); sb = sa + 1; }
+    else if (how === "tie") { sb = sa; }
+    if (day === "day2" && session === "scramble" && x.n === 9) {
+      if (T.skin === "unwon") sb = sa;
+      else if (T.skin === "roll") {
+        if (matchIdx < 2) sb = sa;
+        else if (matchIdx === 2) sb = sa + 1;
+      }
+    }
+    return (sa === x.sa && sb === x.sb) ? x : { ...x, sa, sb };
+  });
+}
+
+/** Money ledger for the player's team: chip prize + every hole-9 skin + chip-off. */
+function invMoneyLedger(st) {
+  const rows = {}; // name -> {name,isYou,chip,skins}
+  const team = (st.teams && st.teams[0]) || [];
+  team.forEach((p) => { rows[p.isYou ? "YOU" : p.name] = { name: p.isYou ? "YOU" : p.name, isYou: !!p.isYou, chip: 0, skins: 0 }; });
+  if ((st.chipWinnerIdx || 0) === 0 && st.chipPays && st.chipPays.length) {
+    st.chipPays.forEach((c) => { if (rows[c.name]) rows[c.name].chip += c.amount; });
+  }
+  const skin = st.day2Skin || {};
+  const addPays = (pay) => (pay && pay.pays || []).forEach((c) => { if (rows[c.name]) rows[c.name].skins += c.amount; });
+  (skin.claims || []).forEach((c) => { if (c.side === "us") addPays(c.pay); });
+  if (skin.chipoff && skin.chipoff.side === "us") addPays(skin.chipoff.pay);
+  const list = Object.values(rows).map((r) => ({ ...r, total: r.chip + r.skins })).sort((a, b) => (b.isYou - a.isYou) || (b.total - a.total));
+  const you = list.find((r) => r.isYou) || { chip: 0, skins: 0, total: 0 };
+  return { list, you, teamTotal: list.reduce((t, r) => t + r.total, 0) };
 }
 
 /** Pay pot: split among recipients, each capped at INV_SKIN_MAX_PAY. Returns {pays:[{name,amount}], totalPaid}. */
@@ -988,6 +986,11 @@ function InvChipContest({ wind, captains, title, stakes, seed, onComplete }) {
   const aimPt = toSvg(aim.x, aim.y);
   const windPulse = 6 + Math.sin(windT * 3) * 3;
   const wAngle = Math.atan2(wind.dy, wind.dx) * 180 / Math.PI;
+  const wTier = (wind.mph || 0) < 8 ? 1 : (wind.mph || 0) < 13 ? 2 : 3; // light breeze / breezy / howling — shown only as animation
+  const wTierName = ["", "LIGHT BREEZE", "BREEZY", "HOWLING"][wTier];
+  const flagSide = wind.dx < -0.1 ? -1 : 1;
+  const flap = Math.sin(windT * (2 + wTier * 3)) * (wTier * 1.6);
+  const flagLen = 6 + wTier * 2.5;
 
   const meter = (aimV, half, tapped, labels) => h("div", {
     className: "relative h-10 rounded-md my-2 overflow-hidden",
@@ -1004,9 +1007,9 @@ function InvChipContest({ wind, captains, title, stakes, seed, onComplete }) {
     h("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, title || "CHIP CONTEST"),
     h("p", { className: "text-sm mb-2", style: { color: C.chalk } }, stakes || "Closest to the hole wins. Ties re-chip."),
     h("div", { className: "flex justify-center items-center gap-2 mb-2 text-xs", style: { color: C.muted } },
-      h("span", { style: { color: C.gold, fontFamily: FONT } }, "WIND " + wind.label + " · " + wind.mph + " mph"),
-      h("span", { style: { display: "inline-block", transform: "rotate(" + wAngle + "deg)", fontSize: 18, transition: "transform .2s" } }, "➤"),
-      h("span", { style: { opacity: 0.5 + (windPulse / 20) } }, "≈".repeat(Math.max(1, Math.round(wind.mph / 5))))),
+      h("span", { style: { color: C.gold, fontFamily: FONT } }, "WIND · " + wTierName),
+      h("span", { style: { display: "inline-block", transform: "rotate(" + wAngle + "deg) translateX(" + (Math.sin(windT * (1 + wTier * 2)) * wTier * 1.5) + "px)", fontSize: 18 } }, "➤"),
+      h("span", { style: { opacity: 0.5 + (windPulse / 20), letterSpacing: 2 - wTier * 0.5 } }, "≈".repeat(wTier))),
     h("svg", {
       ref: svgRef, viewBox: "0 0 200 200", width: "100%",
       style: { maxWidth: 320, margin: "0 auto", display: "block", background: "#1a3d28", borderRadius: 16, border: "1px solid rgba(232,195,90,0.35)", touchAction: "none" },
@@ -1019,7 +1022,8 @@ function InvChipContest({ wind, captains, title, stakes, seed, onComplete }) {
       // cup
       h("circle", { cx: 100, cy: 88, r: 4, fill: "#0E2A1C" }),
       h("line", { x1: 100, y1: 88, x2: 100, y2: 68, stroke: "#F4F7F2", strokeWidth: 1.2 }),
-      h("path", { d: "M100 68 l10 3 l-10 3 z", fill: "#D96C4F" }),
+      h("path", { d: "M100 68 Q" + (100 + flagSide * flagLen * 0.5) + " " + (68 + flap) + " " + (100 + flagSide * flagLen) + " " + (71 + flap * 0.6) + " Q" + (100 + flagSide * flagLen * 0.5) + " " + (74 + flap) + " 100 74 z", fill: "#D96C4F" }),
+      wTier === 3 && [30, 52, 148, 170].map((gx, gi) => h("path", { key: "g" + gi, d: "M" + gx + " 170 q" + (flagSide * (3 + Math.sin(windT * 9 + gi) * 2)) + " -6 " + (flagSide * (6 + Math.sin(windT * 9 + gi) * 2)) + " -10", stroke: "#9FD98B", strokeWidth: 1.4, fill: "none", opacity: 0.8 })),
       // wind arrow overlay near top
       h("g", { transform: "translate(168,28) rotate(" + wAngle + ")", opacity: 0.85 },
         h("line", { x1: -windPulse, y1: 0, x2: windPulse, y2: 0, stroke: C.gold, strokeWidth: 2 }),
@@ -1071,6 +1075,101 @@ function InvChipContest({ wind, captains, title, stakes, seed, onComplete }) {
 }
 
 
+// --- Day 2 UI pieces: running scoreboard, match list, skin rollover list, money box ---
+/** Team score text; a playoff decides a tie without changing the points (8–8 · won in a playoff). */
+function scoreWithPlayoff(us, them, po) {
+  if (!po) return us + " – " + them;
+  const u = us - (po.winner === "us" ? 0.5 : 0), t = them - (po.winner === "them" ? 0.5 : 0);
+  return u + " – " + t;
+}
+function matchStatus(holes) {
+  const d = (holes || []).reduce((t, x) => t + (x.sa < x.sb ? 1 : x.sb < x.sa ? -1 : 0), 0);
+  return d;
+}
+/** Real match-play result: "4&3" once a side is up by more than holes left, else "2 UP" / "HALVED". */
+function matchResultText(holes) {
+  const hs = holes || [];
+  let d = 0;
+  for (let i = 0; i < hs.length; i++) {
+    d += hs[i].sa < hs[i].sb ? 1 : hs[i].sb < hs[i].sa ? -1 : 0;
+    const left = hs.length - (i + 1);
+    if (left > 0 && Math.abs(d) > left) return (d > 0 ? "WON " : "LOST ") + Math.abs(d) + "&" + left;
+  }
+  return d > 0 ? "WON " + d + " UP" : d < 0 ? "LOST " + (-d) + " DN" : "HALVED";
+}
+function statusText(d, n) {
+  if (!n) return "All square";
+  if (d === 0) return "All square thru " + n;
+  return (d > 0 ? "You " : "They ") + Math.abs(d) + " UP thru " + n;
+}
+function Day2Board({ st, session, liveHoles }) {
+  const us = st.captains[0], them = st.captains[st.day2ThemIdx];
+  const sp = st.day2ScramblePts || { us: 0, them: 0 };
+  const ip = session === "done" ? (st.day2SinglesPts || { us: 0, them: 0 }) : { us: 0, them: 0 };
+  const carriedUs = session === "scramble" ? 0 : sp.us, carriedThem = session === "scramble" ? 0 : sp.them;
+  const sdAdj = session === "done" && st.day2SD ? st.day2SD.winner : null;
+  const totUs = carriedUs + ip.us - (sdAdj === "us" ? 0.5 : 0), totThem = carriedThem + ip.them - (sdAdj === "them" ? 0.5 : 0);
+  const left = session === "scramble" ? 24 : session === "singles" ? 16 : 0;
+  const d = matchStatus(liveHoles);
+  return h("div", { className: "rounded-xl p-2 mb-2", style: { background: "rgba(0,0,0,0.35)", border: "1px solid rgba(232,195,90,0.4)" } },
+    h("div", { className: "flex justify-between items-center" },
+      h("div", { className: "text-left" },
+        h("div", { style: { fontFamily: FONT, fontSize: 11, color: us.color || C.gold } }, us.teamName),
+        h("div", { style: { fontFamily: FONT, fontSize: 26, color: C.gold, lineHeight: 1 } }, totUs)),
+      h("div", { className: "text-center" },
+        h("div", { style: { fontFamily: FONT, fontSize: 10, letterSpacing: 2, color: C.muted } }, "DAY 2 · 24 PTS"),
+        h("div", { className: "text-[11px]", style: { color: C.chalk } }, "12½ to win"),
+        left > 0 && h("div", { className: "text-[10px]", style: { color: C.muted } }, left + " pts still to play")),
+      h("div", { className: "text-right" },
+        h("div", { style: { fontFamily: FONT, fontSize: 11, color: them.color || C.chalk } }, them.teamName),
+        h("div", { style: { fontFamily: FONT, fontSize: 26, color: C.chalk, lineHeight: 1 } }, totThem))),
+    session !== "done" && liveHoles && h("div", { className: "text-[11px] mt-1 text-center", style: { color: C.muted } },
+      (session === "scramble" ? "Scramble 0 of 8 decided" : "Scramble " + sp.us + "–" + sp.them + " carried in · singles 0 of 16 decided"),
+      " · your match: ", h("span", { style: { color: d > 0 ? C.gold : d < 0 ? "#D4796A" : C.chalk } }, statusText(d, (liveHoles || []).length))),
+    session !== "done" && liveHoles && h("div", { className: "text-[10px] text-center", style: { color: C.muted } }, "The other matches finish when yours does."));
+}
+function MatchList({ title, mus, pair }) {
+  const nm = (p) => p.isYou ? "YOU" : p.name;
+  return h("div", { className: "rounded-xl p-2 mb-3", style: { background: C.panel } },
+    h("div", { className: "text-[11px] mb-1", style: { color: C.gold, fontFamily: FONT, letterSpacing: 1 } }, title),
+    (mus || []).map((m, i) => {
+      const d = matchStatus(m.holes);
+      const res = matchResultText(m.holes);
+      const an = pair ? m.a.map(nm).join(" + ") : nm(m.a);
+      const bn = pair ? m.b.map(nm).join(" + ") : nm(m.b);
+      return h("div", { key: i, className: "flex justify-between gap-2 text-[11px] py-0.5", style: { color: d > 0 ? C.gold : d < 0 ? "#D4796A" : C.chalk, borderBottom: "1px solid rgba(255,255,255,0.04)" } },
+        h("span", { style: { flex: 1, minWidth: 0 } }, (i + 1) + ". " + an + " v " + bn),
+        h("span", { className: "font-mono shrink-0" }, res));
+    }));
+}
+function SkinList({ skin, st }) {
+  const ev = (skin && skin.events) || [];
+  const usName = st.captains[0].teamName, themName = st.captains[st.day2ThemIdx].teamName;
+  return h("div", { className: "rounded-xl p-2 mb-3", style: { background: C.panel } },
+    h("div", { className: "text-[11px] mb-1", style: { color: C.gold, fontFamily: FONT, letterSpacing: 1 } }, "HOLE-9 SKINS · $50K A MATCH · $25K A PLAYER"),
+    ev.map((e, i) => {
+      const txt = e.result === "halved" ? "halved in " + e.sa + " · " + fmtInvCash(e.pot) + " rolls on"
+        : (e.result === "us" ? usName + " win it " + e.sa + " v " + e.sb : themName + " win it " + e.sb + " v " + e.sa) + " · take " + fmtInvCash(e.claimed);
+      return h("div", { key: i, className: "flex justify-between gap-2 text-[11px] py-0.5", style: { color: e.result === "us" ? C.gold : e.result === "them" ? "#D4796A" : C.muted } },
+        h("span", null, "Match " + (e.match + 1)), h("span", { className: "text-right" }, txt));
+    }),
+    (skin.claims || []).map((c, i) => h("div", { key: "c" + i, className: "text-[11px] mt-1", style: { color: C.chalk } },
+      "💰 Match " + (c.match + 1) + ": " + fmtInvCash(c.amount) + " → " + c.pay.pays.map((p) => p.name).join(", ") + " (" + fmtInvCash(c.pay.pays[0] ? c.pay.pays[0].amount : 0) + " each)")),
+    skin.pot > 0 && h("div", { className: "text-[11px] mt-1", style: { color: C.gold } },
+      skin.chipoff ? "Chip-off: " + fmtInvCash(skin.pot) + " → " + skin.chipoff.pay.pays.map((p) => p.name).join(", ") + " (" + fmtInvCash(skin.chipoff.pay.pays[0] ? skin.chipoff.pay.pays[0].amount : 0) + " each)"
+        : fmtInvCash(skin.pot) + " still rolling · captains chip-off after the singles"));
+}
+function MoneyBox({ st, title }) {
+  const L = invMoneyLedger(st);
+  return h("div", { className: "rounded-xl p-3 mb-3", style: { background: "rgba(232,195,90,0.08)", border: "1px solid " + C.gold } },
+    h("div", { className: "flex justify-between items-baseline" },
+      h("div", { style: { color: C.gold, fontFamily: FONT, fontSize: 14 } }, title || "PRIZE MONEY"),
+      h("div", { style: { color: C.gold, fontFamily: FONT, fontSize: 22 } }, "YOU " + fmtInvCash(L.you.total))),
+    h("div", { className: "text-[11px] mb-1", style: { color: C.muted } }, "Chip prize " + fmtInvCash(L.you.chip) + " · skins " + fmtInvCash(L.you.skins) + " · team total " + fmtInvCash(L.teamTotal)),
+    L.list.filter((r) => r.total > 0 && !r.isYou).slice(0, 16).map((r, i) => h("div", { key: i, className: "flex justify-between text-[11px]", style: { color: C.chalk } },
+      h("span", null, r.name), h("span", { className: "font-mono" }, fmtInvCash(r.total)))));
+}
+
 // --- React root component ---
 function InternetInvitational({ onHome }) {
   const [st, setSt] = useState(() => invLoad() || null);
@@ -1116,7 +1215,7 @@ function InternetInvitational({ onHome }) {
           h("li", null, "Wheel for draft order, then snake draft your squad."),
           h("li", null, "Post-draft chip contest: winner picks their Day 1 opponent ($5k each to the winning team)."),
           h("li", null, "Day 1: front 9 scramble 2v2 match play (8 pts), reshuffle, back 9 alternate shot (8 pts)."),
-          h("li", null, "Winners go to Day 2: 8 scramble pts + 16 singles (24). Hole-9 skin rolls forever; captains chip-off if it never lands. Final Day for the winner."))),
+          h("li", null, "Winners go to Day 2: 8 better-ball pts + 16 singles (24). Hole 9 of each better-ball match is a $50k skin ($25k a player) that rolls until won; captains chip-off if it never lands. Final Day for the winner."))),
       st && st.phase && st.phase !== "intro" && h(Btn, { small: true, onClick: () => setPhase(st.phase) }, "RESUME EVENT"),
       h(Btn, { onClick: () => { try { typeof track === "function" && track("invitational/start"); } catch (e) {} setName(""); setChannelId("tips"); setCombineScores({}); setCombineIdx(0); setPhase("channel"); } }, "START INVITATIONAL"),
       h("p", { className: "text-[11px] text-center mt-3", style: { color: C.muted } }, "Names only · fair use · no photos or likenesses"));
@@ -1406,40 +1505,45 @@ function InternetInvitational({ onHome }) {
       if (chip && chip.ranked) {
         const winnerLocal = chip.ranked[0].capIdxLocal;
         const winnerTeamIdx = winnerLocal === 0 ? aIdx : bIdx;
+        const side = winnerTeamIdx === aIdx ? "us" : "them";
         const skin = st.day2Skin || {};
-        const recipients = winnerTeamIdx === aIdx ? (skin.halvedUs || st.teams[aIdx]) : (skin.halvedThem || st.teams[bIdx]);
-        const pay = paySkinPot(skin.pot || INV_SKIN_STAKE * 8, recipients);
+        const recipients = side === "us" ? (skin.halvedUs || []) : (skin.halvedThem || []);
+        const pay = paySkinPot(skin.pot || 0, recipients);
         return h(Shell, null,
           h(BackTop, { onClick: goHome, label: "Home" }),
           h("div", { className: "text-center mb-3" },
             h("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "HOLE-9 SKIN · CHIP-OFF"),
             h("h2", { style: { fontFamily: FONT, fontSize: 28, color: C.chalk } }, st.captains[winnerTeamIdx].name + " wins the pot"),
             h("div", { style: { fontFamily: FONT, fontSize: 36, color: C.gold } }, fmtInvCash(skin.pot || 0))),
+          h("div", { className: "rounded-xl p-2 mb-3", style: { background: C.panel } },
+            chip.ranked.map((r, i) => h("div", { key: i, className: "flex justify-between text-sm", style: { color: caps[r.capIdxLocal].isYou ? C.gold : C.chalk } },
+              h("span", null, (i + 1) + ". " + caps[r.capIdxLocal].name), h("span", { className: "font-mono" }, r.prox + " ft")))),
           h("div", { className: "rounded-xl p-3 mb-3", style: { background: C.panel } },
-            h("div", { className: "text-[11px] mb-1", style: { color: C.muted } }, "Paid to players who halved hole 9 (max " + fmtInvCash(INV_SKIN_MAX_PAY) + " each)"),
+            h("div", { className: "text-[11px] mb-1", style: { color: C.muted } }, "Paid to " + st.captains[winnerTeamIdx].teamName + " players who halved a rolled-over hole 9 (" + fmtInvCash(INV_SKIN_MAX_PAY) + " each)"),
             pay.pays.map((p, i) => h("div", { key: i, className: "flex justify-between text-sm", style: { color: p.isYou ? C.gold : C.chalk } },
               h("span", null, p.name), h("span", null, fmtInvCash(p.amount))))),
           h(Btn, { onClick: () => {
-            persist({ ...st, day2Skin: { ...skin, resolved: true, pay, winnerTeamIdx }, phase: "day2Results" }, "day2Results");
+            persist({ ...st, day2Skin: { ...skin, resolved: true, chipoff: { side, winnerTeamIdx, pay } }, phase: "day2Results" }, "day2Results");
             setChip(null);
           } }, "CONTINUE"));
       }
+      const T = invTest();
       return h(Shell, null,
         h(BackTop, { onClick: goHome, label: "Home", confirm: true }),
+        chip && chip.rechip && h("div", { className: "text-center mb-2", style: { fontFamily: FONT, fontSize: 18, color: C.gold } }, "Dead level — re-chip!"),
         h(InvChipContest, {
-          wind, captains: caps, seed: st.seed ^ 0x30E7, title: "SKIN CHIP-OFF",
+          key: (chip && chip.key) || "money1",
+          wind, captains: caps, seed: (st.seed ^ 0x30E7 ^ ((chip && chip.key) || 0)) >>> 0, title: chip && chip.rechip ? "SKIN CHIP-OFF · RE-CHIP" : "SKIN CHIP-OFF",
           stakes: "Pot " + fmtInvCash((st.day2Skin && st.day2Skin.pot) || 0) + " · closest captain wins it for their team",
           onComplete: (ranked) => {
-            // ties for first → re-chip those
-            if (ranked.length >= 2 && ranked[0].prox === ranked[1].prox) {
-              const tied = ranked.filter((r) => r.prox === ranked[0].prox).map((r) => caps[r.capIdxLocal]);
-              setChip({ kind: "money", wind: chipWindFromSeed(st.seed ^ Date.now()), rechip: true });
-              // restart with only tied — stash by replacing captains via state
-              persist({ ...st, chipKind: "money", chipWind: chipWindFromSeed((st.seed ^ 0x71E) >>> 0), chipTiedNames: tied.map((c) => c.name) }, "chip");
-              setChip({ kind: "money", wind: chipWindFromSeed((st.seed ^ 0x71E) >>> 0), ranked: null, key: Date.now() });
+            const forcedTie = T && T.chipoffTie && !(chip && chip.rechip);
+            if (ranked.length >= 2 && (ranked[0].prox === ranked[1].prox || forcedTie)) {
+              const w = chipWindFromSeed((st.seed ^ Date.now()) >>> 0);
+              persist({ ...st, chipKind: "money", chipWind: w }, "chip");
+              setChip({ kind: "money", wind: w, ranked: null, rechip: true, key: Date.now() });
               return;
             }
-            setChip({ kind: "money", wind, ranked });
+            setChip({ ...(chip || {}), kind: "money", wind, ranked });
           }
         }));
     }
@@ -1661,7 +1765,7 @@ function InternetInvitational({ onHome }) {
             const rb = mode === "scramble" ? playScrambleHole(m.b[0], m.b[1], hl, rngM) : playAltHole(m.b[0], m.b[1], hl, hi % 2, rngM);
             hs.push({ n: hi + 1, par: hl[0], sa: ra.score, sb: rb.score });
           }
-          return { ...m, holes: hs };
+          return { ...m, holes: invForceHoles(hs, "day1", nine, i) };
         });
         const pts = finishNine(finalMus);
         if (nine === "front") {
@@ -1703,11 +1807,11 @@ function InternetInvitational({ onHome }) {
       }
       const sa = resA.score, sb = resB.score;
       const log = (resA.log || []).concat([{ name: "vs", text: "— opponents —", lie: "note" }]).concat(resB.log || []);
-      const entry = { n: holeIdx + 1, par: hole[0], sa, sb, log };
+      const entry = invForceHoles([{ n: holeIdx + 1, par: hole[0], sa, sb, log }], "day1", nine, 0)[0];
       const slices = [
         { p: 0.18, s: "longfw" }, { p: 0.32, s: "fairway" }, { p: 0.30, s: "green" }, { p: 0.20, s: "rough" }
       ];
-      let i = sa <= hole[0] - 1 ? 0 : sa === hole[0] ? 1 : sa === hole[0] + 1 ? 2 : 3;
+      let i = entry.sa <= hole[0] - 1 ? 0 : entry.sa === hole[0] ? 1 : entry.sa === hole[0] + 1 ? 2 : 3;
       setPlay({ ...(play || {}), matchIdx, holeIdx, nine, spinning: { o: slices, i }, pendingEntry: entry });
     };
 
@@ -1788,7 +1892,8 @@ function InternetInvitational({ onHome }) {
           (s.name || "") + " · " + (s.text || s.lie || ""))))),
       h("div", { className: "text-center mb-3", style: { fontFamily: FONT, fontSize: 22, color: tb.winner === "us" ? C.gold : C.chalk } },
         tb.winner === "us" ? "YOU WIN THE PLAYOFF" : "THEY WIN THE PLAYOFF"),
-      h("div", { className: "text-center mb-3", style: { fontFamily: FONT, fontSize: 36, color: C.gold } }, us + " – " + them),
+      h("div", { className: "text-center mb-3", style: { fontFamily: FONT, fontSize: 36, color: C.gold } }, scoreWithPlayoff(us, them, tb)),
+      h("p", { className: "text-xs text-center mb-3", style: { color: C.muted } }, tb.winner === "us" ? "Level on points — you go through on the playoff." : "Level on points — they go through on the playoff."),
       h(Btn, { onClick: () => {
         const nbp = { ...bp };
         if (tb.winner === "us") nbp.us = (nbp.us || 0) + 0.5; else nbp.them = (nbp.them || 0) + 0.5;
@@ -1830,8 +1935,10 @@ function InternetInvitational({ onHome }) {
       h("div", { className: "text-center mb-3" },
         h("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "DAY 1 FINAL"),
         h("h2", { style: { fontFamily: FONT, fontSize: 32, color: won ? C.gold : C.chalk } }, won ? "YOU WIN" : tied ? "TIED" : "DEFEAT"),
-        h("div", { style: { fontFamily: FONT, fontSize: 48, color: C.gold } }, us + " – " + them),
-        h("p", { className: "text-xs", style: { color: C.muted } }, "Front " + fp.us + "–" + fp.them + " · Back " + bp.us + "–" + bp.them)),
+        h("div", { style: { fontFamily: FONT, fontSize: 48, color: C.gold } }, scoreWithPlayoff(us, them, st.day1Tie)),
+        h("p", { className: "text-xs", style: { color: C.muted } }, st.day1Tie
+          ? "Front " + fp.us + "–" + fp.them + " · Back " + scoreWithPlayoff(bp.us, bp.them, st.day1Tie).replace(" – ", "–") + " · " + (st.day1Tie.winner === "us" ? "won" : "lost") + " in a playoff"
+          : "Front " + fp.us + "–" + fp.them + " · Back " + bp.us + "–" + bp.them)),
       chipPays.length > 0 && h("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
         h("div", { style: { color: C.gold, fontFamily: FONT } }, "CHIP PRIZE · $5,000 EACH"),
         chipPays.slice(0, 8).map((p, i) => h("div", { key: i, className: "flex justify-between text-sm", style: { color: p.isYou ? C.gold : C.chalk } },
@@ -1840,7 +1947,7 @@ function InternetInvitational({ onHome }) {
       h("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
         h("div", { style: { color: C.gold, fontFamily: FONT } }, "OTHER SEMI"),
         h("p", { className: "text-sm mt-1", style: { color: C.chalk } },
-          st.captains[other.aIdx].teamName + " " + other.us + " – " + other.them + " " + st.captains[other.bIdx].teamName),
+          st.captains[other.aIdx].teamName + " " + scoreWithPlayoff(other.us, other.them, other.tie) + " " + st.captains[other.bIdx].teamName),
         h("p", { className: "text-xs", style: { color: C.muted } },
           "Winner: " + st.captains[other.winnerIdx].name + (other.tie ? " (playoff)" : ""))),
       newsBadges.length > 0 && h("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(232,195,90,0.1)", border: "1px solid " + C.gold } },
@@ -1872,7 +1979,7 @@ function InternetInvitational({ onHome }) {
         h("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "DAY 2"),
         h("h2", { style: { fontFamily: FONT, fontSize: 30, color: C.chalk } }, "vs " + them.teamName),
         h("p", { className: "text-sm", style: { color: C.muted } },
-          "Nine-hole 2v2 better-ball scramble (8 pts) — same engine as Day 1 scramble — then 16 singles (16 pts). 24 total. Halves = 0.5. Hole-9 skin: $25k/match, rolls until won.")),
+          "Nine-hole 2v2 better-ball scramble (8 pts) — same engine as Day 1 scramble — then 16 singles (16 pts). 24 total. Halves = 0.5. Hole 9 of every scramble match is a $50k skin ($25k a player). Halve it and it rolls on until someone wins it.")),
       h("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
         h("div", { style: { color: C.gold, fontFamily: FONT } }, "YOUR FIRST GROUP"),
         (st.day2Scramble && st.day2Scramble[0] ? st.day2Scramble[0].a : []).map((p, i) =>
@@ -1914,7 +2021,7 @@ function InternetInvitational({ onHome }) {
               const rb = playScrambleHole(m.b[0], m.b[1], hl, rngM);
               hs.push({ n: hi + 1, par: hl[0], sa: ra.score, sb: rb.score });
             }
-            return { ...m, holes: hs };
+            return { ...m, holes: invForceHoles(hs, "day2", "scramble", i) };
           });
           const pts = scramblePts(finalMus);
           const skin = resolveHole9Skins(finalMus, INV_SKIN_STAKE);
@@ -1933,7 +2040,7 @@ function InternetInvitational({ onHome }) {
         const resA = playScrambleHole(youP, partner, hole, rng);
         const resB = playScrambleHole(oppPair[0], oppPair[1], hole, rng);
         const log = (resA.log || []).concat([{ name: "vs", text: "— opponents —", lie: "note" }]).concat(resB.log || []);
-        const entry = { n: holeIdx + 1, par: hole[0], sa: resA.score, sb: resB.score, log };
+        const entry = invForceHoles([{ n: holeIdx + 1, par: hole[0], sa: resA.score, sb: resB.score, log }], "day2", "scramble", 0)[0];
         resolveHole(entry);
       };
 
@@ -1945,10 +2052,11 @@ function InternetInvitational({ onHome }) {
           h("div", { style: { fontFamily: FONT, color: C.chalk } }, "Hole " + (holeIdx + 1) + " · Par " + hole[0])),
         h("div", { className: "text-center mb-2", style: { fontFamily: FONT, fontSize: 22, color: C.chalk } },
           fmtPair(youPair) + " vs " + fmtPair(oppPair)),
-        h("p", { className: "text-[11px] text-center mb-2", style: { color: C.muted } }, "Better-ball (each plays own ball; best score counts)"),
+        h(Day2Board, { st, session: "scramble", liveHoles: mu.holes }),
+        h("p", { className: "text-[11px] text-center mb-2", style: { color: C.muted } }, "Better-ball (each plays own ball; best score counts)" + (holeIdx === 8 ? " · 💰 this hole is the $50k skin" : "")),
         play && play.last && h("div", { className: "p-2 rounded-lg mb-2", style: { background: C.panel } },
           h("div", { style: { color: C.gold } }, "Last: " + play.last.sa + " – " + play.last.sb),
-          (play.shotLog || []).slice(0, 8).map((s, i) => h("div", { key: i, className: "text-[11px]", style: { color: C.muted } }, (s.name || "") + " · " + (s.text || "")))),
+          (play.shotLog || []).slice(0, 10).map((s, i) => h("div", { key: i, className: "text-[11px]", style: { color: C.muted } }, s.text || ""))),
         h(Btn, { onClick: takeShot }, "PLAY HOLE " + (holeIdx + 1)));
     }
 
@@ -1977,7 +2085,7 @@ function InternetInvitational({ onHome }) {
             const rb = playBallHole([m.b], hl, 0, rngM, "solo");
             hs.push({ n: hi + 1, par: hl[0], sa: ra.score, sb: rb.score });
           }
-          return { ...m, holes: hs };
+          return { ...m, holes: invForceHoles(hs, "day2", "singles", i) };
         });
         const pts = sessionPtsFromMatchups(finalMus);
         const sp = st.day2ScramblePts || { us: 0, them: 0 };
@@ -2000,7 +2108,7 @@ function InternetInvitational({ onHome }) {
       const resA = playBallHole([youP], hole, 0, rng, "solo");
       const resB = playBallHole([oppP], hole, 0, rng, "solo");
       const log = (resA.log || []).concat([{ name: "vs", text: "—", lie: "note" }]).concat(resB.log || []);
-      resolveHole({ n: holeIdx + 1, par: hole[0], sa: resA.score, sb: resB.score, log });
+      resolveHole(invForceHoles([{ n: holeIdx + 1, par: hole[0], sa: resA.score, sb: resB.score, log }], "day2", "singles", 0)[0]);
     };
 
     return h(Shell, null,
@@ -2010,6 +2118,8 @@ function InternetInvitational({ onHome }) {
         h("div", { style: { fontFamily: FONT, color: C.chalk } }, "Hole " + (holeIdx + 1) + " · Par " + hole[0])),
       h("div", { className: "text-center mb-2", style: { fontFamily: FONT, fontSize: 22, color: C.chalk } },
         (youP.isYou ? "YOU" : youP.name) + " vs " + oppP.name),
+      h("div", { className: "text-[11px] text-center mb-1", style: { color: C.muted } }, (youP.isYou ? "YOU" : youP.name) + " " + youP.overall + " · " + oppP.name + " " + oppP.overall + " · matched by overall"),
+      h(Day2Board, { st, session: "singles", liveHoles: mu.holes }),
       play && play.last && h("div", { className: "p-2 rounded-lg mb-2", style: { background: C.panel } },
         h("div", { style: { color: C.gold } }, "Last: " + play.last.sa + " – " + play.last.sb)),
       h(Btn, { onClick: takeShot }, "PLAY HOLE " + (holeIdx + 1)));
@@ -2024,13 +2134,9 @@ function InternetInvitational({ onHome }) {
         h("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "SCRAMBLE COMPLETE"),
         h("h2", { style: { fontFamily: FONT, fontSize: 36, color: C.gold } }, pts.us + " – " + pts.them),
         h("p", { className: "text-xs", style: { color: C.muted } }, "8 points · better-ball scramble")),
-      h("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
-        h("div", { style: { color: C.gold, fontFamily: FONT } }, "HOLE-9 SKIN"),
-        skin.winnerSide
-          ? h("p", { className: "text-sm", style: { color: C.chalk } },
-              (skin.winnerSide === "us" ? "Your side" : "Their side") + " claimed " + fmtInvCash(skin.claimed || 0))
-          : h("p", { className: "text-sm", style: { color: C.chalk } },
-              "Still rolling · pot " + fmtInvCash(skin.pot || 0) + (skin.needsPuttoff ? " · captains chip-off after Day 2" : ""))),
+      h(Day2Board, { st, session: "singles", liveHoles: null }),
+      h(SkinList, { skin, st }),
+      h(MatchList, { title: "BETTER-BALL RESULTS", mus: st.day2Scramble, pair: true }),
       h(Btn, { onClick: () => {
         const mus = evenSingles(st.teams[0], st.teams[st.day2ThemIdx]);
         persist({ ...st, day2Singles: mus, day2Session: "singles", playHoleIdx: 0, phase: "day2Play" }, "day2Play");
@@ -2053,7 +2159,7 @@ function InternetInvitational({ onHome }) {
         h("div", { style: { color: C.gold } }, "Hole " + e.n + " · " + e.sa + " – " + e.sb))),
       h("div", { className: "text-center mb-3", style: { fontFamily: FONT, fontSize: 28, color: sd.winner === "us" ? C.gold : C.chalk } },
         sd.winner === "us" ? "YOU WIN" : "THEY WIN"),
-      h("div", { className: "text-center mb-3", style: { fontFamily: FONT, fontSize: 36, color: C.gold } }, us + " – " + them),
+      h("div", { className: "text-center mb-3", style: { fontFamily: FONT, fontSize: 36, color: C.gold } }, scoreWithPlayoff(us, them, sd)),
       h(Btn, { onClick: () => {
         const nip = { ...ip };
         if (sd.winner === "us") nip.us = (nip.us || 0) + 0.5; else nip.them = (nip.them || 0) + 0.5;
@@ -2076,19 +2182,6 @@ function InternetInvitational({ onHome }) {
           setChip({ kind: "money", wind, key: Date.now() });
         } }, "CHIP FOR THE POT"));
     }
-    // Auto-pay if skin was claimed on a hole-9 win (not chip-off)
-    let skinView = skin;
-    if (skin.winnerSide && !skin.resolved && !skin.needsPuttoff) {
-      const recipients = skin.winPair || (skin.winnerSide === "us" ? st.teams[0] : st.teams[st.day2ThemIdx]);
-      const pay = paySkinPot(skin.claimed || 0, recipients);
-      skinView = { ...skin, resolved: true, pay };
-      // persist once
-      if (!st._skinPaid) {
-        const nxt = { ...st, day2Skin: skinView, _skinPaid: true };
-        // don't change phase
-        try { invSave(nxt); } catch (e) {}
-      }
-    }
     const sp = st.day2ScramblePts || { us: 0, them: 0 };
     const ip = st.day2SinglesPts || { us: 0, them: 0 };
     const us = sp.us + ip.us, them = sp.them + ip.them;
@@ -2104,17 +2197,14 @@ function InternetInvitational({ onHome }) {
       h("div", { className: "text-center mb-3" },
         h("div", { style: { fontFamily: FONT, fontSize: 12, letterSpacing: 3, color: C.gold } }, "DAY 2 FINAL"),
         h("h2", { style: { fontFamily: FONT, fontSize: 32, color: won ? C.gold : C.chalk } }, won ? "YOU WIN DAY 2" : "DEFEAT"),
-        h("div", { style: { fontFamily: FONT, fontSize: 48, color: C.gold } }, us + " – " + them),
+        h("div", { style: { fontFamily: FONT, fontSize: 48, color: C.gold } }, scoreWithPlayoff(us, them, st.day2SD)),
         h("p", { className: "text-xs", style: { color: C.muted } },
-          "Scramble " + sp.us + "–" + sp.them + " · Singles " + ip.us + "–" + ip.them)),
-      skinView.resolved && skinView.pay && h("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
-        h("div", { style: { color: C.gold, fontFamily: FONT } }, "SKIN PAYOUT"),
-        skinView.pay.pays.map((p, i) => h("div", { key: i, className: "flex justify-between text-sm", style: { color: p.isYou ? C.gold : C.chalk } },
-          h("span", null, p.name), h("span", null, fmtInvCash(p.amount))))),
-      skinView.winnerSide && !skinView.resolved && h("div", { className: "p-3 rounded-xl mb-3", style: { background: C.panel } },
-        h("div", { style: { color: C.gold, fontFamily: FONT } }, "SKIN"),
-        h("p", { className: "text-sm", style: { color: C.chalk } },
-          (skinView.winnerSide === "us" ? "Your side" : "Their side") + " claimed " + fmtInvCash(skinView.claimed || 0) + " on hole 9")),
+          "Better-ball " + sp.us + "–" + sp.them + " · Singles " + scoreWithPlayoff(ip.us, ip.them, st.day2SD).replace(" – ", "–") + (st.day2SD ? " · " + (st.day2SD.winner === "us" ? "won" : "lost") + " in the captains' playoff" : ""))),
+      h(Day2Board, { st, session: "done", liveHoles: [] }),
+      st.day2SD && h("p", { className: "text-xs text-center mb-2", style: { color: C.muted } }, "12–12 after singles · captains' sudden death: " + (st.day2SD.winner === "us" ? "you won it" : st.captains[st.day2ThemIdx].name + " won it") + " on hole " + st.day2SD.entry.n),
+      h(MoneyBox, { st, title: "PRIZE MONEY SO FAR" }),
+      h(SkinList, { skin, st }),
+      h(MatchList, { title: "SINGLES RESULTS", mus: st.day2Singles, pair: false }),
       newsBadges.length > 0 && h("div", { className: "p-3 rounded-xl mb-3", style: { background: "rgba(232,195,90,0.1)", border: "1px solid " + C.gold } },
         newsBadges.map((b) => h("div", { key: b.id, className: "text-sm", style: { color: C.chalk } }, "🏅 " + b.name))),
       won ? h(Btn, { onClick: () => { try { typeof track === "function" && track("invitational/finish"); } catch (e) {} persist({ ...st, phase: "finalDay" }, "finalDay"); } }, "FINAL DAY") : null,
@@ -2130,6 +2220,9 @@ function InternetInvitational({ onHome }) {
         h("h2", { style: { fontFamily: FONT, fontSize: 32, color: C.chalk } }, "Coming soon"),
         h("p", { className: "text-sm", style: { color: C.muted } },
           "You punched your ticket. The Final Day format drops next — stay tuned.")),
+      (() => { const sp = st.day2ScramblePts || { us: 0, them: 0 }, ip = st.day2SinglesPts || { us: 0, them: 0 };
+        return h("p", { className: "text-sm text-center mb-3", style: { color: C.chalk } }, st.captains[0].teamName + " beat " + st.captains[st.day2ThemIdx].teamName + " " + scoreWithPlayoff(sp.us + ip.us, sp.them + ip.them, st.day2SD).replace(" – ", "–") + (st.day2SD ? " (captains' playoff)" : "") + " on Day 2"); })(),
+      h(MoneyBox, { st, title: "YOUR INVITATIONAL MONEY" }),
       h(Btn, { onClick: () => { invSave(null); setSt(null); setPhase("intro"); } }, "PLAY AGAIN"),
       h(Btn, { small: true, kind: "panel", onClick: goHome }, "BACK TO HOME"));
   }
@@ -2152,4 +2245,6 @@ global.invRosterRaw = INV_ROSTER_RAW;
 global.calibrateAltPairs = calibrateAltPairs;
 global.playAltHole = playAltHole;
 global.makeAttrsAtOvr = makeAttrsAtOvr;
+global.invResolveHole9Skins = resolveHole9Skins;
+global.invMoneyLedger = invMoneyLedger;
 })(typeof window !== "undefined" ? window : globalThis);
