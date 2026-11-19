@@ -7052,7 +7052,6 @@ function GolfCareerSim() {
                             React.createElement(Btn, { small: true, kind: "red", onClick: async () => { await eraseSlot(md.id); startFresh(md.id); } }, "YES, ERASE"),
                             React.createElement(Btn, { small: true, kind: "panel", onClick: () => setConfirmEraseId(null) }, "CANCEL"))))));
             })),
-            ,
             React.createElement("div", { className: "w-full mb-3 p-4 rounded-xl text-left relative overflow-hidden", style: { background: "linear-gradient(160deg, #1D5237 0%, #0B2318 100%)", border: "1.5px solid " + C.gold, boxShadow: "0 10px 30px rgba(0,0,0,0.25)" } },
                 React.createElement("div", { className: "absolute", style: { left: 0, top: 0, bottom: 0, width: 4, background: C.gold } }),
                 React.createElement("div", { className: "flex justify-between items-start gap-2" },
@@ -7060,7 +7059,7 @@ function GolfCareerSim() {
                     React.createElement("span", { className: "text-[9px] px-1.5 py-0.5 rounded shrink-0", style: { background: C.gold, color: "#1A1405", fontFamily: FONT, fontSize: 11, letterSpacing: 1 } }, "NEW · BETA")),
                 React.createElement("p", { className: "text-sm mt-1", style: { color: C.gold, fontWeight: 600 } }, "64 YouTubers. Four captains. Day 1 scramble/alt-shot. Day 2 scramble + singles. Chip contest sets the bracket."),
                 React.createElement("div", { className: "flex flex-wrap gap-1 mt-2" }, ["Wheel draft", "Chip matchups", "Day 1 + Day 2", "Hole-9 skins"].map((f) => React.createElement("span", { key: f, className: "text-[10px] px-1.5 py-0.5 rounded", style: { background: "rgba(244,247,242,0.08)", color: C.chalk } }, f))),
-                React.createElement("div", { className: "mt-3" }, React.createElement(Btn, { small: true, onClick: () => { track("invitational/open"); setScreen("invitational"); } }, "ENTER THE INVITATIONAL"))),,
+                React.createElement("div", { className: "mt-3" }, React.createElement(Btn, { small: true, onClick: () => { track("invitational/open"); setScreen("invitational"); } }, "ENTER THE INVITATIONAL"))),
             CH_ON && React.createElement("div", { className: "w-full mb-3 p-4 rounded-xl text-left relative overflow-hidden", style: { background: "linear-gradient(160deg, #2A2410, #10301F)", border: "1px solid rgba(232,195,90,0.4)" } },
                 React.createElement("div", { className: "absolute", style: { left: 0, top: 0, bottom: 0, width: 4, background: C.gold } }),
                 React.createElement("div", { style: { fontFamily: FONT, fontSize: 22, color: C.chalk, lineHeight: 1.1 } }, "🏆 Challenges"),
